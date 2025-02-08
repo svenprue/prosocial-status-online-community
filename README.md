@@ -1,4 +1,4 @@
-# The Complementarity of Prosocial and Status-Seeking Behavior in Contributor Recruitment and Retention in Online Communities
+# The Complementarity of Prosocial and Status-Seeking Behavior
 
 This repository contains the full code to run create the datasets, run the statistical models, and reproduce all figures for the article:
 
