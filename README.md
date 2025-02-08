@@ -4,7 +4,7 @@ This repository contains the full code to run create the datasets, run the stati
 
 **Strahringer, L., Prüß, S.: _The Complementarity of Prosocial and Status-Seeking Behavior in Contributor Recruitment and Retention in Online Communities_**
 
-## 📂 Contents
+## Contents
 - **main.Rmd** - The main R Markdown file to execute the analysis  
 - **01_input_data/** - Folder containing input data files  
 - **02_output_plots/** - Folder for storing simulation results and generated plots  
