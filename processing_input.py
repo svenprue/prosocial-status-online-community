@@ -17,7 +17,9 @@ def parse_generic_row_posts(elem):
             'Id': attrib.get('Id', None),
             'PostTypeId': post_type_id,
             'CreationDate': attrib.get('CreationDate', None),
-            'OwnerUserId': attrib.get('OwnerUserId', None)
+            'OwnerUserId': attrib.get('OwnerUserId', None),
+            'AcceptedAnswerId': attrib.get('AcceptedAnswerId', None),
+            'ParentId': attrib.get('ParentId', None)
         }
 
     except Exception as e:
@@ -34,6 +36,7 @@ def parse_generic_row_votes(elem):
 
         return {
             'Id': attrib.get('Id', None),
+            'PostId': attrib.get('PostId', None),
             'VoteTypeId': vote_type_id,
             'CreationDate': attrib.get('CreationDate', None),
             'UserId': attrib.get('UserId', None),
@@ -148,7 +151,7 @@ def fix_column_types(parquet_file_paths):
         # Cast ID columns to INTEGER
         id_columns = con.execute(f"PRAGMA table_info('temp')").fetchdf()
         for col in id_columns['name']:
-            if any(id_keyword in col.lower() for id_keyword in ['id', 'userid', 'owneruserid']):
+            if any(id_keyword in col.lower() for id_keyword in ['id', 'userid', 'owneruserid', 'AcceptedAnswerId', 'ParentId']):
                 con.execute(f"ALTER TABLE temp ALTER COLUMN {col} SET DATA TYPE INTEGER")
 
         # Cast date columns to TIMESTAMP
@@ -173,17 +176,17 @@ def main():
     badges_file_path = os.path.join(input_folder, 'Badges.xml')
 
     # process_posts(posts_file_path, output_folder)
-    # process_votes(votes_file_path, output_folder)
+    process_votes(votes_file_path, output_folder)
     # process_users(users_file_path, output_folder)
     # process_badges(badges_file_path, output_folder)
 
     # Fix column types for all processed parquet files
     parquet_files = [
-        os.path.join(output_folder, 'posts_answers.parquet'),
-        os.path.join(output_folder, 'posts_questions.parquet'),
+        # os.path.join(output_folder, 'posts_answers.parquet'),
+        # os.path.join(output_folder, 'posts_questions.parquet'),
         os.path.join(output_folder, 'Votes.parquet'),
-        os.path.join(output_folder, 'Users.parquet'),
-        os.path.join(output_folder, 'Badges.parquet')
+        # os.path.join(output_folder, 'Users.parquet'),
+        # os.path.join(output_folder, 'Badges.parquet')
     ]
     fix_column_types(parquet_files)
 
