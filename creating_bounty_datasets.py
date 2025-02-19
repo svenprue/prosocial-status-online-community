@@ -15,6 +15,7 @@ def process_bounty_data(
     con.execute("PRAGMA enable_progress_bar;")
 
     # Define paths
+    # Note: bounty_timeline_results_cleaned only includes cases where both bounty_start and bounty_end are given.
     bounty_timeline_path = os.path.join(input_folder, 'scraped_datasets', 'bounty_timeline_results_cleaned.parquet')
     questions_path = os.path.join(input_folder, 'processed_data_dump', 'posts_questions.parquet')
     answers_path = os.path.join(input_folder, 'processed_data_dump', 'posts_answers.parquet')
@@ -102,7 +103,7 @@ def process_bounty_data(
             b.bounty_end,
             b.BountyAmount,
             a.owner_user_id AS user_id,
-            a.creation_date AS answer_timestamp,
+            a.creation_date AS timestamp,
             CASE
                 WHEN a.creation_date BETWEEN b.question_posted AND b.bounty_start THEN 0
                 WHEN a.creation_date BETWEEN b.bounty_start AND b.bounty_end THEN 1
@@ -129,7 +130,7 @@ def process_bounty_data(
         );
     """)
 
-    # 2. Historical answers provided
+    # 2. Historical answers provided (excluding answers to own questions)
     con.execute("""
         CREATE TEMPORARY VIEW historical_answers AS
         SELECT
@@ -138,45 +139,49 @@ def process_bounty_data(
             'Answer' AS event_history,
             1 AS is_history
         FROM answers a
-        WHERE a.owner_user_id IN (
-            SELECT DISTINCT user_id FROM bounty_answers
-        );
-    """)
-
-    # 3. Historical accepted answers received
-    con.execute("""
-        CREATE TEMPORARY VIEW historical_accepted_answers AS
-        SELECT
-            q.owner_user_id AS user_id,
-            a.creation_date AS timestamp,
-            'AcceptedAnswer' AS event_history,
-            1 AS is_history
-        FROM questions q
-        JOIN answers a ON q.AcceptedAnswerId = a.answer_id
-        WHERE q.owner_user_id IN (
-            SELECT DISTINCT user_id FROM bounty_answers
-        )
-        AND q.AcceptedAnswerId IS NOT NULL;
-    """)
-
-    # 4. Historical accepted answers provided
-    con.execute("""
-        CREATE TEMPORARY VIEW historical_answers_accepted AS
-        SELECT
-            a.owner_user_id AS user_id,
-            a.creation_date AS answer_timestamp,
-            v.vote_date AS acceptance_date,
-            a.answer_id,
-            q.question_id,
-            'AcceptedAnswerProvided' AS event_history,
-            1 AS is_history
-        FROM answers a
-        JOIN questions q ON a.answer_id = q.AcceptedAnswerId
-        JOIN accept_votes v ON a.answer_id = v.post_id
+        JOIN questions q ON a.question_id = q.question_id
         WHERE a.owner_user_id IN (
             SELECT DISTINCT user_id FROM bounty_answers
         )
-        AND q.AcceptedAnswerId IS NOT NULL;
+        AND a.owner_user_id != q.owner_user_id;
+    """)
+
+    # 3. Historical accepted answers received (excluding self-answers)
+    con.execute("""
+       CREATE TEMPORARY VIEW historical_accepted_answers AS
+       SELECT
+           q.owner_user_id AS user_id,
+           a.creation_date AS timestamp,
+           'AcceptedAnswer' AS event_history,
+           1 AS is_history
+       FROM questions q
+       JOIN answers a ON q.AcceptedAnswerId = a.answer_id
+       WHERE q.owner_user_id IN (
+           SELECT DISTINCT user_id FROM bounty_answers
+       )
+       AND q.AcceptedAnswerId IS NOT NULL
+       AND q.owner_user_id != a.owner_user_id;
+    """)
+
+    # 4. Historical accepted answers provided (excluding self-answers)
+    con.execute("""
+       CREATE TEMPORARY VIEW historical_answers_accepted AS
+       SELECT
+           a.owner_user_id AS user_id,
+           a.creation_date AS timestamp,
+           v.vote_date AS acceptance_date,
+           a.answer_id,
+           q.question_id,
+           'AcceptedAnswerProvided' AS event_history,
+           1 AS is_history
+       FROM answers a
+       JOIN questions q ON a.answer_id = q.AcceptedAnswerId
+       JOIN accept_votes v ON a.answer_id = v.post_id
+       WHERE a.owner_user_id IN (
+           SELECT DISTINCT user_id FROM bounty_answers
+       )
+       AND q.AcceptedAnswerId IS NOT NULL
+       AND a.owner_user_id != q.owner_user_id;
     """)
 
     # Combine all events
@@ -191,7 +196,7 @@ def process_bounty_data(
                 bounty_end,
                 BountyAmount,
                 user_id,
-                answer_timestamp,
+                timestamp,
                 NULL AS acceptance_date,
                 after_bounty,
                 event_history,
@@ -207,7 +212,7 @@ def process_bounty_data(
                 NULL AS bounty_end,
                 NULL AS BountyAmount,
                 user_id,
-                timestamp AS answer_timestamp,
+                timestamp,
                 NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
@@ -223,7 +228,7 @@ def process_bounty_data(
                 NULL AS bounty_end,
                 NULL AS BountyAmount,
                 user_id,
-                timestamp AS answer_timestamp,
+                timestamp,
                 NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
@@ -239,7 +244,7 @@ def process_bounty_data(
                 NULL AS bounty_end,
                 NULL AS BountyAmount,
                 user_id,
-                timestamp AS answer_timestamp,
+                timestamp,
                 NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
@@ -255,14 +260,14 @@ def process_bounty_data(
                 NULL AS bounty_end,
                 NULL AS BountyAmount,
                 user_id,
-                answer_timestamp,
+                timestamp,
                 acceptance_date,
                 NULL AS after_bounty,
                 event_history,
                 is_history
             FROM historical_answers_accepted
 
-            ORDER BY user_id, answer_timestamp
+            ORDER BY user_id, timestamp
         )
         TO '{output_path}'
         (FORMAT PARQUET, COMPRESSION 'GZIP');

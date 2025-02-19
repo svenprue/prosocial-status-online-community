@@ -1,89 +1,134 @@
-import pandas as pd
 import duckdb
+import os
 
 
-def test_multiple_answers_per_user_question():
-    # Load the dataset
-    file_path = r".\02_raw_datasets\bounty_dataset.parquet"
-    df = pd.read_parquet(file_path)
+def check_user_answers_count(user_id, timestamp):
+    """
+    Check the correct count of answers provided by a user before a specific timestamp,
+    reading directly from original parquet files.
 
-    # Filter to keep only bounty data (non-historical rows)
-    bounty_data = df[df['is_history'] == 0].copy()
+    Args:
+        user_id: The user ID to check
+        timestamp: Cut-off timestamp (answers before this time will be counted)
 
-    # Create connection and register dataframe
+    Returns:
+        Dict containing counts and detail information
+    """
+    # Create connection
     con = duckdb.connect(database=':memory:')
-    con.register('bounty_data', bounty_data)
 
-    # Count total unique questions first
-    total_questions = con.execute("""
-        SELECT COUNT(DISTINCT question_id) AS total_unique_questions
-        FROM bounty_data
-        WHERE question_id IS NOT NULL
-    """).fetchone()[0]
+    # Define paths to original data files
+    data_path = os.path.join('.', '01_input_data', 'processed_data_dump')
+    answers_path = os.path.join(data_path, 'posts_answers.parquet')
+    questions_path = os.path.join(data_path, 'posts_questions.parquet')
 
-    # Count instances where a user provided multiple answers to the same question
-    result = con.execute("""
-        WITH user_question_counts AS (
-            SELECT 
-                user_id,
-                question_id,
-                COUNT(*) AS answer_count
-            FROM bounty_data
-            WHERE question_id IS NOT NULL
-            GROUP BY user_id, question_id
-            HAVING COUNT(*) > 1
-        )
-        SELECT 
-            COUNT(*) AS total_multiple_answer_cases,
-            COUNT(DISTINCT user_id) AS unique_users_with_multiple_answers,
-            COUNT(DISTINCT question_id) AS unique_questions_with_multiple_answers,
-            MAX(answer_count) AS max_answers_per_question,
-            AVG(answer_count) AS avg_answers_when_multiple
-        FROM user_question_counts
-    """).fetchdf()
+    # Ensure files exist
+    if not os.path.exists(answers_path) or not os.path.exists(questions_path):
+        return {"error": f"Data files not found at {data_path}"}
 
-    # Get first 20 question IDs with multiple answers from same user
-    first_20_questions = con.execute("""
-        WITH user_question_counts AS (
-            SELECT 
-                user_id,
-                question_id,
-                COUNT(*) AS answer_count
-            FROM bounty_data
-            WHERE question_id IS NOT NULL
-            GROUP BY user_id, question_id
-            HAVING COUNT(*) > 1
-        )
-        SELECT DISTINCT question_id
-        FROM user_question_counts
-        ORDER BY question_id
-        LIMIT 20
-    """).fetchall()
+    # Get answers count (excluding self-answers)
+    answer_count_query = f"""
+    WITH 
+    answers_data AS (
+      SELECT * FROM '{answers_path}'
+    ),
+    questions_data AS (
+      SELECT * FROM '{questions_path}'
+    )
 
-    # Display results
-    print(f"Total number of unique questions in the dataset: {total_questions}")
-    print("\nStatistics on users providing multiple answers to the same question:")
-    print(f"Total cases of multiple answers: {result['total_multiple_answer_cases'][0]}")
-    print(f"Number of unique users who provided multiple answers: {result['unique_users_with_multiple_answers'][0]}")
-    print(
-        f"Number of unique questions receiving multiple answers from same user: {result['unique_questions_with_multiple_answers'][0]}")
-    print(f"Maximum number of answers from same user to one question: {result['max_answers_per_question'][0]}")
-    print(f"Average number of answers when a user answers multiple times: {result['avg_answers_when_multiple'][0]:.2f}")
+    SELECT
+      COUNT(*) AS correct_answer_count
+    FROM answers_data a
+    JOIN questions_data q ON a.ParentId = q.Id
+    WHERE 
+      a.OwnerUserId = {user_id}
+      AND a.CreationDate < TIMESTAMP '{timestamp}'
+      -- Exclude self-answers
+      AND a.OwnerUserId != q.OwnerUserId
+    """
 
-    # Calculate percentage
-    if total_questions > 0:
-        percentage = (result['unique_questions_with_multiple_answers'][0] / total_questions) * 100
-        print(f"\nPercentage of questions with multiple answers from same user: {percentage:.2f}%")
+    answer_count = con.execute(answer_count_query).fetchone()[0]
 
-    # Print first 20 question IDs with multiple answers
-    print("\nFirst 20 question IDs that received multiple answers from the same user:")
-    for idx, (question_id,) in enumerate(first_20_questions, 1):
-        print(f"{idx}. {question_id}")
+    # Get details of the answers for debugging
+    answer_details_query = f"""
+    WITH 
+    answers_data AS (
+      SELECT * FROM '{answers_path}'
+    ),
+    questions_data AS (
+      SELECT * FROM '{questions_path}'
+    )
 
+    SELECT
+      a.Id AS answer_id,
+      a.ParentId AS question_id,
+      a.CreationDate AS timestamp,
+      q.OwnerUserId AS question_owner_id
+    FROM answers_data a
+    JOIN questions_data q ON a.ParentId = q.Id
+    WHERE 
+      a.OwnerUserId = {user_id}
+      AND a.CreationDate < TIMESTAMP '{timestamp}'
+      AND a.OwnerUserId != q.OwnerUserId
+    ORDER BY a.CreationDate
+    """
+
+    answer_details = con.execute(answer_details_query).fetchall()
+
+    # Check for potential duplicates
+    duplicate_check_query = f"""
+    WITH 
+    answers_data AS (
+      SELECT * FROM '{answers_path}'
+    )
+
+    SELECT
+      a.ParentId AS question_id,
+      a.CreationDate,
+      COUNT(*) AS answer_count
+    FROM answers_data a
+    WHERE 
+      a.OwnerUserId = {user_id}
+      AND a.CreationDate < TIMESTAMP '{timestamp}'
+    GROUP BY a.ParentId, a.CreationDate
+    HAVING COUNT(*) > 1
+    """
+
+    duplicates = con.execute(duplicate_check_query).fetchall()
+
+    # Close connection
     con.close()
 
-    return result
+    # Return results
+    return {
+        "correct_answer_count": answer_count,
+        "answer_details": answer_details,
+        "potential_duplicates": duplicates,
+        "user_id": user_id,
+        "timestamp": timestamp
+    }
 
 
-if __name__ == "__main__":
-    test_multiple_answers_per_user_question()
+# Check the specific case with discrepancy
+result = check_user_answers_count(356, '2008-11-20 14:36:42.953')
+
+print(
+    f"Correct answer count for user {result['user_id']} before {result['timestamp']}: {result['correct_answer_count']}")
+
+if result['potential_duplicates']:
+    print("\nPotential duplicates found:")
+    for dup in result['potential_duplicates']:
+        print(f"  Question ID: {dup[0]}, Timestamp: {dup[1]}, Count: {dup[2]}")
+
+print(f"\nFound {len(result['answer_details'])} answers:")
+for i, answer in enumerate(result['answer_details'], 1):
+    print(f"{i}. Answer ID: {answer[0]}, Question ID: {answer[1]}, Posted: {answer[2]}, Question Owner: {answer[3]}")
+
+# You can save this to a file for further analysis
+if result['answer_details']:
+    import pandas as pd
+
+    pd.DataFrame(result['answer_details'],
+                 columns=['answer_id', 'question_id', 'timestamp', 'question_owner_id']
+                 ).to_csv(f"user_{result['user_id']}_answers.csv", index=False)
+    print(f"\nDetailed answer data saved to user_{result['user_id']}_answers.csv")
