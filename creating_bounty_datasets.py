@@ -15,10 +15,10 @@ def process_bounty_data(
     con.execute("PRAGMA enable_progress_bar;")
 
     # Define paths
-    bounty_timeline_path = os.path.join(input_folder, 'scraped_bounty_data', 'bounty_timeline_results_cleaned.parquet')
-    questions_path = os.path.join(input_folder, 'processed_SO_data_dump', 'posts_questions.parquet')
-    answers_path = os.path.join(input_folder, 'processed_SO_data_dump', 'posts_answers.parquet')
-    votes_path = os.path.join(input_folder, 'processed_SO_data_dump', 'Votes.parquet')
+    bounty_timeline_path = os.path.join(input_folder, 'scraped_datasets', 'bounty_timeline_results_cleaned.parquet')
+    questions_path = os.path.join(input_folder, 'processed_data_dump', 'posts_questions.parquet')
+    answers_path = os.path.join(input_folder, 'processed_data_dump', 'posts_answers.parquet')
+    votes_path = os.path.join(input_folder, 'processed_data_dump', 'Votes.parquet')
 
     # Create view for bounty timeline with row number to handle duplicates
     con.execute(f"""
@@ -69,6 +69,16 @@ def process_bounty_data(
             BountyAmount
         FROM '{votes_path}'
         WHERE VoteTypeId = 8;
+    """)
+
+    con.execute(f"""
+        CREATE TEMPORARY VIEW accept_votes AS
+        SELECT
+            PostId AS post_id,
+            UserId AS voter_id,
+            CAST(CreationDate AS TIMESTAMP) AS vote_date
+        FROM '{votes_path}'
+        WHERE VoteTypeId = 1;
     """)
 
     # Create main bounty dataset - mark these as non-historical (is_history = 0)
@@ -133,7 +143,7 @@ def process_bounty_data(
         );
     """)
 
-    # 3. Historical accepted answers (matching with first code structure)
+    # 3. Historical accepted answers received
     con.execute("""
         CREATE TEMPORARY VIEW historical_accepted_answers AS
         SELECT
@@ -149,8 +159,28 @@ def process_bounty_data(
         AND q.AcceptedAnswerId IS NOT NULL;
     """)
 
+    # 4. Historical accepted answers provided
+    con.execute("""
+        CREATE TEMPORARY VIEW historical_answers_accepted AS
+        SELECT
+            a.owner_user_id AS user_id,
+            a.creation_date AS answer_timestamp,
+            v.vote_date AS acceptance_date,
+            a.answer_id,
+            q.question_id,
+            'AcceptedAnswerProvided' AS event_history,
+            1 AS is_history
+        FROM answers a
+        JOIN questions q ON a.answer_id = q.AcceptedAnswerId
+        JOIN accept_votes v ON a.answer_id = v.post_id
+        WHERE a.owner_user_id IN (
+            SELECT DISTINCT user_id FROM bounty_answers
+        )
+        AND q.AcceptedAnswerId IS NOT NULL;
+    """)
+
     # Combine all events
-    output_path = os.path.join(output_folder, 'bounty_dataset.parquet')
+    output_path = os.path.join(output_folder, 'bounty_raw_dataset.parquet')
 
     con.execute(f"""
         COPY (
@@ -162,6 +192,7 @@ def process_bounty_data(
                 BountyAmount,
                 user_id,
                 answer_timestamp,
+                NULL AS acceptance_date,
                 after_bounty,
                 event_history,
                 is_history
@@ -177,6 +208,7 @@ def process_bounty_data(
                 NULL AS BountyAmount,
                 user_id,
                 timestamp AS answer_timestamp,
+                NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
                 is_history
@@ -192,6 +224,7 @@ def process_bounty_data(
                 NULL AS BountyAmount,
                 user_id,
                 timestamp AS answer_timestamp,
+                NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
                 is_history
@@ -207,10 +240,27 @@ def process_bounty_data(
                 NULL AS BountyAmount,
                 user_id,
                 timestamp AS answer_timestamp,
+                NULL AS acceptance_date,
                 NULL AS after_bounty,
                 event_history,
                 is_history
             FROM historical_accepted_answers
+
+            UNION ALL
+
+            SELECT
+                question_id,
+                NULL AS question_posted,
+                NULL AS bounty_start,
+                NULL AS bounty_end,
+                NULL AS BountyAmount,
+                user_id,
+                answer_timestamp,
+                acceptance_date,
+                NULL AS after_bounty,
+                event_history,
+                is_history
+            FROM historical_answers_accepted
 
             ORDER BY user_id, answer_timestamp
         )

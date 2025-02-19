@@ -167,8 +167,8 @@ def fix_column_types(parquet_file_paths):
 
 
 def main():
-    input_folder = './01_input_data/SO_data_dump'  # Specify your input folder here
-    output_folder = './01_input_data/processed_SO_data_dump'  # Specify your output folder here
+    input_folder = './01_input_data/raw_data_dump'  # Specify your input folder here
+    output_folder = './01_input_data/processed_data_dump'  # Specify your output folder here
 
     posts_file_path = os.path.join(input_folder, 'Posts.xml')
     votes_file_path = os.path.join(input_folder, 'Votes.xml')

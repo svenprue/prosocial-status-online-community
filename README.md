@@ -5,31 +5,26 @@ This repository contains the full code to run create the datasets, run the stati
 **Strahringer, L., Prüß, S.: _The Complementarity of Prosocial and Status-Seeking Behavior in Contributor Recruitment and Retention in Online Communities_**
 
 ## Contents
-- **main.Rmd** - The main R Markdown file to execute the analysis  
-- **01_input_data/** - Folder containing input data files  
-- **02_output_plots/** - Folder for storing simulation results and generated plots  
-- **03_functions/** - Helper functions for data processing and analysis  
-- **04_plotting/** - Plotting functions for generating figures  
+- **main.Rmd** - Lorem ipsum dolor sit amet, consectetur adipiscing elit  
+- **01_input_data/** - Folder lorem ipsum dolor sit amet, consectetur adipiscing elit  
+- **02_output_plots/** - Folder for storing lorem ipsum results and generated plots  
+- **03_functions/** - Helper functions for lorem ipsum data processing and analysis  
+- **04_plotting/** - Plotting functions for generating lorem ipsum figures  
+
+## Background on Data Dump
+1. For a full documentation of all data available in the public data dump, see: [Database Schema Documentation for the Public Data Dump and SEDE](https://meta.stackexchange.com/questions/2677/database-schema-documentation-for-the-public-data-dump-and-sede)
+2. To download a new version of the data dump, you can download it under _settings_ in your Stack Overflow profile (for further information see [here](https://stackoverflow.com/help/data-dumps)).
 
 ## Instructions
+There are two options to use this code:
 
-There are two options to use this code, controlled by a switch in `main.Rmd`:
+### **1. Reproduction**
 
-### **1. Reproduction Mode (Default)**
-- Download the pre-processed data files (if available) and place them into `01_input_data/`
-- Run `main.Rmd`
-- This will import the data, reproduce all figures from the article, and save them into `02_output_plots/`
-
-### **2. Simulation Mode**
-- Set `model.mode = "simulation"` in `main.Rmd`
-- Adjust parameters such as the sample size `n` for simulations as needed
-- Run `main.Rmd`
-- This will initiate the full simulation, which may take some time depending on the sample size
-- The output figures will be saved in `02_output_plots/`. Note that results might slightly deviate from the article figures due to randomness in the simulation process.
+### **2. New Data Dump**
 
 ## Code Environment
 
-Make sure the following R packages are installed before running the code:
+Make sure the following python packages are installed before running the code:
 
-```r
-install.packages(c("tidyverse", "data.table", "ggplot2", "lme4", "broom", "sandwich", "lmtest", "stargazer"))
+```python
+pip install "tidyverse", "data.table", "ggplot2", "lme4", "broom", "sandwich", "lmtest", "stargazer"
