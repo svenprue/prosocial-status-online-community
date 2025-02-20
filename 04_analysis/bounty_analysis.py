@@ -7,6 +7,11 @@ df = pd.read_parquet('../03_processed_datasets/processed_bounty_dataset.parquet'
 
 # Print all column names
 print(df.columns)
+df['question_to_bounty_end'] = (df['bounty_end'] - df['question_posted']).dt.days
+df['question_to_answer'] = (df['timestamp'] - df['question_posted']).dt.days
+df = df[df['question_to_bounty_end'] < 30]
+df = df[df['question_to_answer'] < 30]
+
 df['BountyAmount'] = df['BountyAmount'].astype(int) / 100
 
 # Count the occurrences of each user_id
@@ -23,7 +28,6 @@ user_bins = pd.cut(user_counts, bins=bins, labels=labels, right=False, include_l
 distribution = user_bins.value_counts(sort=False)
 
 print(distribution)
-
 
 
 # Select the columns of interest
