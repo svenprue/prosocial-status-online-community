@@ -10,7 +10,12 @@ from numba import njit
 def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: str = "2025-01-03") -> None:
     """
     Processes each parquet file in the input_folder by:
-      1. Calculating per-user cumulative metrics at the moment the Phase_One_Start event occurs.
+      1. Calculating per-user cumulative metrics at different time windows before Phase_One_Start:
+         - All time (AT)
+         - Last 30 days (30D)
+         - Last 14 days (14D)
+         - Last 7 days (7D)
+         - Last 3 days (3D)
       2. Propagating these metrics (for the same event_id) to all rows.
       3. Dropping all rows where is_history == 1.
       4. Determining the phase (1 or 2) for each row based on the event timestamps.
@@ -18,7 +23,7 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
       6. Grouping and aggregating data by event_id and phase.
       7. Demeaning the numHelped and hasHelped columns by user.
       8. Finally, removing any aggregated rows whose phase_two_end is after the cutoff date.
-      9. Saving the final aggregated data as a parquet file with suffix "_XD_all_answers.parquet".
+      9. Saving the final aggregated data as a parquet file with suffix "_processed.parquet".
 
     Expected columns in each file (in order):
       event_id, user_id, timestamp, event, question_id,
@@ -35,48 +40,150 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
     os.makedirs(output_folder, exist_ok=True)
 
     # -----------------------------------------------------------------------------
-    # Numba-optimized function to calculate cumulative metrics at a target time.
+    # Numba-optimized function to calculate cumulative metrics at different time points.
     # -----------------------------------------------------------------------------
     @njit
-    def calculate_metrics_numba(timestamps, cum_question, cum_accepted, cum_answer, target_time):
-        idx = np.searchsorted(timestamps, target_time, side="left") - 1
-        if idx < 0:
-            numQuestionsAskedAT = 0
-            numHelpReceivedAT = 0
-            numHelpProvidedAT = 0
-        else:
-            numQuestionsAskedAT = cum_question[idx]
-            numHelpReceivedAT = cum_accepted[idx]
-            numHelpProvidedAT = cum_answer[idx]
-        numHelpProvidedEver = 1 if numHelpProvidedAT > 0 else 0
-        return numQuestionsAskedAT, numHelpReceivedAT, numHelpProvidedAT, numHelpProvidedEver
+    def calculate_metrics_numba(timestamps, cum_question, cum_accepted, cum_answer,
+                                target_time, days_30, days_14, days_7, days_3):
+        # Index for current time (AT) metrics
+        idx_at = np.searchsorted(timestamps, target_time, side="left") - 1
+
+        # Indices for different time windows
+        idx_30d = np.searchsorted(timestamps, days_30, side="left") - 1
+        idx_14d = np.searchsorted(timestamps, days_14, side="left") - 1
+        idx_7d = np.searchsorted(timestamps, days_7, side="left") - 1
+        idx_3d = np.searchsorted(timestamps, days_3, side="left") - 1
+
+        # Initialize all metrics to 0
+        metrics = {
+            "AT": [0, 0, 0, 0],  # [q, a, ans, ever]
+            "30D": [0, 0, 0],  # [q, a, ans]
+            "14D": [0, 0, 0],  # [q, a, ans]
+            "7D": [0, 0, 0],  # [q, a, ans]
+            "3D": [0, 0, 0]  # [q, a, ans]
+        }
+
+        # Calculate AT metrics
+        if idx_at >= 0:
+            metrics["AT"][0] = cum_question[idx_at]
+            metrics["AT"][1] = cum_accepted[idx_at]
+            metrics["AT"][2] = cum_answer[idx_at]
+            metrics["AT"][3] = 1 if cum_answer[idx_at] > 0 else 0
+
+        # Calculate 30D metrics (counts within the last 30 days)
+        if idx_at >= 0:
+            q_30d = cum_question[idx_30d] if idx_30d >= 0 else 0
+            a_30d = cum_accepted[idx_30d] if idx_30d >= 0 else 0
+            ans_30d = cum_answer[idx_30d] if idx_30d >= 0 else 0
+
+            metrics["30D"][0] = metrics["AT"][0] - q_30d
+            metrics["30D"][1] = metrics["AT"][1] - a_30d
+            metrics["30D"][2] = metrics["AT"][2] - ans_30d
+
+        # Calculate 14D metrics
+        if idx_at >= 0:
+            q_14d = cum_question[idx_14d] if idx_14d >= 0 else 0
+            a_14d = cum_accepted[idx_14d] if idx_14d >= 0 else 0
+            ans_14d = cum_answer[idx_14d] if idx_14d >= 0 else 0
+
+            metrics["14D"][0] = metrics["AT"][0] - q_14d
+            metrics["14D"][1] = metrics["AT"][1] - a_14d
+            metrics["14D"][2] = metrics["AT"][2] - ans_14d
+
+        # Calculate 7D metrics
+        if idx_at >= 0:
+            q_7d = cum_question[idx_7d] if idx_7d >= 0 else 0
+            a_7d = cum_accepted[idx_7d] if idx_7d >= 0 else 0
+            ans_7d = cum_answer[idx_7d] if idx_7d >= 0 else 0
+
+            metrics["7D"][0] = metrics["AT"][0] - q_7d
+            metrics["7D"][1] = metrics["AT"][1] - a_7d
+            metrics["7D"][2] = metrics["AT"][2] - ans_7d
+
+        # Calculate 3D metrics
+        if idx_at >= 0:
+            q_3d = cum_question[idx_3d] if idx_3d >= 0 else 0
+            a_3d = cum_accepted[idx_3d] if idx_3d >= 0 else 0
+            ans_3d = cum_answer[idx_3d] if idx_3d >= 0 else 0
+
+            metrics["3D"][0] = metrics["AT"][0] - q_3d
+            metrics["3D"][1] = metrics["AT"][1] - a_3d
+            metrics["3D"][2] = metrics["AT"][2] - ans_3d
+
+        return (metrics["AT"][0], metrics["AT"][1], metrics["AT"][2], metrics["AT"][3],
+                metrics["30D"][0], metrics["30D"][1], metrics["30D"][2],
+                metrics["14D"][0], metrics["14D"][1], metrics["14D"][2],
+                metrics["7D"][0], metrics["7D"][1], metrics["7D"][2],
+                metrics["3D"][0], metrics["3D"][1], metrics["3D"][2])
 
     def compute_user_metrics(user_id: int, target_time: pd.Timestamp, user_data: dict) -> dict:
         """
-        For a given user and target_time, compute cumulative metrics.
+        For a given user and target_time, compute metrics for different time windows:
+        - All time before target_time (AT)
+        - Last 30 days before target_time (30D)
+        - Last 14 days before target_time (14D)
+        - Last 7 days before target_time (7D)
+        - Last 3 days before target_time (3D)
         """
         if user_id not in user_data:
             return {
                 "numQuestionsAskedAT": 0,
                 "numHelpReceivedAT": 0,
                 "numHelpProvidedAT": 0,
-                "numHelpProvidedAT": 0,
-                "numHelpProvidedEver": 0
+                "numHelpProvidedEver": 0,
+                "numQuestionsAsked30D": 0,
+                "numHelpReceived30D": 0,
+                "numHelpProvided30D": 0,
+                "numQuestionsAsked14D": 0,
+                "numHelpReceived14D": 0,
+                "numHelpProvided14D": 0,
+                "numQuestionsAsked7D": 0,
+                "numHelpReceived7D": 0,
+                "numHelpProvided7D": 0,
+                "numQuestionsAsked3D": 0,
+                "numHelpReceived3D": 0,
+                "numHelpProvided3D": 0
             }
+
         data = user_data[user_id]
         target_sec = target_time.timestamp()
-        nq, nha, nhp, nhaever = calculate_metrics_numba(
+
+        # Calculate cutoff timestamps for different windows
+        days_30_sec = target_sec - (30 * 86400)  # 30 days in seconds
+        days_14_sec = target_sec - (14 * 86400)  # 14 days in seconds
+        days_7_sec = target_sec - (7 * 86400)  # 7 days in seconds
+        days_3_sec = target_sec - (3 * 86400)  # 3 days in seconds
+
+        # Get all metrics using the numba function
+        (q_at, a_at, ans_at, ever,
+         q_30d, a_30d, ans_30d,
+         q_14d, a_14d, ans_14d,
+         q_7d, a_7d, ans_7d,
+         q_3d, a_3d, ans_3d) = calculate_metrics_numba(
             data["timestamps"],
             data["cum_question"],
             data["cum_accepted"],
             data["cum_answer"],
-            target_sec,
+            target_sec, days_30_sec, days_14_sec, days_7_sec, days_3_sec
         )
+
         return {
-            "numQuestionsAskedAT": nq,
-            "numHelpReceivedAT": nha,
-            "numHelpProvidedAT": nhp,
-            "numHelpProvidedEver": nhaever,
+            "numQuestionsAskedAT": q_at,
+            "numHelpReceivedAT": a_at,
+            "numHelpProvidedAT": ans_at,
+            "numHelpProvidedEver": ever,
+            "numQuestionsAsked30D": q_30d,
+            "numHelpReceived30D": a_30d,
+            "numHelpProvided30D": ans_30d,
+            "numQuestionsAsked14D": q_14d,
+            "numHelpReceived14D": a_14d,
+            "numHelpProvided14D": ans_14d,
+            "numQuestionsAsked7D": q_7d,
+            "numHelpReceived7D": a_7d,
+            "numHelpProvided7D": ans_7d,
+            "numQuestionsAsked3D": q_3d,
+            "numHelpReceived3D": a_3d,
+            "numHelpProvided3D": ans_3d
         }
 
     for file_path in parquet_files:
@@ -163,8 +270,8 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
             }
 
         results = [process_row(r) for r in tqdm(df_phase1.itertuples(index=False),
-                                                   total=len(df_phase1),
-                                                   desc="Calculating metrics")]
+                                                total=len(df_phase1),
+                                                desc="Calculating metrics")]
         df_metrics = pd.DataFrame(results)
         if not df_metrics.empty:
             df = df.merge(df_metrics, on=["user_id", "event_id"], how="left")
@@ -180,6 +287,18 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
             "numHelpProvidedAT",
             "numHelpReceivedAT",
             "numQuestionsAskedAT",
+            "numQuestionsAsked30D",
+            "numHelpReceived30D",
+            "numHelpProvided30D",
+            "numQuestionsAsked14D",
+            "numHelpReceived14D",
+            "numHelpProvided14D",
+            "numQuestionsAsked7D",
+            "numHelpReceived7D",
+            "numHelpProvided7D",
+            "numQuestionsAsked3D",
+            "numHelpReceived3D",
+            "numHelpProvided3D"
         ]
         existing_cols = [c for c in cols_to_propagate if c in df.columns]
         if existing_cols:
@@ -195,7 +314,7 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
                 df[col] = df[col + "_from_phase1"]
                 df.drop(columns=[col + "_from_phase1"], inplace=True)
 
-        # ***** NEW STEP: Drop all rows where is_history == 1 *****
+        # ***** Drop all rows where is_history == 1 *****
         df = df[df["is_history"] == 0]
 
         # ---------------------------------------------------------------------
@@ -249,9 +368,6 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
 
         # ---------------------------------------------------------------------
         # 10. Group and aggregate data by event_id and phase.
-        #     Final output includes these 10 columns (in order):
-        #       event_id, user_id, timestamp, event, question_id,
-        #       phase_one_start, phase_two_end, event_history, is_history, response_time
         # ---------------------------------------------------------------------
         group_cols = ["event_id", "phase"]
         agg_dict = {
@@ -274,22 +390,24 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
             "numHelpProvidedAT": "first",
             "numHelpReceivedAT": "first",
             "numQuestionsAskedAT": "first",
+            "numQuestionsAsked30D": "first",
+            "numHelpReceived30D": "first",
+            "numHelpProvided30D": "first",
+            "numQuestionsAsked14D": "first",
+            "numHelpReceived14D": "first",
+            "numHelpProvided14D": "first",
+            "numQuestionsAsked7D": "first",
+            "numHelpReceived7D": "first",
+            "numHelpProvided7D": "first",
+            "numQuestionsAsked3D": "first",
+            "numHelpReceived3D": "first",
+            "numHelpProvided3D": "first"
         }
-        agg_df = df.groupby(group_cols).agg(agg_dict).reset_index()
 
-        # Keep only the 10 expected columns.
-        agg_df = agg_df[[
-            "event_id",
-            "user_id",
-            "timestamp",
-            "event",
-            "question_id",
-            "phase_one_start",
-            "phase_two_end",
-            "event_history",
-            "is_history",
-            "response_time"
-        ]]
+        # Filter to include only existing columns
+        agg_dict = {k: v for k, v in agg_dict.items() if k in df.columns}
+
+        agg_df = df.groupby(group_cols).agg(agg_dict).reset_index()
 
         # ---------------------------------------------------------------------
         # 11. Remove aggregated rows with phase_two_end after the cutoff date.
@@ -302,9 +420,9 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
         # ---------------------------------------------------------------------
         # 12. Demean numHelped and hasHelped per user (if these columns exist).
         # ---------------------------------------------------------------------
-        if "numHelped" in df.columns:
+        if "numHelped" in agg_df.columns:
             agg_df["meaned_numHelped"] = agg_df.groupby("user_id")["numHelped"].transform(lambda x: x - x.mean())
-        if "hasHelped" in df.columns:
+        if "hasHelped" in agg_df.columns:
             agg_df["meaned_hasHelped"] = agg_df.groupby("user_id")["hasHelped"].transform(lambda x: x - x.mean())
 
         # ---------------------------------------------------------------------
@@ -322,7 +440,7 @@ def process_parquet_files(input_folder: str, output_folder: str, cutoff_date: st
 
 
 def main():
-    input_folder = "./testing"  # Adjust input folder path as needed.
+    input_folder = "./02_raw_datasets"  # Adjust input folder path as needed.
     output_folder = "./03_processed_datasets"  # Adjust output folder path as needed.
     cutoff_date = "2025-01-03"  # Phase two end cutoff.
     process_parquet_files(input_folder, output_folder, cutoff_date)

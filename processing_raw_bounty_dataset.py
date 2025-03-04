@@ -264,7 +264,7 @@ def test_data_consistency(processed_df):
 
 if __name__ == "__main__":
     # Example usage
-    input_file = r".\02_raw_datasets\bounty_raw_dataset.parquet"
+    input_file = r"bounty_raw_dataset.parquet"
     processed_df = process_bounty_dataset(input_file)
 
     # Test data consistency

@@ -286,7 +286,7 @@ def main():
     """Main function to run the sanity checks with predefined test cases"""
     # Default paths - change these if your files are stored elsewhere
     processed_path = r"./03_processed_datasets/processed_bounty_dataset.parquet"
-    raw_path = r"./02_raw_datasets/bounty_raw_dataset.parquet"
+    raw_path = r"bounty_raw_dataset.parquet"
 
     # Check if files exist, otherwise use command line arguments
     if not os.path.exists(processed_path) or not os.path.exists(raw_path):
