@@ -285,7 +285,7 @@ def find_test_cases(processed_file_path):
 def main():
     """Main function to run the sanity checks with predefined test cases"""
     # Default paths - change these if your files are stored elsewhere
-    processed_path = r"./03_processed_datasets/processed_bounty_dataset.parquet"
+    processed_path = r"../03_processed_datasets/processed_bounty_dataset.parquet"
     raw_path = r"bounty_raw_dataset.parquet"
 
     # Check if files exist, otherwise use command line arguments

@@ -271,7 +271,7 @@ if __name__ == "__main__":
     test_data_consistency(processed_df)
 
     # Save processed data
-    output_path = r".\03_processed_datasets\processed_bounty_dataset.parquet"
+    output_path = r"../03_processed_datasets/processed_bounty_dataset.parquet"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     processed_df.to_parquet(output_path, compression='gzip')
     print(f"Processed dataset saved to {output_path}")
