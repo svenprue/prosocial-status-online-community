@@ -7,6 +7,7 @@ from pathlib import Path
 def create_user_answers_dataset(
         input_folder: str,
         output_folder: str,
+        bounty_timeline_path: str,
         memory_limit: str = '10GB',
         temp_dir_size: str = '30GiB',
         threads: int = 4
@@ -17,6 +18,7 @@ def create_user_answers_dataset(
     Args:
         input_folder: Folder containing input Parquet files
         output_folder: Folder where output dataset will be saved
+        bounty_timeline_path: Path to the cleaned bounty timeline data
         memory_limit: DuckDB memory limit
         temp_dir_size: DuckDB temporary directory size
         threads: Number of threads for DuckDB to use
@@ -33,9 +35,22 @@ def create_user_answers_dataset(
         questions_path = os.path.join(input_folder, 'posts_questions.parquet')
 
         # Verify input files exist
-        for file_path in [answers_path, votes_path, questions_path]:
+        for file_path in [answers_path, votes_path, questions_path, bounty_timeline_path]:
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"Input file not found: {file_path}")
+
+        # Load bounty timeline data - using the cleaned version that already has proper timestamps
+        con.execute(f"""
+            CREATE TEMPORARY VIEW bounty_timeline AS
+            SELECT 
+                question_id,
+                bounty_start,
+                bounty_end
+            FROM '{bounty_timeline_path}'
+            WHERE 
+                bounty_start IS NOT NULL 
+                AND bounty_end IS NOT NULL;
+        """)
 
         # Load ALL answers
         con.execute(f"""
@@ -61,7 +76,7 @@ def create_user_answers_dataset(
             WHERE OwnerUserId IS NOT NULL;
         """)
 
-        # Load bounty votes
+        # Load bounty votes (kept for bounty amount)
         con.execute(f"""
             CREATE TEMPORARY VIEW bounty_votes AS
             SELECT
@@ -73,23 +88,59 @@ def create_user_answers_dataset(
             WHERE VoteTypeId = 8;
         """)
 
-        # Create the main dataset of ALL user answers with bounty information
-        # Excluding self-answers
+        # First create a view with answers joined to questions (without bounty info yet)
         con.execute("""
-            CREATE TEMPORARY TABLE user_answers AS
+            CREATE TEMPORARY VIEW answers_with_questions AS
             SELECT
                 a.owner_user_id AS user_id,
                 a.answer_id,
                 a.parent_question_id AS question_id,
                 a.creation_date AS timestamp,
-                CASE WHEN b.post_id IS NOT NULL THEN 1 ELSE 0 END AS is_bounty,
-                COALESCE(b.bounty_amount, 0) AS bounty_amount,
                 DENSE_RANK() OVER (PARTITION BY a.owner_user_id ORDER BY a.creation_date) AS answer_sequence,
                 q.owner_user_id AS question_owner_id
             FROM answers a
             JOIN questions q ON a.parent_question_id = q.question_id
-            LEFT JOIN bounty_votes b ON a.answer_id = b.post_id
             WHERE a.owner_user_id <> q.owner_user_id;  -- Exclude self-answers
+        """)
+
+        # Now check if any answer falls within any bounty period
+        # This handles the case where a question can have multiple bounty periods
+        con.execute("""
+            CREATE TEMPORARY TABLE answers_with_bounty_info AS
+            SELECT
+                a.user_id,
+                a.answer_id,
+                a.question_id,
+                a.timestamp,
+                a.answer_sequence,
+                a.question_owner_id,
+                CASE 
+                    WHEN EXISTS (
+                        SELECT 1 
+                        FROM bounty_timeline bt 
+                        WHERE a.question_id = bt.question_id 
+                            AND a.timestamp BETWEEN bt.bounty_start AND bt.bounty_end
+                    ) 
+                    THEN 1 
+                    ELSE 0 
+                END AS is_bounty
+            FROM answers_with_questions a;
+        """)
+
+        # Add bounty amount information
+        con.execute("""
+            CREATE TEMPORARY TABLE user_answers AS
+            SELECT
+                a.user_id,
+                a.answer_id,
+                a.question_id,
+                a.timestamp,
+                a.is_bounty,
+                COALESCE(b.bounty_amount, 0) AS bounty_amount,
+                a.answer_sequence,
+                a.question_owner_id
+            FROM answers_with_bounty_info a
+            LEFT JOIN bounty_votes b ON a.answer_id = b.post_id;
         """)
 
         # Create event IDs for each unique user
@@ -162,10 +213,9 @@ def create_user_answers_dataset(
             CREATE TEMPORARY VIEW accepted_answers AS
             SELECT
                 a.answer_id,
-                a.owner_user_id,
+                q.owner_user_id,
                 a.parent_question_id AS question_id,
-                a.creation_date,
-                q.owner_user_id AS question_owner_id
+                a.creation_date
             FROM answers a
             JOIN questions q ON a.answer_id = q.accepted_answer_id
             WHERE a.owner_user_id <> q.owner_user_id;  -- Exclude self-accepted answers
@@ -286,8 +336,10 @@ if __name__ == "__main__":
     base_dir = Path(".")
     input_data_folder = base_dir / "01_input_data" / "processed_data_dump"
     output_data_folder = base_dir / "02_raw_datasets"
+    bounty_timeline_path = r"01_input_data\scraped_datasets\bounty_timeline_results_cleaned.parquet"
 
     create_user_answers_dataset(
         input_folder=str(input_data_folder),
-        output_folder=str(output_data_folder)
+        output_folder=str(output_data_folder),
+        bounty_timeline_path=str(bounty_timeline_path)
     )
