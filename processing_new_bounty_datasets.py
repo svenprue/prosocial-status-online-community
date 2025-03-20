@@ -7,7 +7,7 @@ from tqdm import tqdm
 def process_bounty_dataset(input_file: str, output_file: str) -> None:
     """
     Process the user_answers_bounty_dataset.parquet file to calculate metrics for each user.
-    High-performance implementation that uses binary search and pre-computed arrays.
+    Uses a straightforward approach with optimizations for speed.
     """
     print(f"\n=== Processing {input_file} ===")
 
@@ -15,9 +15,8 @@ def process_bounty_dataset(input_file: str, output_file: str) -> None:
     df = pd.read_parquet(input_file)
     print(f"Loaded {len(df):,} rows.")
 
-    # Ensure the timestamp is in datetime format and convert to epoch seconds
+    # Ensure the timestamp is in datetime format
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df["timestamp_seconds"] = df["timestamp"].view(np.int64) // 10 ** 9  # Convert to seconds since epoch
 
     # Create numeric flags from event type
     df["questionAsked"] = df["event"].map({"Question": 1}).fillna(0).astype(np.int8)
@@ -31,196 +30,105 @@ def process_bounty_dataset(input_file: str, output_file: str) -> None:
     print(f"History rows: {len(history_df):,}")
     print(f"Non-history rows: {len(non_history_df):,}")
 
-    # Pre-calculate window sizes in seconds
-    seconds_30d = 30 * 24 * 60 * 60
-    seconds_14d = 14 * 24 * 60 * 60
-    seconds_7d = 7 * 24 * 60 * 60
-    seconds_3d = 3 * 24 * 60 * 60
+    # Create a dictionary of user histories for faster lookup
+    print("Building user history cache...")
+    user_histories = {}
+    for user_id, user_data in tqdm(history_df.groupby("user_id"), desc="Preprocessing users"):
+        # Sort by timestamp
+        user_data = user_data.sort_values("timestamp")
+        user_histories[user_id] = user_data
 
-    # Build user history arrays with cumulative metrics
-    print("Building optimized user history arrays...")
-    user_data = {}
-
-    for user_id, user_history in tqdm(history_df.groupby("user_id"), desc="Preprocessing users"):
-        # Sort user history by timestamp
-        user_history = user_history.sort_values("timestamp_seconds")
-
-        # Get timestamp array
-        timestamps = user_history["timestamp_seconds"].values
-
-        # Compute cumulative metrics
-        cum_questions = np.cumsum(user_history["questionAsked"].values)
-        cum_accepted = np.cumsum(user_history["acceptedAnswer"].values)
-        cum_answers = np.cumsum(user_history["answer"].values)
-
-        # Store as numpy arrays for fast access
-        user_data[user_id] = {
-            "timestamps": timestamps,
-            "cum_questions": cum_questions,
-            "cum_accepted": cum_accepted,
-            "cum_answers": cum_answers
-        }
-
-    # Process non-history rows by user for better cache efficiency
+    # Process non-history rows
     print("Processing non-history rows...")
     results = []
 
-    # Group non-history data by user_id and sort by timestamp
-    user_groups = non_history_df.groupby("user_id")
+    # Process rows by user_id for better cache efficiency
+    non_history_df = non_history_df.sort_values(["user_id", "timestamp"])
 
-    for user_id, group in tqdm(user_groups, desc="Processing users"):
-        # Sort by timestamp
-        group = group.sort_values("timestamp_seconds")
+    current_user_id = None
+    user_history_df = None
 
-        # If user has no history, add zero-value rows
-        if user_id not in user_data:
-            for _, row in group.iterrows():
-                result = {
-                    "event_id": row["event_id"],
-                    "user_id": user_id,
-                    "timestamp": row["timestamp"],
-                    "event": row["event"],
-                    "answer_id": row.get("answer_id", None),
-                    "question_id": row.get("question_id", None),
-                    "is_bounty": row.get("is_bounty", 0),
-                    "bounty_amount": row.get("bounty_amount", 0),
-                    "answer_sequence": row.get("answer_sequence", None),
-                    "numQuestionsAskedAT": 0,
-                    "numHelpReceivedAT": 0,
-                    "numHelpProvidedAT": 0,
-                    "numHelpProvidedEver": 0,
-                    "numQuestionsAsked30D": 0,
-                    "numHelpReceived30D": 0,
-                    "numHelpProvided30D": 0,
-                    "numQuestionsAsked14D": 0,
-                    "numHelpReceived14D": 0,
-                    "numHelpProvided14D": 0,
-                    "numQuestionsAsked7D": 0,
-                    "numHelpReceived7D": 0,
-                    "numHelpProvided7D": 0,
-                    "numQuestionsAsked3D": 0,
-                    "numHelpReceived3D": 0,
-                    "numHelpProvided3D": 0
-                }
-                results.append(result)
-            continue
+    for _, row in tqdm(non_history_df.iterrows(), total=len(non_history_df), desc="Processing rows"):
+        user_id = row["user_id"]
+        target_time = row["timestamp"]
 
-        # Get user's history data
-        user_history = user_data[user_id]
-        hist_timestamps = user_history["timestamps"]
-        cum_questions = user_history["cum_questions"]
-        cum_accepted = user_history["cum_accepted"]
-        cum_answers = user_history["cum_answers"]
+        # Only fetch user history once for each user (caching optimization)
+        if user_id != current_user_id:
+            current_user_id = user_id
+            if user_id in user_histories:
+                user_history_df = user_histories[user_id]
+            else:
+                user_history_df = pd.DataFrame(columns=history_df.columns)
 
-        # Process each row for this user
-        for _, row in group.iterrows():
-            target_time = row["timestamp_seconds"]
+        # Get history up to target time (strict < comparison)
+        user_history_before = user_history_df[user_history_df["timestamp"] < target_time]
 
-            # Find the index of the last event STRICTLY BEFORE this timestamp
-            idx_at = np.searchsorted(hist_timestamps, target_time, side='left') - 1
+        # Calculate all-time metrics
+        questions_asked_at = user_history_before["questionAsked"].sum()
+        help_received_at = user_history_before["acceptedAnswer"].sum()
+        help_provided_at = user_history_before["answer"].sum()
+        help_provided_ever = 1 if help_provided_at > 0 else 0
 
-            # Skip if no history data before this time
-            if idx_at < 0:
-                result = {
-                    "event_id": row["event_id"],
-                    "user_id": user_id,
-                    "timestamp": row["timestamp"],
-                    "event": row["event"],
-                    "answer_id": row.get("answer_id", None),
-                    "question_id": row.get("question_id", None),
-                    "is_bounty": row.get("is_bounty", 0),
-                    "bounty_amount": row.get("bounty_amount", 0),
-                    "answer_sequence": row.get("answer_sequence", None),
-                    "numQuestionsAskedAT": 0,
-                    "numHelpReceivedAT": 0,
-                    "numHelpProvidedAT": 0,
-                    "numHelpProvidedEver": 0,
-                    "numQuestionsAsked30D": 0,
-                    "numHelpReceived30D": 0,
-                    "numHelpProvided30D": 0,
-                    "numQuestionsAsked14D": 0,
-                    "numHelpReceived14D": 0,
-                    "numHelpProvided14D": 0,
-                    "numQuestionsAsked7D": 0,
-                    "numHelpReceived7D": 0,
-                    "numHelpProvided7D": 0,
-                    "numQuestionsAsked3D": 0,
-                    "numHelpReceived3D": 0,
-                    "numHelpProvided3D": 0
-                }
-                results.append(result)
-                continue
+        # Calculate time window metrics
+        cutoff_30d = target_time - pd.Timedelta(days=30)
+        window_30d = user_history_before[user_history_before["timestamp"] >= cutoff_30d]
+        questions_asked_30d = window_30d["questionAsked"].sum()
+        help_received_30d = window_30d["acceptedAnswer"].sum()
+        help_provided_30d = window_30d["answer"].sum()
 
-            # Calculate time window cutoffs
-            cutoff_30d = target_time - seconds_30d
-            cutoff_14d = target_time - seconds_14d
-            cutoff_7d = target_time - seconds_7d
-            cutoff_3d = target_time - seconds_3d
+        cutoff_14d = target_time - pd.Timedelta(days=14)
+        window_14d = user_history_before[user_history_before["timestamp"] >= cutoff_14d]
+        questions_asked_14d = window_14d["questionAsked"].sum()
+        help_received_14d = window_14d["acceptedAnswer"].sum()
+        help_provided_14d = window_14d["answer"].sum()
 
-            # Find indices for time window boundaries using binary search
-            idx_30d = np.searchsorted(hist_timestamps, cutoff_30d, side='left') - 1
-            idx_14d = np.searchsorted(hist_timestamps, cutoff_14d, side='left') - 1
-            idx_7d = np.searchsorted(hist_timestamps, cutoff_7d, side='left') - 1
-            idx_3d = np.searchsorted(hist_timestamps, cutoff_3d, side='left') - 1
+        cutoff_7d = target_time - pd.Timedelta(days=7)
+        window_7d = user_history_before[user_history_before["timestamp"] >= cutoff_7d]
+        questions_asked_7d = window_7d["questionAsked"].sum()
+        help_received_7d = window_7d["acceptedAnswer"].sum()
+        help_provided_7d = window_7d["answer"].sum()
 
-            # Get all-time metrics
-            q_at = cum_questions[idx_at]
-            a_at = cum_accepted[idx_at]
-            ans_at = cum_answers[idx_at]
+        cutoff_3d = target_time - pd.Timedelta(days=3)
+        window_3d = user_history_before[user_history_before["timestamp"] >= cutoff_3d]
+        questions_asked_3d = window_3d["questionAsked"].sum()
+        help_received_3d = window_3d["acceptedAnswer"].sum()
+        help_provided_3d = window_3d["answer"].sum()
 
-            # Calculate metrics for each time window
-            # If window index is below 0, use 0 as the starting count
-            q_30d = q_at - (cum_questions[idx_30d] if idx_30d >= 0 else 0)
-            a_30d = a_at - (cum_accepted[idx_30d] if idx_30d >= 0 else 0)
-            ans_30d = ans_at - (cum_answers[idx_30d] if idx_30d >= 0 else 0)
+        # Create result
+        result = {
+            "event_id": row["event_id"],
+            "user_id": user_id,
+            "timestamp": target_time,
+            "event": row["event"],
+            "answer_id": row.get("answer_id", None),
+            "question_id": row.get("question_id", None),
+            "is_bounty": row.get("is_bounty", 0),
+            "bounty_amount": row.get("bounty_amount", 0),
+            "answer_sequence": row.get("answer_sequence", None),
 
-            q_14d = q_at - (cum_questions[idx_14d] if idx_14d >= 0 else 0)
-            a_14d = a_at - (cum_accepted[idx_14d] if idx_14d >= 0 else 0)
-            ans_14d = ans_at - (cum_answers[idx_14d] if idx_14d >= 0 else 0)
+            "numQuestionsAskedAT": questions_asked_at,
+            "numHelpReceivedAT": help_received_at,
+            "numHelpProvidedAT": help_provided_at,
+            "numHelpProvidedEver": help_provided_ever,
 
-            q_7d = q_at - (cum_questions[idx_7d] if idx_7d >= 0 else 0)
-            a_7d = a_at - (cum_accepted[idx_7d] if idx_7d >= 0 else 0)
-            ans_7d = ans_at - (cum_answers[idx_7d] if idx_7d >= 0 else 0)
+            "numQuestionsAsked30D": questions_asked_30d,
+            "numHelpReceived30D": help_received_30d,
+            "numHelpProvided30D": help_provided_30d,
 
-            q_3d = q_at - (cum_questions[idx_3d] if idx_3d >= 0 else 0)
-            a_3d = a_at - (cum_accepted[idx_3d] if idx_3d >= 0 else 0)
-            ans_3d = ans_at - (cum_answers[idx_3d] if idx_3d >= 0 else 0)
+            "numQuestionsAsked14D": questions_asked_14d,
+            "numHelpReceived14D": help_received_14d,
+            "numHelpProvided14D": help_provided_14d,
 
-            # Create result
-            result = {
-                "event_id": row["event_id"],
-                "user_id": user_id,
-                "timestamp": row["timestamp"],
-                "event": row["event"],
-                "answer_id": row.get("answer_id", None),
-                "question_id": row.get("question_id", None),
-                "is_bounty": row.get("is_bounty", 0),
-                "bounty_amount": row.get("bounty_amount", 0),
-                "answer_sequence": row.get("answer_sequence", None),
+            "numQuestionsAsked7D": questions_asked_7d,
+            "numHelpReceived7D": help_received_7d,
+            "numHelpProvided7D": help_provided_7d,
 
-                "numQuestionsAskedAT": q_at,
-                "numHelpReceivedAT": a_at,
-                "numHelpProvidedAT": ans_at,
-                "numHelpProvidedEver": 1 if ans_at > 0 else 0,
+            "numQuestionsAsked3D": questions_asked_3d,
+            "numHelpReceived3D": help_received_3d,
+            "numHelpProvided3D": help_provided_3d,
+        }
 
-                "numQuestionsAsked30D": q_30d,
-                "numHelpReceived30D": a_30d,
-                "numHelpProvided30D": ans_30d,
-
-                "numQuestionsAsked14D": q_14d,
-                "numHelpReceived14D": a_14d,
-                "numHelpProvided14D": ans_14d,
-
-                "numQuestionsAsked7D": q_7d,
-                "numHelpReceived7D": a_7d,
-                "numHelpProvided7D": ans_7d,
-
-                "numQuestionsAsked3D": q_3d,
-                "numHelpReceived3D": a_3d,
-                "numHelpProvided3D": ans_3d
-            }
-
-            results.append(result)
+        results.append(result)
 
     # Create DataFrame from results
     output_df = pd.DataFrame(results)
@@ -238,8 +146,8 @@ def process_bounty_dataset(input_file: str, output_file: str) -> None:
 
 
 if __name__ == "__main__":
-    input_file = "02_raw_datasets/user_answers_bounty_dataset_sampled_500K.parquet"
-    output_file = "03_processed_datasets/user_answers_bounty_processed_sampled_500K.parquet"
+    input_file = "02_raw_datasets/user_answers_bounty_dataset_sampled_10k.parquet"
+    output_file = "03_processed_datasets/user_answers_bounty_processed_sampled_10k.parquet"
 
     process_bounty_dataset(
         input_file=input_file,
