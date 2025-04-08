@@ -146,8 +146,8 @@ def process_bounty_dataset(input_file: str, output_file: str) -> None:
 
 
 if __name__ == "__main__":
-    input_file = "02_raw_datasets/user_answers_bounty_dataset_sampled_10k.parquet"
-    output_file = "03_processed_datasets/user_answers_bounty_processed_sampled_10k.parquet"
+    input_file = "02_raw_datasets/user_answers_bounty_dataset_sampled_100k.parquet"
+    output_file = "03_processed_datasets/user_answers_bounty_processed_sampled_100k.parquet"
 
     process_bounty_dataset(
         input_file=input_file,

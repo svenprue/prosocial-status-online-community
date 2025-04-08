@@ -1,109 +1,74 @@
-import os
+import pandas as pd
 import duckdb
+from tqdm import tqdm
 
+# Load the processed dataset with the issue
+df = pd.read_parquet("03_processed_datasets/user_answers_bounty_processed_sampled_100k.parquet")
 
-def count_answer_users_with_questions_join(input_folder: str) -> None:
-    """
-    Count unique users who have posted answers, joining with questions table
-    to distinguish between self-answers and answers to others' questions.
+# Connect to DuckDB for querying bounty data
+con = duckdb.connect(database=':memory:')
 
-    Args:
-        input_folder: Directory containing the parquet files
-    """
-    # Path to parquet files
-    answers_path = os.path.join(input_folder, "posts_answers.parquet")
-    questions_path = os.path.join(input_folder, "posts_questions.parquet")
+# Load the necessary data sources
+bounty_votes_path = "01_input_data/processed_data_dump/Votes.parquet"
+answers_path = "01_input_data/processed_data_dump/posts_answers.parquet"
 
-    # Check if files exist
-    for path in [answers_path, questions_path]:
-        if not os.path.exists(path):
-            print(f"Input file not found: {path}")
-            return
-
-    print(f"Querying answers and questions data...")
-
-    # Connect to DuckDB
-    con = duckdb.connect(database=':memory:')
-    con.execute("PRAGMA memory_limit='4GB'")
-    con.execute("PRAGMA threads=4")
-    con.execute("PRAGMA enable_progress_bar;")
-
-    # All answers (simple count without joins)
-    query_all = f"""
-    SELECT 
-        COUNT(DISTINCT OwnerUserId) AS unique_users,
-        COUNT(*) AS total_answers
-    FROM '{answers_path}'
-    WHERE OwnerUserId IS NOT NULL
-    """
-
-    # Joined query (similar to dataset creation)
-    query_joined = f"""
-    WITH answers AS (
-        SELECT
-            Id AS answer_id,
-            OwnerUserId AS owner_user_id,
-            ParentId AS parent_question_id,
-            CreationDate AS creation_date
-        FROM '{answers_path}'
-        WHERE OwnerUserId IS NOT NULL
-    ),
-    questions AS (
-        SELECT
-            Id AS question_id,
-            OwnerUserId AS owner_user_id,
-            CreationDate AS creation_date
-        FROM '{questions_path}'
-        WHERE OwnerUserId IS NOT NULL
-    ),
-    joined_answers AS (
-        SELECT
-            a.owner_user_id AS user_id,
-            a.answer_id,
-            a.parent_question_id AS question_id,
-            CASE WHEN a.owner_user_id = q.owner_user_id THEN 1 ELSE 0 END AS is_self_answer
-        FROM answers a
-        JOIN questions q ON a.parent_question_id = q.question_id
-    )
+# Create a view of the bounty votes
+con.execute(f"""
+    CREATE TABLE bounty_votes AS
     SELECT
-        COUNT(DISTINCT user_id) AS total_users_after_join,
-        COUNT(DISTINCT CASE WHEN is_self_answer = 0 THEN user_id END) AS users_with_non_self_answers,
-        COUNT(DISTINCT CASE WHEN is_self_answer = 1 THEN user_id END) AS users_with_only_self_answers,
-        COUNT(*) AS total_answers_after_join,
-        SUM(CASE WHEN is_self_answer = 0 THEN 1 ELSE 0 END) AS non_self_answers,
-        SUM(CASE WHEN is_self_answer = 1 THEN 1 ELSE 0 END) AS self_answers
-    FROM joined_answers
-    """
+        PostId AS answer_id,
+        CAST(BountyAmount AS INTEGER) AS bounty_amount
+    FROM '{bounty_votes_path}'
+    WHERE VoteTypeId = 9
+""")
 
-    # Execute queries
-    print("Counting all answers...")
-    all_result = con.execute(query_all).fetchone()
-
-    print("Counting with questions join...")
-    joined_result = con.execute(query_joined).fetchone()
-
-    # Print results
-    print("\n=== ANSWER COUNTS ===")
-    print(f"Total unique users who posted answers: {all_result[0]:,}")
-    print(f"Total answers: {all_result[1]:,}")
-    print(f"Average answers per user: {all_result[1] / all_result[0]:.2f}")
-
-    print("\n=== AFTER JOINING WITH QUESTIONS ===")
-    print(f"Users with answers after join: {joined_result[0]:,}")
-    print(f"Users with non-self answers: {joined_result[1]:,}")
-    print(f"Users with self-answers: {joined_result[2]:,}")
-    print(f"Total answers after join: {joined_result[3]:,}")
-    print(f"Non-self answers: {joined_result[4]:,}")
-    print(f"Self-answers: {joined_result[5]:,}")
-
-    # Calculate how many users/answers were excluded by joining
-    excluded_users = all_result[0] - joined_result[0]
-    excluded_answers = all_result[1] - joined_result[3]
-    print(f"\nExcluded by join: {excluded_users:,} users, {excluded_answers:,} answers")
-
-    con.close()
+# Create a view of answers to link answer_id to question_id
+con.execute(f"""
+    CREATE TABLE answers AS
+    SELECT
+        Id AS answer_id,
+        ParentId AS question_id
+    FROM '{answers_path}'
+""")
 
 
-if __name__ == "__main__":
-    input_data_folder = "./01_input_data/processed_data_dump"
-    count_answer_users_with_questions_join(input_data_folder)
+# Function to look up bounty amount for a given question_id
+def get_bounty_amount(question_id, answer_id=None):
+    # If we have both question_id and answer_id, we can be more specific
+    query = f"""
+            SELECT b.bounty_amount
+            FROM bounty_votes b
+            JOIN answers a ON b.answer_id = a.answer_id
+            WHERE a.question_id = {question_id}
+     """
+
+    result = con.execute(query).fetchone()
+    return result[0] if result else 0
+
+
+# Create a copy of the DataFrame to avoid modifying the original
+result_df = df.copy()
+
+# Filter to only rows where is_bounty is 1 but bounty_amount is 0
+bounty_rows = result_df[(result_df['is_bounty'] == 1) & (result_df['bounty_amount'] == 0)]
+print(f"Found {len(bounty_rows)} rows marked as bounty with amount 0")
+
+# Only update these rows
+for idx in tqdm(bounty_rows.index, desc="Updating bounty amounts"):
+    row = result_df.loc[idx]
+    question_id = row['question_id']
+    answer_id = row['answer_id']
+
+    # Look up the correct bounty amount
+    bounty_amount = get_bounty_amount(question_id, answer_id)
+    # Update the bounty amount in the result DataFrame
+    result_df.at[idx, 'bounty_amount'] = bounty_amount
+
+# Print summary
+updated_count = len(result_df[(result_df['is_bounty'] == 1) & (result_df['bounty_amount'] > 0)])
+print(f"Updated {updated_count} rows with proper bounty amounts")
+print(f"Total bounty amount: {result_df['bounty_amount'].sum()}")
+
+# Save the corrected dataset
+result_df.to_parquet("03_processed_datasets/user_answers_bounty_processed_fixed.parquet", index=False)
+print(f"Fixed dataset saved to 03_processed_datasets/user_answers_bounty_processed_fixed.parquet")

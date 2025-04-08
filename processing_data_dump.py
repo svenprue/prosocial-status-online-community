@@ -18,6 +18,7 @@ def parse_generic_row_posts(elem):
             'PostTypeId': post_type_id,
             'CreationDate': attrib.get('CreationDate', None),
             'OwnerUserId': attrib.get('OwnerUserId', None),
+            'Score': attrib.get('Score', None),
             'AcceptedAnswerId': attrib.get('AcceptedAnswerId', None),
             'ParentId': attrib.get('ParentId', None)
         }
@@ -31,7 +32,7 @@ def parse_generic_row_votes(elem):
     attrib = elem.attrib
     try:
         vote_type_id = attrib.get('VoteTypeId', None)
-        if vote_type_id not in ["1", "8", "9"]:  # Filter: Only relevant vote types
+        if vote_type_id not in ["1", "2", "3", "8", "9"]:  # Filter: Only relevant vote types
             return None
 
         return {
@@ -175,18 +176,18 @@ def main():
     users_file_path = os.path.join(input_folder, 'Users.xml')
     badges_file_path = os.path.join(input_folder, 'Badges.xml')
 
-    # process_posts(posts_file_path, output_folder)
+    process_posts(posts_file_path, output_folder)
     process_votes(votes_file_path, output_folder)
-    # process_users(users_file_path, output_folder)
-    # process_badges(badges_file_path, output_folder)
+    #process_users(users_file_path, output_folder)
+    #process_badges(badges_file_path, output_folder)
 
     # Fix column types for all processed parquet files
     parquet_files = [
-        # os.path.join(output_folder, 'posts_answers.parquet'),
-        # os.path.join(output_folder, 'posts_questions.parquet'),
+        #os.path.join(output_folder, 'posts_answers.parquet'),
+        #os.path.join(output_folder, 'posts_questions.parquet'),
         os.path.join(output_folder, 'Votes.parquet'),
-        # os.path.join(output_folder, 'Users.parquet'),
-        # os.path.join(output_folder, 'Badges.parquet')
+        #os.path.join(output_folder, 'Users.parquet'),
+        #os.path.join(output_folder, 'Badges.parquet')
     ]
     fix_column_types(parquet_files)
 

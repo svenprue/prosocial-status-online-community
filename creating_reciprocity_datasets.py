@@ -182,9 +182,11 @@ def process_data(
             1 AS is_history,
             NULL AS response_time
         FROM answers a
+        JOIN questions q ON a.parent_question_id = q.question_id
         WHERE a.owner_user_id IN (
             SELECT DISTINCT asker_id FROM eligible_answers
-        );
+        )
+        AND a.owner_user_id != q.owner_user_id  -- Exclude self-answers
     """).fetchdf()
 
     historical_events_df = pd.concat([
@@ -313,7 +315,7 @@ def process_data(
     print(f"Done! Saved dataset to {output_path}")
 
 if __name__ == "__main__":
-    input_data_folder = r".\01_input_data\processed_SO_data_dump"
+    input_data_folder = r".\01_input_data\processed_data_dump"
     output_data_folder = r".\02_raw_datasets"
     os.makedirs(output_data_folder, exist_ok=True)
 
