@@ -108,13 +108,19 @@ def convert_xml_to_parquet(xml_path, parquet_path, parse_function, chunk_size=10
         pbar.close()
 
 
-def split_parquet_by_column(parquet_file_path, output_folder, column, values):
+def split_parquet_by_column(parquet_file_path, output_folder, column, values, custom_names=None):
     con = duckdb.connect(database=':memory:', read_only=False)
     con.execute(f"CREATE VIEW data AS SELECT * FROM '{parquet_file_path}'")
 
-    for value in values:
+    for i, value in enumerate(values):
         df = con.execute(f"SELECT * FROM data WHERE {column} = {value}").df()
-        output_path = os.path.join(output_folder, f'{column}_{value}.parquet')
+
+        if custom_names and i < len(custom_names):
+            output_filename = custom_names[i]
+        else:
+            output_filename = f'{column}_{value}.parquet'
+
+        output_path = os.path.join(output_folder, output_filename)
         df.to_parquet(output_path, index=False)
 
     con.close()
@@ -123,7 +129,13 @@ def split_parquet_by_column(parquet_file_path, output_folder, column, values):
 def process_posts(posts_file_path, output_folder):
     posts_parquet_path = os.path.join(output_folder, 'Posts.parquet')
     convert_xml_to_parquet(posts_file_path, posts_parquet_path, parse_generic_row_posts)
-    split_parquet_by_column(posts_parquet_path, output_folder, 'PostTypeId', [1, 2])
+    split_parquet_by_column(
+        posts_parquet_path,
+        output_folder,
+        'PostTypeId',
+        [1, 2],
+        custom_names=['posts_questions.parquet', 'posts_answers.parquet']
+    )
 
 
 def process_votes(votes_file_path, output_folder):
@@ -152,7 +164,8 @@ def fix_column_types(parquet_file_paths):
         # Cast ID columns to INTEGER
         id_columns = con.execute(f"PRAGMA table_info('temp')").fetchdf()
         for col in id_columns['name']:
-            if any(id_keyword in col.lower() for id_keyword in ['id', 'userid', 'owneruserid', 'AcceptedAnswerId', 'ParentId']):
+            if any(id_keyword in col.lower() for id_keyword in
+                   ['id', 'userid', 'owneruserid', 'AcceptedAnswerId', 'ParentId']):
                 con.execute(f"ALTER TABLE temp ALTER COLUMN {col} SET DATA TYPE INTEGER")
 
         # Cast date columns to TIMESTAMP
@@ -178,16 +191,16 @@ def main():
 
     process_posts(posts_file_path, output_folder)
     process_votes(votes_file_path, output_folder)
-    #process_users(users_file_path, output_folder)
-    #process_badges(badges_file_path, output_folder)
+    # process_users(users_file_path, output_folder)
+    # process_badges(badges_file_path, output_folder)
 
     # Fix column types for all processed parquet files
     parquet_files = [
-        #os.path.join(output_folder, 'posts_answers.parquet'),
-        #os.path.join(output_folder, 'posts_questions.parquet'),
+        os.path.join(output_folder, 'posts_answers.parquet'),
+        os.path.join(output_folder, 'posts_questions.parquet'),
         os.path.join(output_folder, 'Votes.parquet'),
-        #os.path.join(output_folder, 'Users.parquet'),
-        #os.path.join(output_folder, 'Badges.parquet')
+        # os.path.join(output_folder, 'Users.parquet'),
+        # os.path.join(output_folder, 'Badges.parquet')
     ]
     fix_column_types(parquet_files)
 
