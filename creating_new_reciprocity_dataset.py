@@ -37,7 +37,7 @@ def process_question_data(
             Id AS answer_id,
             OwnerUserId AS owner_user_id,
             ParentId AS parent_question_id,
-            Score AS score,
+            CAST(Score AS INTEGER) AS score,
             CAST(CreationDate AS TIMESTAMP) AS creation_date
         FROM '{answers_path}'
         WHERE OwnerUserId IS NOT NULL;
@@ -163,6 +163,14 @@ def process_question_data(
             WHERE rn = 1;
         """)
 
+    # Add the summary print statements here
+    question_count = con.execute("SELECT COUNT(*) FROM eligible_questions").fetchone()[0]
+    user_count = con.execute("SELECT COUNT(DISTINCT owner_user_id) FROM eligible_questions").fetchone()[0]
+
+    print(f"Summary for window_length={window_length}d:")
+    print(f"  - Including {question_count} questions from {user_count} unique users")
+    print(f"  - {'All questions' if include_all_questions else 'One question'} per user mode")
+
     con.execute("""
         CREATE OR REPLACE TEMPORARY TABLE phase_definitions AS
         SELECT
@@ -204,7 +212,8 @@ def process_question_data(
             NULL AS has_accepted_answer,
             NULL AS first_answer_timestamp,
             NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp
+            NULL AS accepted_answer_vote_timestamp,
+            NULL AS question_timestamp
         FROM questions q
         WHERE q.owner_user_id IN (
             SELECT DISTINCT owner_user_id FROM eligible_questions
@@ -227,7 +236,8 @@ def process_question_data(
             NULL AS has_accepted_answer,
             NULL AS first_answer_timestamp,
             NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp
+            NULL AS accepted_answer_vote_timestamp,
+            NULL AS question_timestamp
         FROM answers a
         JOIN questions q ON a.parent_question_id = q.question_id
         WHERE a.owner_user_id IN (
@@ -252,7 +262,8 @@ def process_question_data(
             NULL AS has_accepted_answer,
             NULL AS first_answer_timestamp,
             NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp
+            NULL AS accepted_answer_vote_timestamp,
+            NULL AS question_timestamp
         FROM questions q
         JOIN answers a 
           ON q.accepted_answer_id = a.answer_id
@@ -277,7 +288,8 @@ def process_question_data(
             NULL AS has_accepted_answer,
             NULL AS first_answer_timestamp,
             NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp
+            NULL AS accepted_answer_vote_timestamp,
+            NULL AS question_timestamp
         FROM answers a
         JOIN votes v ON a.answer_id = v.post_id
         WHERE a.owner_user_id IN (
@@ -312,7 +324,8 @@ def process_question_data(
             has_accepted_answer,
             first_answer_timestamp,
             accepted_answer_timestamp,
-            accepted_answer_vote_timestamp
+            accepted_answer_vote_timestamp,
+            question_timestamp
         FROM phase_definitions;
     """)
 
@@ -332,7 +345,8 @@ def process_question_data(
             has_accepted_answer,
             first_answer_timestamp,
             accepted_answer_timestamp,
-            accepted_answer_vote_timestamp
+            accepted_answer_vote_timestamp,
+            question_timestamp
         FROM phase_definitions;
     """)
 
@@ -352,7 +366,8 @@ def process_question_data(
             has_accepted_answer,
             first_answer_timestamp,
             accepted_answer_timestamp,
-            accepted_answer_vote_timestamp
+            accepted_answer_vote_timestamp,
+            question_timestamp
         FROM phase_definitions;
     """)
 
@@ -373,7 +388,8 @@ def process_question_data(
             p.has_accepted_answer,
             p.first_answer_timestamp,
             p.accepted_answer_timestamp,
-            p.accepted_answer_vote_timestamp
+            p.accepted_answer_vote_timestamp,
+            p.question_timestamp
         FROM phase_definitions p
         JOIN answers a
           ON a.owner_user_id = p.owner_user_id
@@ -422,7 +438,8 @@ def process_question_data(
                 has_accepted_answer,
                 first_answer_timestamp,
                 accepted_answer_timestamp,
-                accepted_answer_vote_timestamp
+                accepted_answer_vote_timestamp,
+                question_timestamp
             FROM all_events
         )
         TO '{output_path}'
@@ -438,7 +455,7 @@ if __name__ == "__main__":
     output_data_folder = r".\02_raw_datasets"
     os.makedirs(output_data_folder, exist_ok=True)
 
-    for days in [14, 7, 3]:
+    for days in [7]:
         process_question_data(
             input_folder=input_data_folder,
             output_folder=output_data_folder,

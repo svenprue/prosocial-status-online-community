@@ -165,7 +165,7 @@ def fix_column_types(parquet_file_paths):
         id_columns = con.execute(f"PRAGMA table_info('temp')").fetchdf()
         for col in id_columns['name']:
             if any(id_keyword in col.lower() for id_keyword in
-                   ['id', 'userid', 'owneruserid', 'AcceptedAnswerId', 'ParentId']):
+                   ['id', 'userid', 'owneruserid', 'AcceptedAnswerId', 'ParentId', 'Score']):
                 con.execute(f"ALTER TABLE temp ALTER COLUMN {col} SET DATA TYPE INTEGER")
 
         # Cast date columns to TIMESTAMP
@@ -189,8 +189,8 @@ def main():
     users_file_path = os.path.join(input_folder, 'Users.xml')
     badges_file_path = os.path.join(input_folder, 'Badges.xml')
 
-    process_posts(posts_file_path, output_folder)
-    process_votes(votes_file_path, output_folder)
+    # process_posts(posts_file_path, output_folder)
+    # process_votes(votes_file_path, output_folder)
     # process_users(users_file_path, output_folder)
     # process_badges(badges_file_path, output_folder)
 
