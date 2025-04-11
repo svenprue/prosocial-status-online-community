@@ -101,13 +101,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
                              cutoff_date: str = "2025-04-01") -> None:
     """
     Process the question-centered dataset to calculate metrics for each user.
-    Uses a pandas-based approach for metric calculation.
-
-    Args:
-        input_file: Path to the input parquet file
-        output_file: Path to save the processed data
-        chunk_size: Number of users to process in each chunk
-        cutoff_date: Cutoff date for phase_two_end
+    Metrics are calculated only at Phase_One_Start events and applied to all rows with the same event_id.
     """
     print(f"\n=== Processing {input_file} ===")
     cutoff = pd.to_datetime(cutoff_date)
@@ -219,29 +213,22 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         del history_df
         gc.collect()
 
-        # Process non-history rows
-        print("Processing non-history rows...")
+        # Find all Phase_One_Start events
+        phase_one_starts = non_history_df[non_history_df["event"] == "Phase_One_Start"]
+        print(f"Found {len(phase_one_starts)} Phase_One_Start events")
 
-        # Create placeholder for Phase_One_Start events
-        phase_one_start_metrics = {}
+        # Get all unique event IDs
+        all_event_ids = non_history_df["event_id"].unique()
+        print(f"Total unique event_ids: {len(all_event_ids)}")
 
-        # Sort non-history rows by user_id and timestamp for better efficiency
-        non_history_df = non_history_df.sort_values(["user_id", "timestamp"])
-
-        # Create result columns for all phases
-        results = []
-
-        # Choose a debug user to verify metrics
-        debug_user_id = chunk_user_ids[0] if len(chunk_user_ids) > 0 else None
-        debug_count = 0
-
-        # Process each event row
-        for _, row in tqdm(non_history_df.iterrows(), total=len(non_history_df), desc="Processing rows"):
+        # Calculate metrics for Phase_One_Start events
+        event_metrics = {}
+        for _, row in tqdm(phase_one_starts.iterrows(), total=len(phase_one_starts), desc="Calculating metrics at Phase_One_Start"):
             user_id = row["user_id"]
             event_id = row["event_id"]
             target_time = row["timestamp"]
 
-            # If user not in history, use zeros for all metrics
+            # Calculate metrics
             if user_id not in user_histories:
                 metrics = (0, 0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0,
@@ -249,137 +236,96 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
                            0, 0, 0, 0, 0, 0,
                            0, 0, 0, 0, 0, 0)
             else:
-                # Use pandas-based calculation
                 metrics = calculate_metrics_pandas(user_histories[user_id], target_time)
 
-                # Debug output for the first user
-                if user_id == debug_user_id and debug_count < 3:
-                    debug_count += 1
-                    print(f"\nDEBUG: User {user_id}, Event {event_id}, Time {target_time}")
-                    print(f"All-time metrics: {metrics[0:7]}")
-                    print(f"30-day metrics: {metrics[7:13]}")
-                    print(f"Recent events for this user:")
-                    recent = user_histories[user_id][user_histories[user_id]["timestamp"] <= target_time].tail(5)
-                    print(recent[["timestamp", "event", "questionAsked", "acceptedAnswer", "answer"]].to_string())
+            # Store metrics for this event_id
+            event_metrics[event_id] = metrics
 
-            # Store metrics for Phase_One_Start events for later lookup by event_id
-            if row["event"] == "Phase_One_Start":
-                phase_one_start_metrics[event_id] = metrics
+        # Check for missing event_ids
+        missing_event_ids = set(all_event_ids) - set(event_metrics.keys())
+        if missing_event_ids:
+            print(f"Warning: {len(missing_event_ids)} event_ids have no Phase_One_Start event. Using zero metrics.")
+            default_metrics = (0, 0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0,
+                               0, 0, 0, 0, 0, 0)
+            for eid in missing_event_ids:
+                event_metrics[eid] = default_metrics
 
-            # Unpack metrics
-            (q_at, a_at, ans_at, help_provided_ever, ans_rec_at, acc_ans_rec_at, acc_vote_rec_at,
-             q_30d, a_30d, ans_30d, ans_rec_30d, acc_ans_rec_30d, acc_vote_rec_30d,
-             q_14d, a_14d, ans_14d, ans_rec_14d, acc_ans_rec_14d, acc_vote_rec_14d,
-             q_7d, a_7d, ans_7d, ans_rec_7d, acc_ans_rec_7d, acc_vote_rec_7d,
-             q_3d, a_3d, ans_3d, ans_rec_3d, acc_ans_rec_3d, acc_vote_rec_3d) = metrics
+        # Create metric columns with default zeros
+        metric_columns = [
+            "numQuestionsAskedAT", "numHelpReceivedAT", "numHelpProvidedAT", "numHelpProvidedEver",
+            "numAnswersReceivedAT", "numAcceptedAnswersReceivedAT", "numAcceptedVotesReceivedAT",
+            "numQuestionsAsked30D", "numHelpReceived30D", "numHelpProvided30D",
+            "numAnswersReceived30D", "numAcceptedAnswersReceived30D", "numAcceptedVotesReceived30D",
+            "numQuestionsAsked14D", "numHelpReceived14D", "numHelpProvided14D",
+            "numAnswersReceived14D", "numAcceptedAnswersReceived14D", "numAcceptedVotesReceived14D",
+            "numQuestionsAsked7D", "numHelpReceived7D", "numHelpProvided7D",
+            "numAnswersReceived7D", "numAcceptedAnswersReceived7D", "numAcceptedVotesReceived7D",
+            "numQuestionsAsked3D", "numHelpReceived3D", "numHelpProvided3D",
+            "numAnswersReceived3D", "numAcceptedAnswersReceived3D", "numAcceptedVotesReceived3D"
+        ]
 
-            # Create result dictionary
-            result = {
-                "event_id": event_id,
-                "user_id": user_id,
-                "timestamp": target_time,
-                "event": row["event"],
-                "question_id": row.get("question_id", None),
-                "phase_one_start": row.get("phase_one_start", None),
-                "phase_two_end": row.get("phase_two_end", None),
-                "event_history": row.get("event_history", None),
-                "is_history": 0,  # Non-history rows only
+        # Convert event_metrics dictionary to a DataFrame
+        metrics_data = []
+        for event_id, metrics in event_metrics.items():
+            metrics_data.append([event_id] + list(metrics))
 
-                # Question-specific properties
-                "has_answer": row.get("has_answer", 0),
-                "has_accepted_answer": row.get("has_accepted_answer", 0),
-                "time_to_first_answer_hours": row.get("time_to_first_answer_hours", None),
-                "time_to_accepted_answer_hours": row.get("time_to_accepted_answer_hours", None),
-                "time_to_accept_vote_hours": row.get("time_to_accept_vote_hours", None),
+        metrics_df = pd.DataFrame(metrics_data, columns=['event_id'] + metric_columns)
 
-                # All-time metrics
-                "numQuestionsAskedAT": q_at,
-                "numHelpReceivedAT": a_at,
-                "numHelpProvidedAT": ans_at,
-                "numAnswersReceivedAT": ans_rec_at,
-                "numAcceptedAnswersReceivedAT": acc_ans_rec_at,
-                "numAcceptedVotesReceivedAT": acc_vote_rec_at,
-                "numHelpProvidedEver": help_provided_ever,
+        # Merge with non_history_df instead of iterating
+        non_history_df = pd.merge(non_history_df, metrics_df, on='event_id', how='left')
 
-                # 30-day window metrics
-                "numQuestionsAsked30D": q_30d,
-                "numHelpReceived30D": a_30d,
-                "numHelpProvided30D": ans_30d,
-                "numAnswersReceived30D": ans_rec_30d,
-                "numAcceptedAnswersReceived30D": acc_ans_rec_30d,
-                "numAcceptedVotesReceived30D": acc_vote_rec_30d,
-
-                # 14-day window metrics
-                "numQuestionsAsked14D": q_14d,
-                "numHelpReceived14D": a_14d,
-                "numHelpProvided14D": ans_14d,
-                "numAnswersReceived14D": ans_rec_14d,
-                "numAcceptedAnswersReceived14D": acc_ans_rec_14d,
-                "numAcceptedVotesReceived14D": acc_vote_rec_14d,
-
-                # 7-day window metrics
-                "numQuestionsAsked7D": q_7d,
-                "numHelpReceived7D": a_7d,
-                "numHelpProvided7D": ans_7d,
-                "numAnswersReceived7D": ans_rec_7d,
-                "numAcceptedAnswersReceived7D": acc_ans_rec_7d,
-                "numAcceptedVotesReceived7D": acc_vote_rec_7d,
-
-                # 3-day window metrics
-                "numQuestionsAsked3D": q_3d,
-                "numHelpReceived3D": a_3d,
-                "numHelpProvided3D": ans_3d,
-                "numAnswersReceived3D": ans_rec_3d,
-                "numAcceptedAnswersReceived3D": acc_ans_rec_3d,
-                "numAcceptedVotesReceived3D": acc_vote_rec_3d,
-            }
-
-            results.append(result)
-
-        # Create DataFrame from results
-        chunk_output_df = pd.DataFrame(results)
-
-        # Free memory for user histories
-        del user_histories
-        gc.collect()
+        # Set the numHelped column based on answer events
+        non_history_df["numHelped"] = np.where(non_history_df["event"] == "Window_Answer", 1, 0)
+        non_history_df["hasAnswer"] = (non_history_df["has_answer"] > 0).astype(int)
 
         # Determine phase (1 or 2) based on timestamps
-        chunk_output_df["TimestampInt"] = pd.to_numeric(chunk_output_df["timestamp"], errors="coerce",
-                                                        downcast="integer")
+        non_history_df["TimestampInt"] = pd.to_numeric(non_history_df["timestamp"], errors="coerce", downcast="integer")
         start_times = (
-            chunk_output_df.loc[chunk_output_df["event"] == "Phase_One_Start"]
+            non_history_df.loc[non_history_df["event"] == "Phase_One_Start"]
             .groupby("event_id")["TimestampInt"]
             .max()
         )
         end_times = (
-            chunk_output_df.loc[chunk_output_df["event"] == "Phase_Two_End"]
+            non_history_df.loc[non_history_df["event"] == "Phase_Two_End"]
             .groupby("event_id")["TimestampInt"]
             .max()
         )
-        chunk_output_df["start_time"] = chunk_output_df["event_id"].map(start_times)
-        chunk_output_df["end_time"] = chunk_output_df["event_id"].map(end_times)
-        chunk_output_df["end_time"] = chunk_output_df["end_time"].fillna(chunk_output_df["start_time"])
+        non_history_df["start_time"] = non_history_df["event_id"].map(start_times)
+        non_history_df["end_time"] = non_history_df["event_id"].map(end_times)
+        non_history_df["end_time"] = non_history_df["end_time"].fillna(non_history_df["start_time"])
 
-        chunk_output_df["isPhase"] = np.where(
-            (chunk_output_df["TimestampInt"] >= chunk_output_df["start_time"]) &
-            (chunk_output_df["TimestampInt"] < chunk_output_df["end_time"]),
+        non_history_df["isPhase"] = np.where(
+            (non_history_df["TimestampInt"] >= non_history_df["start_time"]) &
+            (non_history_df["TimestampInt"] < non_history_df["end_time"]),
             0,
             1,
         )
-        chunk_output_df["phase"] = chunk_output_df["isPhase"].replace({0: 1, 1: 2})
+        non_history_df["phase"] = non_history_df["isPhase"].replace({0: 1, 1: 2})
 
         # Add additional derived metrics
-        chunk_output_df["receivedHelpEver"] = (chunk_output_df["numHelpReceivedAT"] > 0).astype(int)
-        chunk_output_df["receivedAnswerEver"] = (chunk_output_df["numAnswersReceivedAT"] > 0).astype(int)
-        chunk_output_df["receivedAcceptedAnswerEver"] = (chunk_output_df["numAcceptedAnswersReceivedAT"] > 0).astype(
-            int)
-        chunk_output_df["receivedAcceptedVoteEver"] = (chunk_output_df["numAcceptedVotesReceivedAT"] > 0).astype(int)
-        chunk_output_df["month"] = chunk_output_df["timestamp"].dt.month
-        chunk_output_df["year"] = chunk_output_df["timestamp"].dt.year
+        non_history_df["receivedHelpEver"] = (non_history_df["numHelpReceivedAT"] > 0).astype(int)
+        non_history_df["receivedAnswerEver"] = (non_history_df["numAnswersReceivedAT"] > 0).astype(int)
+        non_history_df["receivedAcceptedAnswerEver"] = (non_history_df["numAcceptedAnswersReceivedAT"] > 0).astype(int)
+        non_history_df["receivedAcceptedVoteEver"] = (non_history_df["numAcceptedVotesReceivedAT"] > 0).astype(int)
+        non_history_df["month"] = non_history_df["timestamp"].dt.month
+        non_history_df["year"] = non_history_df["timestamp"].dt.year
 
-        # Set the numHelped column based on answer events
-        chunk_output_df["numHelped"] = np.where(chunk_output_df["event"] == "Window_Answer", 1, 0)
-        chunk_output_df["hasAnswer"] = (chunk_output_df["has_answer"] > 0).astype(int)
+        # Verify the metrics are consistent across event_ids
+        if chunk_idx == 0:
+            print("\nVerifying metrics consistency across event_ids...")
+            sample_event_id = non_history_df["event_id"].iloc[0]
+            sample_rows = non_history_df[non_history_df["event_id"] == sample_event_id]
+            if len(sample_rows) > 1:
+                # Check a few metrics to make sure they're the same
+                metric_checks = ["numQuestionsAskedAT", "numHelpProvidedAT", "numQuestionsAsked7D"]
+                for metric in metric_checks:
+                    values = sample_rows[metric].unique()
+                    print(f"Event {sample_event_id}, metric {metric}: {len(values)} unique values - {values}")
+                    if len(values) > 1:
+                        print("WARNING: Inconsistent metrics for the same event_id!")
 
         # Group and aggregate data by event_id and phase
         group_cols = ["event_id", "phase"]
@@ -439,7 +385,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         }
 
         # Apply aggregation
-        agg_df = chunk_output_df.groupby(group_cols).agg(agg_dict).reset_index()
+        agg_df = non_history_df.groupby(group_cols).agg(agg_dict).reset_index()
 
         # Print the first few rows of the aggregated dataframe for verification
         if chunk_idx == 0:
@@ -471,10 +417,10 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             print(f"Appended to output file (running total: {all_result_count:,} rows)")
 
         # Free memory
-        del chunk_output_df
         del non_history_df
-        del results
         del agg_df
+        del user_histories
+        del event_metrics
         gc.collect()
         print(f"Memory cleared for next chunk")
 
@@ -495,6 +441,6 @@ if __name__ == "__main__":
         process_question_dataset(
             input_file=input_file,
             output_file=output_file,
-            chunk_size=250000,
+            chunk_size=1000000,
             cutoff_date=cutoff_date
         )
