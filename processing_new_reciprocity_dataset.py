@@ -103,20 +103,20 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
     Process the question-centered dataset to calculate metrics for each user.
     Metrics are calculated only at Phase_One_Start events and applied to all rows with the same event_id.
     """
-    print(f"\n=== Processing {input_file} ===")
+    # print(f"\n=== Processing {input_file} ===")
     cutoff = pd.to_datetime(cutoff_date)
 
     # Get unique user IDs
     user_ids_original = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
-    print(f"Found {len(user_ids_original):,} unique users")
-    print("First 10 user IDs before shuffling:")
-    print(user_ids_original[:10])
+    # print(f"Found {len(user_ids_original):,} unique users")
+    # print("First 10 user IDs before shuffling:")
+    # print(user_ids_original[:10])
 
     # Create a copy and shuffle it
     user_ids = np.copy(user_ids_original)
     np.random.shuffle(user_ids)
-    print("First 10 user IDs after shuffling:")
-    print(user_ids[:10])
+    # print("First 10 user IDs after shuffling:")
+    # print(user_ids[:10])
 
     # Create output directory if it doesn't exist
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -130,12 +130,12 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
     all_result_count = 0
 
     # Process users in chunks
-    for chunk_idx in tqdm(range(num_chunks), desc="Processing chunks", total=num_chunks):
+    for chunk_idx in tqdm(range(num_chunks), desc="Processing chunks", total=num_chunks, position=0, leave=False):
         start_idx = chunk_idx * chunk_size
         end_idx = min((chunk_idx + 1) * chunk_size, len(user_ids))
         chunk_user_ids = user_ids[start_idx:end_idx]
 
-        print(f"\nProcessing chunk {chunk_idx + 1}/{num_chunks} with {len(chunk_user_ids):,} users")
+        # print(f"\nProcessing chunk {chunk_idx + 1}/{num_chunks} with {len(chunk_user_ids):,} users")
 
         # Read only data for current chunk of users
         user_ids_str = ", ".join(str(id) for id in chunk_user_ids)
@@ -145,7 +145,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
            SELECT * FROM read_parquet('{input_file}')
            WHERE user_id IN ({user_ids_str})
        """).to_df()
-        print(f"Loaded {len(df):,} rows for this chunk.")
+        # print(f"Loaded {len(df):,} rows for this chunk.")
 
         # Ensure the timestamp is in datetime format
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
@@ -195,18 +195,18 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         del df
         gc.collect()
 
-        print(f"History rows in chunk: {len(history_df):,}")
-        print(f"Non-history rows in chunk: {len(non_history_df):,}")
+        # print(f"History rows in chunk: {len(history_df):,}")
+        # print(f"Non-history rows in chunk: {len(non_history_df):,}")
 
         if len(non_history_df) == 0:
-            print("No non-history rows in this chunk, skipping...")
+            # print("No non-history rows in this chunk, skipping...")
             continue
 
         # Build user history data
-        print("Building user history cache...")
+        # print("Building user history cache...")
         user_histories = {}
 
-        for user_id, group in tqdm(history_df.groupby("user_id"), desc="Preprocessing users"):
+        for user_id, group in tqdm(history_df.groupby("user_id"), desc="Preprocessing users", position=1, leave=False):
             user_histories[user_id] = group
 
         # Free memory
@@ -215,15 +215,15 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
 
         # Find all Phase_One_Start events
         phase_one_starts = non_history_df[non_history_df["event"] == "Phase_One_Start"]
-        print(f"Found {len(phase_one_starts)} Phase_One_Start events")
+        # print(f"Found {len(phase_one_starts)} Phase_One_Start events")
 
         # Get all unique event IDs
         all_event_ids = non_history_df["event_id"].unique()
-        print(f"Total unique event_ids: {len(all_event_ids)}")
+        # print(f"Total unique event_ids: {len(all_event_ids)}")
 
         # Calculate metrics for Phase_One_Start events
         event_metrics = {}
-        for _, row in tqdm(phase_one_starts.iterrows(), total=len(phase_one_starts), desc="Calculating metrics at Phase_One_Start"):
+        for _, row in tqdm(phase_one_starts.iterrows(), total=len(phase_one_starts), desc="Calculating metrics at Phase_One_Start", position=1, leave=False):
             user_id = row["user_id"]
             event_id = row["event_id"]
             target_time = row["timestamp"]
@@ -244,7 +244,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         # Check for missing event_ids
         missing_event_ids = set(all_event_ids) - set(event_metrics.keys())
         if missing_event_ids:
-            print(f"Warning: {len(missing_event_ids)} event_ids have no Phase_One_Start event. Using zero metrics.")
+            # print(f"Warning: {len(missing_event_ids)} event_ids have no Phase_One_Start event. Using zero metrics.")
             default_metrics = (0, 0, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0, 0,
@@ -315,7 +315,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
 
         # Verify the metrics are consistent across event_ids
         if chunk_idx == 0:
-            print("\nVerifying metrics consistency across event_ids...")
+            # print("\nVerifying metrics consistency across event_ids...")
             sample_event_id = non_history_df["event_id"].iloc[0]
             sample_rows = non_history_df[non_history_df["event_id"] == sample_event_id]
             if len(sample_rows) > 1:
@@ -323,7 +323,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
                 metric_checks = ["numQuestionsAskedAT", "numHelpProvidedAT", "numQuestionsAsked7D"]
                 for metric in metric_checks:
                     values = sample_rows[metric].unique()
-                    print(f"Event {sample_event_id}, metric {metric}: {len(values)} unique values - {values}")
+                    # print(f"Event {sample_event_id}, metric {metric}: {len(values)} unique values - {values}")
                     if len(values) > 1:
                         print("WARNING: Inconsistent metrics for the same event_id!")
 
@@ -387,16 +387,11 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         # Apply aggregation
         agg_df = non_history_df.groupby(group_cols).agg(agg_dict).reset_index()
 
-        # Print the first few rows of the aggregated dataframe for verification
-        if chunk_idx == 0:
-            print("\nSample of aggregated data:")
-            print(agg_df.head().to_string())
-
         # Remove any rows with phase_two_end after the cutoff date
         initial_count = len(agg_df)
         agg_df = agg_df[agg_df["phase_two_end"] <= cutoff]
         removed = initial_count - len(agg_df)
-        print(f"Removed {removed} aggregated rows with phase_two_end after {cutoff_date}.")
+        # print(f"Removed {removed} aggregated rows with phase_two_end after {cutoff_date}.")
 
         # Demean numHelped per user
         agg_df["meaned_numHelped"] = agg_df.groupby("user_id")["numHelped"].transform(lambda x: x - x.mean())
@@ -406,15 +401,15 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         all_result_count += chunk_count
 
         # Save the chunk to file
-        print(f"Saving chunk {chunk_idx + 1}/{num_chunks} with {chunk_count:,} rows...")
+        # print(f"Saving chunk {chunk_idx + 1}/{num_chunks} with {chunk_count:,} rows...")
         if chunk_idx == 0:
             # First chunk, create the file
             agg_df.to_parquet(output_file, index=False)
-            print(f"Created new output file: {output_file}")
+            # print(f"Created new output file: {output_file}")
         else:
             # Subsequent chunks, append to existing file
             agg_df.to_parquet(output_file, index=False, append=True)
-            print(f"Appended to output file (running total: {all_result_count:,} rows)")
+            # print(f"Appended to output file (running total: {all_result_count:,} rows)")
 
         # Free memory
         del non_history_df
@@ -422,7 +417,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         del user_histories
         del event_metrics
         gc.collect()
-        print(f"Memory cleared for next chunk")
+        # print(f"Memory cleared for next chunk")
 
     print(f"Processed a total of {all_result_count:,} rows")
     print(f"Saved output to {output_file}")
@@ -441,6 +436,6 @@ if __name__ == "__main__":
         process_question_dataset(
             input_file=input_file,
             output_file=output_file,
-            chunk_size=1000000,
+            chunk_size=1,
             cutoff_date=cutoff_date
         )

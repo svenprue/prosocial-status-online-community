@@ -393,7 +393,7 @@ def process_question_data(
         FROM phase_definitions p
         JOIN answers a
           ON a.owner_user_id = p.owner_user_id
-         AND a.creation_date BETWEEN p.Phase_One_Start AND p.phase_two_end
+         AND a.creation_date BETWEEN p.phase_one_start AND p.phase_two_end
         JOIN questions q
           ON a.parent_question_id = q.question_id
         WHERE q.owner_user_id <> p.owner_user_id;

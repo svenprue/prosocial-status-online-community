@@ -117,3 +117,5 @@ model = smf.logit(formula=formula, data=filtered_df).fit(cov_type='cluster', cov
 
 # Print the summary of the model
 print(model.summary())
+
+
