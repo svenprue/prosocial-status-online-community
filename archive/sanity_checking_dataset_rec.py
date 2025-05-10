@@ -2,7 +2,7 @@ import pandas as pd
 import datetime
 
 # Load the parquet file
-df = pd.read_parquet('02_raw_datasets/question_centered_model_7d_all_questions.parquet')
+df = pd.read_parquet('../02_raw_datasets/question_centered_model_7d_all_questions.parquet')
 
 # Convert timestamp columns to datetime if needed
 timestamp_cols = ['timestamp', 'phase_one_start', 'phase_two_end', 'first_answer_timestamp',

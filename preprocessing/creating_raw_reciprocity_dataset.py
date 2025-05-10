@@ -297,11 +297,39 @@ def process_question_data(
         )
     """).fetchdf()
 
+    # Historical events: Accepted Answers posted by the user
+    accepted_answers_posted_df = con.execute("""
+        SELECT
+            NULL AS event_id,
+            a.owner_user_id AS user_id,
+            a.creation_date AS timestamp,
+            'AcceptedAnswerPosted' AS event,
+            NULL AS question_id,
+            NULL AS phase_one_start,
+            NULL AS phase_two_end,
+            'AcceptedAnswerPosted' AS event_history,
+            1 AS is_history,
+            NULL AS has_answer,
+            NULL AS has_accepted_answer,
+            NULL AS first_answer_timestamp,
+            NULL AS accepted_answer_timestamp,
+            NULL AS accepted_answer_vote_timestamp,
+            NULL AS question_timestamp
+        FROM answers a
+        JOIN questions q 
+          ON q.accepted_answer_id = a.answer_id
+        WHERE a.owner_user_id IN (
+            SELECT DISTINCT owner_user_id FROM eligible_questions
+        )
+        AND a.owner_user_id != q.owner_user_id  -- Exclude self-accepted answers
+    """).fetchdf()
+
     historical_events_df = pd.concat([
         questions_asked_df,
         answers_provided_df,
         accepted_answers_df,
-        answer_votes_df
+        answer_votes_df,
+        accepted_answers_posted_df
     ], ignore_index=True)
 
     con.register("historical_events_df", historical_events_df)
@@ -451,8 +479,8 @@ def process_question_data(
 
 
 if __name__ == "__main__":
-    input_data_folder = r".\01_input_data\processed_data_dump"
-    output_data_folder = r".\02_raw_datasets"
+    input_data_folder = r"..\data\input"
+    output_data_folder = r"..\data\input"
     os.makedirs(output_data_folder, exist_ok=True)
 
     for days in [7]:
