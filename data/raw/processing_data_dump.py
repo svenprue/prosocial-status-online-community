@@ -10,7 +10,7 @@ def parse_generic_row_posts(elem):
     attrib = elem.attrib
     try:
         post_type_id = attrib.get('PostTypeId', None)
-        if post_type_id not in ["1", "2"]:  # Filter: Only questions and answers
+        if post_type_id not in ["1", "2"]:
             return None
 
         return {
@@ -32,7 +32,7 @@ def parse_generic_row_votes(elem):
     attrib = elem.attrib
     try:
         vote_type_id = attrib.get('VoteTypeId', None)
-        if vote_type_id not in ["1", "2", "3", "8", "9"]:  # Filter: Only relevant vote types
+        if vote_type_id not in ["1", "2", "3", "8", "9"]:
             return None
 
         return {
@@ -181,26 +181,26 @@ def fix_column_types(parquet_file_paths):
 
 
 def main():
-    input_folder = './01_input_data/raw_data_dump'  # Specify your input folder here
-    output_folder = './01_input_data/processed_data_dump'  # Specify your output folder here
+    input_folder = './'  # Specify your input folder here
+    output_folder = '../input/'  # Specify your output folder here
 
     posts_file_path = os.path.join(input_folder, 'Posts.xml')
     votes_file_path = os.path.join(input_folder, 'Votes.xml')
     users_file_path = os.path.join(input_folder, 'Users.xml')
     badges_file_path = os.path.join(input_folder, 'Badges.xml')
 
-    # process_posts(posts_file_path, output_folder)
-    # process_votes(votes_file_path, output_folder)
-    # process_users(users_file_path, output_folder)
-    # process_badges(badges_file_path, output_folder)
+    process_posts(posts_file_path, output_folder)
+    process_votes(votes_file_path, output_folder)
+    process_users(users_file_path, output_folder)
+    process_badges(badges_file_path, output_folder)
 
     # Fix column types for all processed parquet files
     parquet_files = [
         os.path.join(output_folder, 'posts_answers.parquet'),
         os.path.join(output_folder, 'posts_questions.parquet'),
         os.path.join(output_folder, 'Votes.parquet'),
-        # os.path.join(output_folder, 'Users.parquet'),
-        # os.path.join(output_folder, 'Badges.parquet')
+        os.path.join(output_folder, 'Users.parquet'),
+        os.path.join(output_folder, 'Badges.parquet')
     ]
     fix_column_types(parquet_files)
 
