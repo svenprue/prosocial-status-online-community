@@ -42,6 +42,7 @@ def create_user_answers_dataset(
         # Load bounty timeline data
         # TODO: 1) Make sure to scrape latest bountied question
         # TODO: 2) Remove deleted Qs as of scraper from sample + those without start & end
+        # TODO: 3) Check if we correctly create dataset for multiple bounty timeframes
         con.execute(f"""
            CREATE TEMPORARY VIEW bounty_timeline AS
            SELECT 
