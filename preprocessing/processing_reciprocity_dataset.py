@@ -53,11 +53,11 @@ def calculate_metrics_jit(
     accepted_votes_received_3d = 0
     accepted_answers_posted_3d = 0
 
-    # Set cutoff times for different windows (in nanoseconds)
-    cutoff_30d = target_time - 30 * 86400 * 1_000_000_000
-    cutoff_14d = target_time - 14 * 86400 * 1_000_000_000
-    cutoff_7d = target_time - 7 * 86400 * 1_000_000_000
-    cutoff_3d = target_time - 3 * 86400 * 1_000_000_000
+    # Set cutoff times for different windows (in microseconds)
+    cutoff_30d = target_time - 30 * 86400 * 1_000_000
+    cutoff_14d = target_time - 14 * 86400 * 1_000_000
+    cutoff_7d = target_time - 7 * 86400 * 1_000_000
+    cutoff_3d = target_time - 3 * 86400 * 1_000_000
 
     # Find the timestamp of first activity (question asked or answer provided)
     first_activity_timestamp = np.int64(0)  # Initialize to 0 (no activity)
@@ -69,8 +69,8 @@ def calculate_metrics_jit(
     # Calculate time since first activity in days
     time_since_first_activity_days = 0.0
     if first_activity_timestamp > 0:  # If there was activity
-        # Convert nanoseconds to days (86400 seconds per day, 1_000_000_000 nanoseconds per second)
-        time_since_first_activity_days = (target_time - first_activity_timestamp) / (86400 * 1_000_000_000)
+        # Convert microseconds to days (86400 seconds per day, 1_000_000 microseconds per second)
+        time_since_first_activity_days = (target_time - first_activity_timestamp) / (86400 * 1_000_000)
 
     # Process each event in user history
     for i in range(len(timestamps)):
@@ -425,7 +425,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
                                0, 0, 0, 0, 0,
                                0, 0, 0, 0, 0,
                                0, "no help seeked", "no help attempted",
-                               0.0)  # Add default for timeSinceFirstActivityDays
+                               0.0)
             for eid in missing_event_ids:
                 event_metrics[eid] = default_metrics
 
@@ -446,7 +446,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             "numAcceptedAnswersReceived3D", "numAcceptedVotesReceived3D",
             "numAcceptedAnswersPosted3D",
             "numAcceptedAnswersPostedAT", "initialExperienceReceiving", "initialExperienceGiving",
-            "timeSinceFirstActivityDays"  # Add the new metric column
+            "timeSinceFirstActivityDays"
         ]
 
         # Convert metrics to DataFrame for efficient merging
@@ -573,7 +573,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             "numAcceptedAnswersPostedAT": "first",
             "initialExperienceReceiving": "first",
             "initialExperienceGiving": "first",
-            "timeSinceFirstActivityDays": "first",  # Add the new metric
+            "timeSinceFirstActivityDays": "first",
             "reciprocityActivated": "first",
             "reciprocityActivatedTimestamp": "first",
         }
