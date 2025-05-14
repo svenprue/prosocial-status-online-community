@@ -39,14 +39,16 @@ def create_user_answers_dataset(
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"Input file not found: {file_path}")
 
-        # Load bounty timeline data - using the cleaned version that already has proper timestamps
+        # Load bounty timeline data
+        # TODO: 1) Make sure to scrape latest bountied question
+        # TODO: 2) Remove deleted Qs as of scraper from sample + those without start & end
         con.execute(f"""
            CREATE TEMPORARY VIEW bounty_timeline AS
            SELECT 
                question_id,
                bounty_start,
                bounty_end
-           FROM '{bounty_timeline_path}'
+           FROM '{bounty_timeline_path}' 
            WHERE 
                bounty_start IS NOT NULL 
                AND bounty_end IS NOT NULL;
@@ -164,14 +166,15 @@ def create_user_answers_dataset(
         con.execute("""
                     CREATE
                     TEMPORARY TABLE user_events AS
-                    SELECT user_id,
-                           DENSE_RANK() OVER (ORDER BY user_id), answer_id AS event_id  
+                    SELECT
+                        user_id,
+                        answer_id,
+                        answer_id AS event_id  
                     FROM user_answers
-                    GROUP BY user_id;
                     """)
 
         # Count unique users
-        unique_users_result = con.execute("SELECT COUNT(*) as users FROM user_events").fetchone()
+        unique_users_result = con.execute("SELECT COUNT(DISTINCT user_id) as users FROM user_events").fetchone()
         unique_users = unique_users_result[0]
         print(f"Unique users with answers: {unique_users:,}")
 
@@ -190,7 +193,7 @@ def create_user_answers_dataset(
                a.answer_sequence,
                0 AS is_history
            FROM user_answers a
-           JOIN user_events e ON a.user_id = e.user_id;
+           JOIN user_events e ON a.answer_id = e.answer_id
        """)
 
         # Create historical events - Questions asked by users
@@ -209,7 +212,6 @@ def create_user_answers_dataset(
                1 AS is_history
            FROM questions q
            JOIN user_events e ON q.owner_user_id = e.user_id
-           WHERE q.owner_user_id IS NOT NULL;  -- Only include questions with a valid owner for history
        """)
 
         # Create historical events - Answers provided by users (explicitly excluding self-answers)
@@ -229,7 +231,6 @@ def create_user_answers_dataset(
            FROM user_answers a
            JOIN user_events e ON a.user_id = e.user_id
            WHERE a.user_id <> a.question_owner_id  -- Exclude self-answers
-           OR a.question_owner_id IS NULL;  -- Include answers to questions without owners
        """)
 
         # Create historical events - Answers received by users to their questions
@@ -250,7 +251,6 @@ def create_user_answers_dataset(
            JOIN answers a ON q.question_id = a.parent_question_id
            JOIN user_events e ON q.owner_user_id = e.user_id
            WHERE a.owner_user_id <> q.owner_user_id  -- Exclude self-answers
-           AND q.owner_user_id IS NOT NULL;  -- Only include questions with a valid owner
        """)
 
         # Create historical events - Accepted answers received by users
@@ -271,7 +271,6 @@ def create_user_answers_dataset(
            JOIN answers a ON q.accepted_answer_id = a.answer_id
            JOIN user_events e ON q.owner_user_id = e.user_id
            WHERE a.owner_user_id <> q.owner_user_id  -- Exclude self-accepted answers
-           AND q.owner_user_id IS NOT NULL;  -- Only include questions with a valid owner
        """)
 
         # Accept votes received (vote type 1)
@@ -312,7 +311,6 @@ def create_user_answers_dataset(
            JOIN questions q ON q.accepted_answer_id = a.answer_id
            JOIN user_events e ON a.owner_user_id = e.user_id
            WHERE a.owner_user_id <> q.owner_user_id  -- Exclude self-accepted answers
-           AND q.owner_user_id IS NOT NULL;  -- Only include questions with a valid owner
        """)
 
         # Combine all events
