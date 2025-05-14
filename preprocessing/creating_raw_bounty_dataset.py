@@ -165,7 +165,7 @@ def create_user_answers_dataset(
                     CREATE
                     TEMPORARY TABLE user_events AS
                     SELECT user_id,
-                           DENSE_RANK() OVER (ORDER BY user_id) AS event_id
+                           DENSE_RANK() OVER (ORDER BY user_id), answer_id AS event_id  
                     FROM user_answers
                     GROUP BY user_id;
                     """)
