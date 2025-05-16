@@ -9,7 +9,7 @@ def create_user_answers_dataset(
         output_folder: str,
         bounty_timeline_path: str,
         memory_limit: str = '10GB',
-        temp_dir_size: str = '65GiB',
+        temp_dir_size: str = '300GiB',
         threads: int = 4
 ) -> None:
     """
@@ -40,7 +40,6 @@ def create_user_answers_dataset(
                 raise FileNotFoundError(f"Input file not found: {file_path}")
 
         # Load bounty timeline data
-        # TODO: 1) Make sure to scrape latest bountied question
         # TODO: 2) Remove deleted Qs as of scraper from sample + those without start & end
         # TODO: 3) Check if we correctly create dataset for multiple bounty timeframes
         con.execute(f"""
@@ -67,7 +66,7 @@ def create_user_answers_dataset(
            WHERE OwnerUserId IS NOT NULL;
        """)
 
-        # Load ALL questions - without filtering NULL owners
+        # Load all questions
         con.execute(f"""
            CREATE TEMPORARY VIEW questions AS
            SELECT
@@ -107,9 +106,7 @@ def create_user_answers_dataset(
                q.owner_user_id AS question_owner_id
            FROM answers a
            LEFT JOIN questions q ON a.parent_question_id = q.question_id
-           WHERE a.owner_user_id IS NULL 
-              OR q.owner_user_id IS NULL 
-              OR a.owner_user_id <> q.owner_user_id;  -- Include: self-answer exclusion, answers to deleted/orphaned questions, answers to questions with NULL owner
+           WHERE a.owner_user_id <> q.owner_user_id;  -- Include: self-answer exclusion, answers to deleted/orphaned questions, answers to questions with NULL owner
        """)
 
         # Count answers after filtering
@@ -422,14 +419,14 @@ def create_user_answers_dataset(
        """)
 
         # Count total events
-        total_events_result = con.execute("SELECT COUNT(*) as total_events FROM all_events").fetchone()
+        total_events_result = con.execute("SELECT COUNT(DISTINCT event_id) as total_events FROM all_events").fetchone()
         total_events = total_events_result[0]
         print(f"Total events in final dataset: {total_events:,}")
 
         # Count events by type
         print("\nEvent type breakdown:")
         event_breakdown = con.execute("""
-                                      SELECT event, is_history, COUNT(*) as count
+                                      SELECT event, is_history, COUNT(DISTINCT event_id) as count
                                       FROM all_events
                                       GROUP BY event, is_history
                                       ORDER BY is_history, event

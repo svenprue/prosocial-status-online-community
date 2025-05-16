@@ -565,5 +565,5 @@ def print_full_event_details_from_dict(row_dict):
 
 
 if __name__ == "__main__":
-    processed_file_path = "../data/study_datasets/question_centered_model_7d_processedv2.parquet"
+    processed_file_path = "../data/study_datasets/question_centered_model_7d_processed.parquet"
     question_centered_sanity_check(processed_file_path)
