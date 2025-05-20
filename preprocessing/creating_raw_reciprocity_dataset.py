@@ -27,10 +27,8 @@ def process_question_data(
             AcceptedAnswerId AS accepted_answer_id,
             CAST(CreationDate AS TIMESTAMP) AS creation_date
         FROM '{questions_path}'
-        WHERE OwnerUserId IS NOT NULL;
     """)
 
-    # Modified to include Score for answers
     con.execute(f"""
         CREATE TEMPORARY VIEW answers AS
         SELECT
@@ -40,7 +38,6 @@ def process_question_data(
             CAST(Score AS INTEGER) AS score,
             CAST(CreationDate AS TIMESTAMP) AS creation_date
         FROM '{answers_path}'
-        WHERE OwnerUserId IS NOT NULL;
     """)
 
     con.execute(f"""
@@ -49,7 +46,7 @@ def process_question_data(
             PostId AS post_id,
             CAST(CreationDate AS TIMESTAMP) AS vote_date
         FROM '{votes_path}'
-        WHERE VoteTypeId = 1;  -- accepted answer vote
+        WHERE VoteTypeId = 1;
     """)
 
     # Define eligible questions with all the metrics we need
@@ -97,6 +94,7 @@ def process_question_data(
             WHERE q.owner_user_id IN (
                 SELECT DISTINCT owner_user_id 
                 FROM questions
+                WHERE owner_user_id IS NOT NULL
             );
         """)
     else:
@@ -148,6 +146,7 @@ def process_question_data(
                 WHERE q.owner_user_id IN (
                     SELECT DISTINCT owner_user_id 
                     FROM questions
+                    WHERE owner_user_id IS NOT NULL
                 )
             )
             SELECT 
@@ -243,7 +242,7 @@ def process_question_data(
         WHERE a.owner_user_id IN (
             SELECT DISTINCT owner_user_id FROM eligible_questions
         )
-        AND a.owner_user_id != q.owner_user_id  -- Exclude self-answers
+        AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
     """).fetchdf()
 
     # Historical events: AcceptedAnswers received
@@ -269,7 +268,7 @@ def process_question_data(
           ON q.accepted_answer_id = a.answer_id
         WHERE q.owner_user_id IN (
             SELECT DISTINCT owner_user_id FROM eligible_questions
-        );
+        )
     """).fetchdf()
 
     # Historical events: Accepted Answer Vote received
@@ -321,7 +320,7 @@ def process_question_data(
         WHERE a.owner_user_id IN (
             SELECT DISTINCT owner_user_id FROM eligible_questions
         )
-        AND a.owner_user_id != q.owner_user_id  -- Exclude self-accepted answers
+        AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
     """).fetchdf()
 
     historical_events_df = pd.concat([
@@ -399,7 +398,6 @@ def process_question_data(
         FROM phase_definitions;
     """)
 
-    # Also filter window answers to only include non-negative score answers
     con.execute("""
         CREATE TEMPORARY TABLE window_answers AS
         SELECT
@@ -424,7 +422,7 @@ def process_question_data(
          AND a.creation_date BETWEEN p.phase_one_start AND p.phase_two_end
         JOIN questions q
           ON a.parent_question_id = q.question_id
-        WHERE q.owner_user_id <> p.owner_user_id;
+        WHERE (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL);
     """)
 
     con.execute("""

@@ -63,9 +63,9 @@ def create_user_answers_dataset(
                Id AS answer_id,
                OwnerUserId AS owner_user_id,
                ParentId AS parent_question_id,
-               CAST(Score AS INTEGER) AS score,
                CAST(CreationDate AS TIMESTAMP) AS creation_date
            FROM '{answers_path}'
+           WHERE OwnerUserId IS NOT NULL;
        """)
 
         # Load all questions
@@ -108,8 +108,7 @@ def create_user_answers_dataset(
                q.owner_user_id AS question_owner_id
            FROM answers a
            LEFT JOIN questions q ON a.parent_question_id = q.question_id
-           WHERE a.owner_user_id IS NOT NULL
-           AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+           WHERE a.owner_user_id <> q.owner_user_id;  -- Include: self-answer exclusion, answers to deleted/orphaned questions, answers to questions with NULL owner
        """)
 
         # Count answers after filtering
@@ -252,7 +251,7 @@ def create_user_answers_dataset(
                                              """).fetchdf()
             append_to_output(questions_asked_df, "Historical Question events")
 
-            # Historical events: Answers provided by users (excluding self-answers)
+            # Historical events: Answers provided by users (explicitly excluding self-answers)
             answers_provided_df = con.execute("""
                                               SELECT a.user_id,
                                                      a.timestamp,
@@ -265,7 +264,7 @@ def create_user_answers_dataset(
                                                      1                AS is_history
                                               FROM user_answers a
                                               WHERE a.user_id IN (SELECT user_id FROM batch_users)
-                                                AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+                                                AND a.user_id <> a.question_owner_id -- Exclude self-answers
                                               """).fetchdf()
             append_to_output(answers_provided_df, "Historical AnswerProvided events")
 
@@ -284,8 +283,7 @@ def create_user_answers_dataset(
                                                   JOIN answers a
                                               ON q.question_id = a.parent_question_id
                                               WHERE q.owner_user_id IN (SELECT user_id FROM batch_users)
-                                                AND (a.owner_user_id <> q.owner_user_id OR a.owner_user_id IS NULL)
-                                                AND a.score >= 0 -- only non-negative answers
+                                                AND a.owner_user_id <> q.owner_user_id -- Exclude self-answers
                                               """).fetchdf()
             append_to_output(answers_received_df, "Historical AnswerReceived events")
 
@@ -304,7 +302,7 @@ def create_user_answers_dataset(
                                                            JOIN answers a
                                                        ON q.accepted_answer_id = a.answer_id
                                                        WHERE q.owner_user_id IN (SELECT user_id FROM batch_users)
-                                                         AND (a.owner_user_id <> q.owner_user_id OR a.owner_user_id IS NULL)
+                                                         AND a.owner_user_id <> q.owner_user_id -- Exclude self-accepted answers
                                                        """).fetchdf()
             append_to_output(accepted_answers_received_df, "Historical AcceptedAnswerReceived events")
 
@@ -342,7 +340,7 @@ def create_user_answers_dataset(
                                                          JOIN questions q
                                                      ON q.accepted_answer_id = a.answer_id
                                                      WHERE a.owner_user_id IN (SELECT user_id FROM batch_users)
-                                                       AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+                                                       AND a.owner_user_id <> q.owner_user_id -- Exclude self-accepted answers
                                                      """).fetchdf()
             append_to_output(accepted_answers_posted_df, "Historical AcceptedAnswerPosted events")
 

@@ -15,9 +15,9 @@ def focused_sanity_check(processed_file_path):
     # 1. Basic distribution statistics
     print("\n=== Basic Dataset Statistics ===")
 
-    # Count distinct eventIds to verify that each is unique
-    result = conn.execute(f"SELECT COUNT(DISTINCT eventId) AS unique_eventIds FROM '{processed_file_path}'").fetchone()
-    print(f"Unique eventIds: {result[0]:,}")
+    # Count distinct answerIds to verify that each is unique
+    result = conn.execute(f"SELECT COUNT(DISTINCT answerId) AS unique_answerIds FROM '{processed_file_path}'").fetchone()
+    print(f"Unique answerIds: {result[0]:,}")
 
     # Unique users count
     result = conn.execute(f"SELECT COUNT(DISTINCT userId) AS unique_users FROM '{processed_file_path}'").fetchone()
@@ -28,15 +28,15 @@ def focused_sanity_check(processed_file_path):
         f"SELECT COUNT(DISTINCT answerId) AS unique_answers FROM '{processed_file_path}'").fetchone()
     print(f"Unique answerId: {result[0]:,}")
 
-    # Check bounty distribution - use COUNT(eventId) since we want all events
+    # Check bounty distribution - use COUNT(answerId) since we want all events
     bounty_counts = conn.execute(f"""
-        WITH total AS (SELECT COUNT(eventId) AS total FROM '{processed_file_path}')
+        WITH total AS (SELECT COUNT(answerId) AS total FROM '{processed_file_path}')
         SELECT 
             isBounty, 
-            COUNT(eventId) AS count, 
-            CAST(COUNT(eventId) * 100.0 / (SELECT total FROM total) AS FLOAT) AS percentage
+            COUNT(answerId) AS count, 
+            CAST(COUNT(answerId) * 100.0 / (SELECT total FROM total) AS FLOAT) AS percentage
         FROM (
-            SELECT eventId, isBounty 
+            SELECT answerId, isBounty 
             FROM '{processed_file_path}'
         )
         GROUP BY isBounty
@@ -45,17 +45,17 @@ def focused_sanity_check(processed_file_path):
 
     print("\nBounty distribution:")
     for row in bounty_counts:
-        print(f"  isBounty={row[0]}: {row[1]:,} eventIds ({row[2]:.1f}%)")
+        print(f"  isBounty={row[0]}: {row[1]:,} answerIds ({row[2]:.1f}%)")
 
     # Check for missing values in key columns
-    key_columns = ['userId', 'eventId', 'timestamp', 'event', 'questionId',
+    key_columns = ['userId', 'answerId', 'timestamp', 'event', 'questionId',
                    'numQuestionsAskedAT', 'numHelpProvidedAT', 'reciprocityActivated']
 
     print("\nMissing values in key columns:")
 
     # Create a single pass query to check all nulls in one go
     null_check_query = f"""
-        WITH total AS (SELECT COUNT(eventId) AS total FROM '{processed_file_path}')
+        WITH total AS (SELECT COUNT(answerId) AS total FROM '{processed_file_path}')
         SELECT 
             {', '.join([f"SUM(CASE WHEN {col} IS NULL THEN 1 ELSE 0 END) AS {col}_null" for col in key_columns])},
             (SELECT total FROM total) AS total_count
@@ -78,13 +78,13 @@ def focused_sanity_check(processed_file_path):
     # 2. Find specific example cases
     print("\n=== Specific Example Cases ===")
 
-    # Case 1: Count matching eventIds
-    needed_columns_case1 = ['eventId', 'numQuestionsAskedAT', 'numHelpProvidedAT',
+    # Case 1: Count matching answerIds
+    needed_columns_case1 = ['answerId', 'numQuestionsAskedAT', 'numHelpProvidedAT',
                             'numAcceptedAnswersReceivedAT', 'numAcceptedAnswersPostedAT',
                             'reciprocityActivated', 'isBounty']
 
     case1_count = conn.execute(f"""
-        SELECT COUNT(eventId)
+        SELECT COUNT(answerId)
         FROM (
             SELECT {', '.join(needed_columns_case1)} 
             FROM '{processed_file_path}'
@@ -98,12 +98,12 @@ def focused_sanity_check(processed_file_path):
     """).fetchone()[0]
 
     print("\nCase 1: All key metrics non-zero, reciprocity activated, isBounty=1")
-    print(f"Found {case1_count:,} matching eventIds")
+    print(f"Found {case1_count:,} matching answerIds")
 
     if case1_count > 0:
         # Only select essential columns for the example
         case1_columns = [
-            'eventId', 'userId', 'event', 'questionId', 'isBounty',
+            'answerId', 'userId', 'event', 'questionId', 'isBounty',
             'numQuestionsAskedAT', 'numHelpProvidedAT', 'numAcceptedAnswersReceivedAT',
             'numAcceptedAnswersPostedAT', 'reciprocityActivated',
             'initialExperienceReceiving', 'initialExperienceGiving'
@@ -124,11 +124,11 @@ def focused_sanity_check(processed_file_path):
         if case1:
             print_event_details(dict(zip(case1_columns, case1)))
     else:
-        print("  No matching eventIds found.")
+        print("  No matching answerIds found.")
 
         # Try with bounty=0 as fallback
         fallback_columns = [
-            'eventId', 'userId', 'event', 'questionId', 'isBounty',
+            'answerId', 'userId', 'event', 'questionId', 'isBounty',
             'numQuestionsAskedAT', 'numHelpProvidedAT', 'numAcceptedAnswersReceivedAT',
             'numAcceptedAnswersPostedAT', 'reciprocityActivated',
             'initialExperienceReceiving', 'initialExperienceGiving'
@@ -150,10 +150,10 @@ def focused_sanity_check(processed_file_path):
             print_event_details(dict(zip(fallback_columns, fallback)))
 
     # Case 2: Reciprocity not activated, isBounty=0
-    needed_columns_case2 = ['eventId', 'reciprocityActivated', 'isBounty']
+    needed_columns_case2 = ['answerId', 'reciprocityActivated', 'isBounty']
 
     case2_count = conn.execute(f"""
-        SELECT COUNT(eventId)
+        SELECT COUNT(answerId)
         FROM (
             SELECT {', '.join(needed_columns_case2)}
             FROM '{processed_file_path}'
@@ -163,12 +163,12 @@ def focused_sanity_check(processed_file_path):
     """).fetchone()[0]
 
     print("\nCase 2: Reciprocity not activated, isBounty=0")
-    print(f"Found {case2_count:,} matching eventIds")
+    print(f"Found {case2_count:,} matching answerIds")
 
     if case2_count > 0:
         # Only select essential columns
         case2_columns = [
-            'eventId', 'userId', 'event', 'questionId', 'isBounty',
+            'answerId', 'userId', 'event', 'questionId', 'isBounty',
             'numQuestionsAskedAT', 'numHelpProvidedAT', 'reciprocityActivated',
             'initialExperienceReceiving', 'initialExperienceGiving'
         ]
@@ -184,7 +184,7 @@ def focused_sanity_check(processed_file_path):
         if case2:
             print_event_details(dict(zip(case2_columns, case2)))
     else:
-        print("  No matching eventIds found.")
+        print("  No matching answerIds found.")
 
     # 3. Find examples for each experience case
     print("\n=== Experience Cases ===")
@@ -194,15 +194,15 @@ def focused_sanity_check(processed_file_path):
     receiving_values = ["no help seeked", "help seeked", "help received"]
 
     # Get the total count only once
-    total_count = conn.execute(f"SELECT COUNT(eventId) FROM '{processed_file_path}'").fetchone()[0]
+    total_count = conn.execute(f"SELECT COUNT(answerId) FROM '{processed_file_path}'").fetchone()[0]
 
     # Get all value counts in one query rather than separate ones
     receiving_query = f"""
         SELECT 
             initialExperienceReceiving,
-            COUNT(eventId) AS count
+            COUNT(answerId) AS count
         FROM (
-            SELECT eventId, initialExperienceReceiving 
+            SELECT answerId, initialExperienceReceiving 
             FROM '{processed_file_path}'
             WHERE initialExperienceReceiving IN ({', '.join([f"'{v}'" for v in receiving_values])})
         )
@@ -218,12 +218,12 @@ def focused_sanity_check(processed_file_path):
     for value in receiving_values:
         count = receiving_count_dict.get(value, 0)
         percentage = (count / total_count) * 100 if total_count > 0 else 0
-        print(f"  {value}: {count:,} eventIds ({percentage:.1f}%)")
+        print(f"  {value}: {count:,} answerIds ({percentage:.1f}%)")
 
         if count > 0:
             # Only select minimal columns for the example
             example_columns = [
-                'eventId', 'userId', 'initialExperienceReceiving',
+                'answerId', 'userId', 'questionId', 'initialExperienceReceiving',
                 'numQuestionsAskedAT', 'numHelpProvidedAT'
             ]
 
@@ -235,12 +235,13 @@ def focused_sanity_check(processed_file_path):
             """).fetchone()
 
             if example:
-                event_id = example[0]  # eventId is the first column
+                event_id = example[0]  # answerId is the first column
                 user_id = example[1]  # userId is the second column
-                print(f"    Example eventId: {event_id}, userId: {user_id}")
+                print(f"    Example answerId: {event_id}, userId: {user_id}")
 
                 # Print only key metrics
                 example_dict = dict(zip(example_columns, example))
+                print(f"    questionId: {example_dict.get('questionId', 'N/A')}")
                 print(f"    Questions asked: {example_dict.get('numQuestionsAskedAT', 'N/A')}")
                 print(f"    Help provided: {example_dict.get('numHelpProvidedAT', 'N/A')}")
 
@@ -253,9 +254,9 @@ def focused_sanity_check(processed_file_path):
     giving_query = f"""
         SELECT 
             initialExperienceGiving,
-            COUNT(eventId) AS count
+            COUNT(answerId) AS count
         FROM (
-            SELECT eventId, initialExperienceGiving 
+            SELECT answerId, initialExperienceGiving 
             FROM '{processed_file_path}'
             WHERE initialExperienceGiving IN ({', '.join([f"'{v}'" for v in giving_values])})
         )
@@ -271,12 +272,12 @@ def focused_sanity_check(processed_file_path):
     for value in giving_values:
         count = giving_count_dict.get(value, 0)
         percentage = (count / total_count) * 100 if total_count > 0 else 0
-        print(f"  {value}: {count:,} eventIds ({percentage:.1f}%)")
+        print(f"  {value}: {count:,} answerIds ({percentage:.1f}%)")
 
         if count > 0:
             # Only select minimal columns for the example
             example_columns = [
-                'eventId', 'userId', 'initialExperienceGiving',
+                'answerId', 'userId', 'questionId', 'initialExperienceGiving',
                 'numQuestionsAskedAT', 'numHelpProvidedAT'
             ]
 
@@ -288,12 +289,13 @@ def focused_sanity_check(processed_file_path):
             """).fetchone()
 
             if example:
-                event_id = example[0]  # eventId is the first column
+                event_id = example[0]  # answerId is the first column
                 user_id = example[1]  # userId is the second column
-                print(f"    Example eventId: {event_id}, userId: {user_id}")
+                print(f"    Example answerId: {event_id}, userId: {user_id}")
 
                 # Print only key metrics
                 example_dict = dict(zip(example_columns, example))
+                print(f"    questionId: {example_dict.get('questionId', 'N/A')}")
                 print(f"    Questions asked: {example_dict.get('numQuestionsAskedAT', 'N/A')}")
                 print(f"    Help provided: {example_dict.get('numHelpProvidedAT', 'N/A')}")
 
@@ -302,8 +304,8 @@ def focused_sanity_check(processed_file_path):
 
 
 def print_event_details(row_dict):
-    """Helper function to print key details of an eventId"""
-    print(f"  Event ID: {row_dict.get('eventId', 'N/A')}")
+    """Helper function to print key details of an answerId"""
+    print(f"  Event ID: {row_dict.get('answerId', 'N/A')}")
     print(f"  User ID: {row_dict.get('userId', 'N/A')}")
     print(f"  Event Type: {row_dict.get('event', 'N/A')}")
     print(f"  Question ID: {row_dict.get('questionId', 'N/A')}")

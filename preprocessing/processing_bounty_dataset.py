@@ -202,7 +202,7 @@ def calculate_reciprocity_activation(user_histories):
     return reciprocity_status
 
 
-def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 100000) -> None:
+def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 500000) -> None:
     print(f"\n=== Processing {input_file} ===")
 
     print("Reading unique user IDs...")
@@ -218,7 +218,7 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
     processed_rows = 0
 
     columns_to_read = [
-        "event_id", "user_id", "timestamp", "event", "answer_id",
+        "user_id", "timestamp", "event", "answer_id",
         "question_id", "is_bounty", "bounty_amount", "answer_sequence", "is_history"
     ]
 
@@ -340,7 +340,6 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
                 activation_timestamp = pd.NaT
 
             result = {
-                "eventId": row["event_id"],
                 "userId": user_id,
                 "timestamp": row["timestamp"],
                 "event": row["event"],
