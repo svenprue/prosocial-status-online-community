@@ -3,6 +3,9 @@ import duckdb
 import pandas as pd
 from pathlib import Path
 
+import tqdm
+from tqdm import tqdm
+
 
 def create_user_answers_dataset(
         input_folder: str,
@@ -185,7 +188,7 @@ def create_user_answers_dataset(
         first_write = True
 
         # Process users in batches
-        for batch_idx in range(num_batches):
+        for batch_idx in tqdm(range(num_batches), desc="Processing batches", unit="batch"):
             start_idx = batch_idx * batch_size
             end_idx = min((batch_idx + 1) * batch_size, total_users)
             batch_user_ids = all_user_ids[start_idx:end_idx]
@@ -265,7 +268,6 @@ def create_user_answers_dataset(
                                                      1                AS is_history
                                               FROM user_answers a
                                               WHERE a.user_id IN (SELECT user_id FROM batch_users)
-                                                AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
                                               """).fetchdf()
             append_to_output(answers_provided_df, "Historical AnswerProvided events")
 
