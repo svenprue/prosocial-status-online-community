@@ -481,7 +481,7 @@ if __name__ == "__main__":
     output_data_folder = r"..\data\input"
     os.makedirs(output_data_folder, exist_ok=True)
 
-    for days in [7]:
+    for days in [3,14]:
         process_question_data(
             input_folder=input_data_folder,
             output_folder=output_data_folder,

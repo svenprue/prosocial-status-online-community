@@ -211,10 +211,9 @@ def create_user_answers_dataset(
                     df.to_parquet(output_path, compression='gzip', index=False)
                     first_write = False
                 else:
-                    # Subsequent writes: append to existing file
-                    existing_df = pd.read_parquet(output_path)
-                    combined_df = pd.concat([existing_df, df], ignore_index=True)
-                    combined_df.to_parquet(output_path, compression='gzip', index=False)
+                    # Use fastparquet to append without loading the entire file
+                    import fastparquet as fp
+                    fp.write(output_path, df, compression='gzip', append=True, write_index=False)
 
                 print(f"    {event_type_name}: {len(df):,} events")
 
