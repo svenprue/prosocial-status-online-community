@@ -219,7 +219,8 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
 
     columns_to_read = [
         "user_id", "timestamp", "event", "answer_id",
-        "question_id", "is_bounty", "bounty_amount", "answer_sequence", "is_history"
+        "question_id", "is_bounty", "answered_before_bounty", "answered_after_bounty_ended",
+        "question_ever_had_bounty", "bounty_amount", "answer_sequence", "is_history"
     ]
 
     # Only one progress bar for chunks, with estimated time
@@ -346,6 +347,9 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
                 "answerId": row.get("answer_id", None),
                 "questionId": row.get("question_id", None),
                 "isBounty": row.get("is_bounty", 0),
+                "answeredBeforeBounty": row.get("answered_before_bounty", 0),
+                "answeredAfterBountyEnded": row.get("answered_after_bounty_ended", 0),
+                "questionEverHadBounty": row.get("question_ever_had_bounty", 0),
                 "bountyAmount": row.get("bounty_amount", 0),
                 "answerSequence": row.get("answer_sequence", None),
 

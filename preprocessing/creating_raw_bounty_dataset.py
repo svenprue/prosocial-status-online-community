@@ -38,9 +38,11 @@ def create_user_answers_dataset(
         answers_path = os.path.join(input_folder, 'posts_answers.parquet')
         votes_path = os.path.join(input_folder, 'Votes.parquet')
         questions_path = os.path.join(input_folder, 'posts_questions.parquet')
+        users_path = os.path.join(input_folder, 'Users.parquet')
+        badges_path = os.path.join(input_folder, 'Badges.parquet')
 
         # Verify input files exist
-        for file_path in [answers_path, votes_path, questions_path, bounty_timeline_path]:
+        for file_path in [answers_path, votes_path, questions_path, bounty_timeline_path, users_path, badges_path]:
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"Input file not found: {file_path}")
 
@@ -94,6 +96,25 @@ def create_user_answers_dataset(
            FROM '{votes_path}';
        """)
 
+        # Load users table
+        con.execute(f"""
+           CREATE TEMPORARY VIEW users AS
+           SELECT
+               Id AS user_id,
+               CAST(CreationDate AS TIMESTAMP) AS registration_date
+           FROM '{users_path}';
+       """)
+
+        # Load Autobiography badges
+        con.execute(f"""
+           CREATE TEMPORARY VIEW autobiography_badges AS
+           SELECT
+               UserId AS user_id,
+               CAST(Date AS TIMESTAMP) AS autobiography_received
+           FROM '{badges_path}'
+           WHERE Name = 'Autobiographer';
+       """)
+
         # Count total answers before filtering
         total_answers_result = con.execute("SELECT COUNT(*) as total FROM answers").fetchone()
         total_answers = total_answers_result[0]
@@ -122,6 +143,7 @@ def create_user_answers_dataset(
         print(f"Self-answers excluded: {total_answers - filtered_answers:,}")
 
         # Now check if any answer falls within any bounty period
+        # AND add new flags for bounty timing
         con.execute("""
                     CREATE
                     TEMPORARY TABLE answers_with_bounty_info AS
@@ -131,6 +153,7 @@ def create_user_answers_dataset(
                            a.timestamp,
                            a.answer_sequence,
                            a.question_owner_id,
+                           -- FLAG 1: answer posted DURING a bounty period
                            CASE
                                WHEN EXISTS (SELECT 1
                                             FROM bounty_timeline bt
@@ -138,17 +161,63 @@ def create_user_answers_dataset(
                                               AND a.timestamp BETWEEN bt.bounty_start AND bt.bounty_end)
                                    THEN 1
                                ELSE 0
-                               END AS is_bounty
+                               END AS is_bounty,
+                           -- FLAG 2: answer posted BEFORE the FIRST bounty started
+                           -- (i.e., question got its first bounty AFTER this answer)
+                           CASE
+                               WHEN a.timestamp < (SELECT MIN(bt.bounty_start)
+                                                   FROM bounty_timeline bt
+                                                   WHERE a.question_id = bt.question_id)
+                                   THEN 1
+                               ELSE 0
+                               END AS answered_before_bounty,
+                           -- FLAG 3: answer posted when NO bounty was active, but question had been bountied before
+                           -- (i.e., answer came after at least one bounty ended, but not during any active bounty)
+                           CASE
+                               WHEN EXISTS (SELECT 1
+                                            FROM bounty_timeline bt
+                                            WHERE a.question_id = bt.question_id
+                                              AND a.timestamp > bt.bounty_end)
+                                   AND NOT EXISTS (SELECT 1
+                                                   FROM bounty_timeline bt2
+                                                   WHERE a.question_id = bt2.question_id
+                                                     AND a.timestamp BETWEEN bt2.bounty_start AND bt2.bounty_end)
+                                   THEN 1
+                               ELSE 0
+                               END AS answered_after_bounty_ended,
+                           -- FLAG 4: question ever had a bounty (regardless of answer timing)
+                           CASE
+                               WHEN EXISTS (SELECT 1
+                                            FROM bounty_timeline bt
+                                            WHERE a.question_id = bt.question_id)
+                                   THEN 1
+                               ELSE 0
+                               END AS question_ever_had_bounty
                     FROM answers_with_questions a;
                     """)
 
         # Count bounty answers
-        bounty_answers_result = con.execute(
-            "SELECT COUNT(*) as bounty_count FROM answers_with_bounty_info WHERE is_bounty = 1").fetchone()
-        bounty_answers = bounty_answers_result[0]
-        print(f"Answers during bounty periods: {bounty_answers:,}")
+        bounty_during_result = con.execute(
+            "SELECT COUNT(*) as count FROM answers_with_bounty_info WHERE is_bounty = 1").fetchone()
+        bounty_before_result = con.execute(
+            "SELECT COUNT(*) as count FROM answers_with_bounty_info WHERE answered_before_bounty = 1").fetchone()
+        bounty_after_result = con.execute(
+            "SELECT COUNT(*) as count FROM answers_with_bounty_info WHERE answered_after_bounty_ended = 1").fetchone()
+        bounty_ever_result = con.execute(
+            "SELECT COUNT(*) as count FROM answers_with_bounty_info WHERE question_ever_had_bounty = 1").fetchone()
 
-        # Add bounty amount information
+        print(f"\nBounty flag statistics:")
+        print(f"  FLAG 1 - Answers DURING bounty periods (is_bounty=1): {bounty_during_result[0]:,}")
+        print(f"  FLAG 2 - Answers BEFORE first bounty started (answered_before_bounty=1): {bounty_before_result[0]:,}")
+        print(f"  FLAG 3 - Answers AFTER bounty ended, no active bounty (answered_after_bounty_ended=1): {bounty_after_result[0]:,}")
+        print(f"  FLAG 4 - Answers to questions that ever had bounty (question_ever_had_bounty=1): {bounty_ever_result[0]:,}")
+
+        # Check overlap
+        overlap_result = con.execute(
+            "SELECT COUNT(*) as count FROM answers_with_bounty_info WHERE is_bounty = 1 AND answered_before_bounty = 1").fetchone()
+        print(f"  Overlap (both flags=1, should be 0): {overlap_result[0]:,}")
+
+        # Add bounty amount information, user registration, and autobiography badge
         con.execute("""
                     CREATE
                     TEMPORARY TABLE user_answers AS
@@ -157,20 +226,34 @@ def create_user_answers_dataset(
                            a.question_id,
                            a.timestamp,
                            a.is_bounty,
+                           a.answered_before_bounty,
+                           a.answered_after_bounty_ended,
+                           a.question_ever_had_bounty,
                            COALESCE(b.bounty_amount, 0) AS bounty_amount,
                            a.answer_sequence,
-                           a.question_owner_id
+                           a.question_owner_id,
+                           u.registration_date,
+                           CAST(DATEDIFF('day', u.registration_date, a.timestamp) AS INTEGER) AS days_since_registration,
+                           ab.autobiography_received,
+                           CASE
+                               WHEN ab.autobiography_received IS NOT NULL
+                                   AND ab.autobiography_received <= a.timestamp
+                                   THEN 1
+                               ELSE 0
+                               END AS had_autobiography_badge
                     FROM answers_with_bounty_info a
                              LEFT JOIN (SELECT post_id, bounty_amount
                                         FROM votes
-                                        WHERE vote_type_id = 8) b ON a.answer_id = b.post_id;
+                                        WHERE vote_type_id = 8) b ON a.answer_id = b.post_id
+                             LEFT JOIN users u ON a.user_id = u.user_id
+                             LEFT JOIN autobiography_badges ab ON a.user_id = ab.user_id;
                     """)
 
         # Get all unique users to process in batches
         unique_users_result = con.execute("SELECT DISTINCT user_id FROM user_answers ORDER BY user_id").fetchall()
         all_user_ids = [row[0] for row in unique_users_result]
         total_users = len(all_user_ids)
-        print(f"Total unique users to process: {total_users:,}")
+        print(f"\nTotal unique users to process: {total_users:,}")
 
         # Calculate number of batches
         num_batches = (total_users + batch_size - 1) // batch_size
@@ -230,9 +313,16 @@ def create_user_answers_dataset(
                                                        a.answer_id,
                                                        a.question_id,
                                                        a.is_bounty,
+                                                       a.answered_before_bounty,
+                                                       a.answered_after_bounty_ended,
+                                                       a.question_ever_had_bounty,
                                                        a.bounty_amount,
                                                        a.answer_sequence,
-                                                       0        AS is_history
+                                                       0        AS is_history,
+                                                       a.registration_date,
+                                                       a.days_since_registration,
+                                                       a.autobiography_received,
+                                                       a.had_autobiography_badge
                                                 FROM user_answers a
                                                 WHERE a.user_id IN (SELECT user_id FROM batch_users)
                                                 """).fetchdf()
@@ -242,14 +332,29 @@ def create_user_answers_dataset(
             questions_asked_df = con.execute("""
                                              SELECT q.owner_user_id AS user_id,
                                                     q.creation_date AS timestamp,
-                   'Question' AS event,
-                   NULL AS answer_id,
-                   q.question_id,
-                   0 AS is_bounty, 
-                   0 AS bounty_amount,
-                   NULL AS answer_sequence,
-                   1 AS is_history
+                                                    'Question' AS event,
+                                                    NULL AS answer_id,
+                                                    q.question_id,
+                                                    0 AS is_bounty,
+                                                    0 AS answered_before_bounty,
+                                                    0 AS answered_after_bounty_ended,
+                                                    0 AS question_ever_had_bounty,
+                                                    0 AS bounty_amount,
+                                                    NULL AS answer_sequence,
+                                                    1 AS is_history,
+                                                    u.registration_date,
+                                                    CAST(DATEDIFF('day', u.registration_date, q.creation_date) AS INTEGER) AS days_since_registration,
+                                                    ab.autobiography_received,
+                                                    CASE 
+                                                        WHEN ab.autobiography_received IS NOT NULL 
+                                                             AND ab.autobiography_received <= q.creation_date 
+                                                        THEN 1 
+                                                        ELSE 0
+                                             END
+                                             AS had_autobiography_badge
                                              FROM questions q
+                                             LEFT JOIN users u ON q.owner_user_id = u.user_id
+                                             LEFT JOIN autobiography_badges ab ON q.owner_user_id = ab.user_id
                                              WHERE q.owner_user_id IN (SELECT user_id FROM batch_users)
                                              """).fetchdf()
             append_to_output(questions_asked_df, "Historical Question events")
@@ -262,9 +367,16 @@ def create_user_answers_dataset(
                                                      a.answer_id,
                                                      a.question_id,
                                                      a.is_bounty,
+                                                     a.answered_before_bounty,
+                                                     a.answered_after_bounty_ended,
+                                                     a.question_ever_had_bounty,
                                                      a.bounty_amount,
                                                      a.answer_sequence,
-                                                     1                AS is_history
+                                                     1                AS is_history,
+                                                     a.registration_date,
+                                                     a.days_since_registration,
+                                                     a.autobiography_received,
+                                                     a.had_autobiography_badge
                                               FROM user_answers a
                                               WHERE a.user_id IN (SELECT user_id FROM batch_users)
                                               """).fetchdf()
@@ -274,16 +386,30 @@ def create_user_answers_dataset(
             answers_received_df = con.execute("""
                                               SELECT q.owner_user_id AS user_id,
                                                      a.creation_date AS timestamp,
-                   'AnswerReceived' AS event,
-                   a.answer_id,
-                   q.question_id,
-                   0 AS is_bounty,
-                   0 AS bounty_amount,
-                   NULL AS answer_sequence,
-                   1 AS is_history
+                                                     'AnswerReceived' AS event,
+                                                     a.answer_id,
+                                                     q.question_id,
+                                                     0 AS is_bounty,
+                                                     0 AS answered_before_bounty,
+                                                     0 AS answered_after_bounty_ended,
+                                                     0 AS question_ever_had_bounty,
+                                                     0 AS bounty_amount,
+                                                     NULL AS answer_sequence,
+                                                     1 AS is_history,
+                                                     u.registration_date,
+                                                     CAST(DATEDIFF('day', u.registration_date, a.creation_date) AS INTEGER) AS days_since_registration,
+                                                     ab.autobiography_received,
+                                                     CASE 
+                                                         WHEN ab.autobiography_received IS NOT NULL 
+                                                              AND ab.autobiography_received <= a.creation_date 
+                                                         THEN 1 
+                                                         ELSE 0
+                                              END
+                                              AS had_autobiography_badge
                                               FROM questions q
-                                                  JOIN answers a
-                                              ON q.question_id = a.parent_question_id
+                                                  JOIN answers a ON q.question_id = a.parent_question_id
+                                                  LEFT JOIN users u ON q.owner_user_id = u.user_id
+                                                  LEFT JOIN autobiography_badges ab ON q.owner_user_id = ab.user_id
                                               WHERE q.owner_user_id IN (SELECT user_id FROM batch_users)
                                                 AND (a.owner_user_id <> q.owner_user_id OR a.owner_user_id IS NULL)
                                                 AND a.score >= 0 -- only non-negative answers
@@ -294,16 +420,30 @@ def create_user_answers_dataset(
             accepted_answers_received_df = con.execute("""
                                                        SELECT q.owner_user_id AS user_id,
                                                               a.creation_date AS timestamp,
-                   'AcceptedAnswerReceived' AS event,
-                   a.answer_id,
-                   q.question_id,
-                   0 AS is_bounty,
-                   0 AS bounty_amount,
-                   NULL AS answer_sequence,
-                   1 AS is_history
+                                                              'AcceptedAnswerReceived' AS event,
+                                                              a.answer_id,
+                                                              q.question_id,
+                                                              0 AS is_bounty,
+                                                              0 AS answered_before_bounty,
+                                                              0 AS answered_after_bounty_ended,
+                                                              0 AS question_ever_had_bounty,
+                                                              0 AS bounty_amount,
+                                                              NULL AS answer_sequence,
+                                                              1 AS is_history,
+                                                              u.registration_date,
+                                                              CAST(DATEDIFF('day', u.registration_date, a.creation_date) AS INTEGER) AS days_since_registration,
+                                                              ab.autobiography_received,
+                                                              CASE 
+                                                                  WHEN ab.autobiography_received IS NOT NULL 
+                                                                       AND ab.autobiography_received <= a.creation_date 
+                                                                  THEN 1 
+                                                                  ELSE 0
+                                                       END
+                                                       AS had_autobiography_badge
                                                        FROM questions q
-                                                           JOIN answers a
-                                                       ON q.accepted_answer_id = a.answer_id
+                                                           JOIN answers a ON q.accepted_answer_id = a.answer_id
+                                                           LEFT JOIN users u ON q.owner_user_id = u.user_id
+                                                           LEFT JOIN autobiography_badges ab ON q.owner_user_id = ab.user_id
                                                        WHERE q.owner_user_id IN (SELECT user_id FROM batch_users)
                                                          AND (a.owner_user_id <> q.owner_user_id OR a.owner_user_id IS NULL)
                                                        """).fetchdf()
@@ -313,16 +453,30 @@ def create_user_answers_dataset(
             accepted_vote_received_df = con.execute("""
                                                     SELECT a.owner_user_id AS user_id,
                                                            v.vote_date AS timestamp,
-                   'AcceptedAnswerVote' AS event,
-                   a.answer_id,
-                   a.parent_question_id AS question_id,
-                   0 AS is_bounty,
-                   0 AS bounty_amount,
-                   NULL AS answer_sequence,
-                   1 AS is_history
+                                                           'AcceptedAnswerVote' AS event,
+                                                           a.answer_id,
+                                                           a.parent_question_id AS question_id,
+                                                           0 AS is_bounty,
+                                                           0 AS answered_before_bounty,
+                                                           0 AS answered_after_bounty_ended,
+                                                           0 AS question_ever_had_bounty,
+                                                           0 AS bounty_amount,
+                                                           NULL AS answer_sequence,
+                                                           1 AS is_history,
+                                                           u.registration_date,
+                                                           CAST(DATEDIFF('day', u.registration_date, v.vote_date) AS INTEGER) AS days_since_registration,
+                                                           ab.autobiography_received,
+                                                           CASE 
+                                                               WHEN ab.autobiography_received IS NOT NULL 
+                                                                    AND ab.autobiography_received <= v.vote_date 
+                                                               THEN 1 
+                                                               ELSE 0
+                                                    END
+                                                    AS had_autobiography_badge
                                                     FROM answers a
-                                                        JOIN votes v
-                                                    ON a.answer_id = v.post_id
+                                                        JOIN votes v ON a.answer_id = v.post_id
+                                                        LEFT JOIN users u ON a.owner_user_id = u.user_id
+                                                        LEFT JOIN autobiography_badges ab ON a.owner_user_id = ab.user_id
                                                     WHERE a.owner_user_id IN (SELECT user_id FROM batch_users)
                                                       AND v.vote_type_id = 1 -- Accept vote
                                                     """).fetchdf()
@@ -332,16 +486,30 @@ def create_user_answers_dataset(
             accepted_answers_posted_df = con.execute("""
                                                      SELECT a.owner_user_id AS user_id,
                                                             a.creation_date AS timestamp,
-                   'AcceptedAnswerPosted' AS event,
-                   a.answer_id,
-                   q.question_id,
-                   0 AS is_bounty,
-                   0 AS bounty_amount,
-                   NULL AS answer_sequence,
-                   1 AS is_history
+                                                            'AcceptedAnswerPosted' AS event,
+                                                            a.answer_id,
+                                                            q.question_id,
+                                                            0 AS is_bounty,
+                                                            0 AS answered_before_bounty,
+                                                            0 AS answered_after_bounty_ended,
+                                                            0 AS question_ever_had_bounty,
+                                                            0 AS bounty_amount,
+                                                            NULL AS answer_sequence,
+                                                            1 AS is_history,
+                                                            u.registration_date,
+                                                            CAST(DATEDIFF('day', u.registration_date, a.creation_date) AS INTEGER) AS days_since_registration,
+                                                            ab.autobiography_received,
+                                                            CASE 
+                                                                WHEN ab.autobiography_received IS NOT NULL 
+                                                                     AND ab.autobiography_received <= a.creation_date 
+                                                                THEN 1 
+                                                                ELSE 0
+                                                     END
+                                                     AS had_autobiography_badge
                                                      FROM answers a
-                                                         JOIN questions q
-                                                     ON q.accepted_answer_id = a.answer_id
+                                                         JOIN questions q ON q.accepted_answer_id = a.answer_id
+                                                         LEFT JOIN users u ON a.owner_user_id = u.user_id
+                                                         LEFT JOIN autobiography_badges ab ON a.owner_user_id = ab.user_id
                                                      WHERE a.owner_user_id IN (SELECT user_id FROM batch_users)
                                                        AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
                                                      """).fetchdf()
@@ -359,6 +527,13 @@ def create_user_answers_dataset(
         for _, row in event_breakdown.iterrows():
             history_label = "Historical" if row['is_history'] else "Current"
             print(f"  {history_label} {row['event']}: {row['count']:,}")
+
+        # Bounty flag summary in final dataset
+        print("\nBounty flags in final dataset:")
+        print(f"  FLAG 1 - is_bounty=1: {(final_df['is_bounty'] == 1).sum():,}")
+        print(f"  FLAG 2 - answered_before_bounty=1: {(final_df['answered_before_bounty'] == 1).sum():,}")
+        print(f"  FLAG 3 - answered_after_bounty_ended=1: {(final_df['answered_after_bounty_ended'] == 1).sum():,}")
+        print(f"  FLAG 4 - question_ever_had_bounty=1: {(final_df['question_ever_had_bounty'] == 1).sum():,}")
 
         con.close()
         print(f"\nDone! Saved dataset to {output_path}")
