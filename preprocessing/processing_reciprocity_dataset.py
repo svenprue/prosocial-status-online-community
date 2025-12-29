@@ -203,7 +203,8 @@ def prepare_user_history_for_jit(user_history_df):
 def calculate_reciprocity_activation(user_histories):
     """
     Calculate reciprocity activation for each user, considering event timing.
-    Tracks whether a user's first answer followed receiving an accepted answer within 7 days.
+    Tracks whether a user's first answer followed receiving a non-self accepted answer within 7 days.
+    Note: All accepted answers in the dataset are already non-self answers (self-answers excluded in raw data).
     """
     reciprocity_status = {}
     print("Calculating reciprocity activation...")
@@ -235,10 +236,12 @@ def calculate_reciprocity_activation(user_histories):
     return reciprocity_status
 
 
-def process_question_dataset(input_file: str, output_file: str, chunk_size: int = 1000,
-                             cutoff_date: str = "2025-04-01") -> None:
+def process_question_centered_dataset(input_file: str, output_file: str, chunk_size: int = 1000,
+                                       cutoff_date: str = "2025-04-01") -> None:
     """
     Process the question-centered dataset to calculate metrics for each user.
+    Dataset is centered on when users post their question.
+    Self-answers are excluded from all metrics.
     Uses JIT compilation for performance optimization.
     """
     print(f"\n=== Processing {input_file} ===")
@@ -296,6 +299,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         df["phase_two_end"] = pd.to_datetime(df["phase_two_end"], errors="coerce")
 
         # Create binary event flags using minimal memory (int8)
+        # Note: All Answer, AcceptedAnswer, and AcceptedAnswerPosted events in raw data exclude self-answers
         df["questionAsked"] = df["event"].map({"Question": 1}).fillna(0).astype(np.int8)
         df["acceptedAnswer"] = df["event"].map({"AcceptedAnswer": 1}).fillna(0).astype(np.int8)
         df["answer"] = df["event"].map({"Answer": 1, "Window_Answer": 1}).fillna(0).astype(np.int8)
@@ -303,16 +307,16 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         df["acceptedVoteReceived"] = df["event"].map({"AcceptedAnswerVote": 1}).fillna(0).astype(np.int8)
         df["acceptedAnswerPosted"] = df["event"].map({"AcceptedAnswerPosted": 1}).fillna(0).astype(np.int8)
 
-        # Calculate time-to-first-answer in hours
-        df["timeToFirstAnswerHours"] = None
+        # Calculate response time in hours (time to first non-self, non-negative answer)
+        df["responseTimeHours"] = None
         mask = ~df["first_answer_timestamp"].isna() & ~df["question_timestamp"].isna()
         if any(mask):
-            df.loc[mask, "timeToFirstAnswerHours"] = (
+            df.loc[mask, "responseTimeHours"] = (
                     (pd.to_datetime(df.loc[mask, "first_answer_timestamp"]) -
                      pd.to_datetime(df.loc[mask, "question_timestamp"])).dt.total_seconds() / 3600
             )
 
-        # Calculate time-to-accepted-answer in hours
+        # Calculate time-to-accepted-answer in hours (time to accepted non-self answer, if any)
         df["timeToAcceptedAnswerHours"] = None
         mask = ~df["accepted_answer_timestamp"].isna() & ~df["question_timestamp"].isna()
         if any(mask):
@@ -522,6 +526,13 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
                 non_history_chunk["numAcceptedAnswersReceivedAT"] > 0).astype(int)
         non_history_chunk["receivedAcceptedVoteEver"] = (non_history_chunk["numAcceptedVotesReceivedAT"] > 0).astype(
             int)
+
+        # Add reciprocity activation flag for before Phase 1
+        non_history_chunk["reciprocityActivatedBeforePhase1"] = (
+            (non_history_chunk["reciprocityActivated"] == 1) &
+            (non_history_chunk["reciprocityActivatedTimestamp"] < non_history_chunk["phase_one_start"])
+        ).astype(int)
+
         non_history_chunk["month"] = non_history_chunk["timestamp"].dt.month
         non_history_chunk["year"] = non_history_chunk["timestamp"].dt.year
 
@@ -537,7 +548,8 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             "phase_two_end": "first",
             "has_answer": "first",
             "has_accepted_answer": "first",
-            "timeToFirstAnswerHours": "first",
+            "has_self_answer": "first",
+            "responseTimeHours": "first",
             "timeToAcceptedAnswerHours": "first",
             "timeToAcceptVoteHours": "first",
             "numHelped": "sum",
@@ -576,6 +588,13 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             "timeSinceFirstActivityDays": "first",
             "reciprocityActivated": "first",
             "reciprocityActivatedTimestamp": "first",
+            "reciprocityActivatedBeforePhase1": "first",
+            "autobiography_received": "first",
+            "registration_date": "first",
+            "autobiography_active_phase_one_start": "first",
+            "autobiography_active_phase_two_start": "first",
+            "days_since_registration_at_phase_one_start": "first",
+            "helps_given_between_question_and_answer": "first"
         }
 
         # Apply aggregation
@@ -593,7 +612,9 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         print("Optimizing data types...")
         agg_df = agg_df.convert_dtypes()  # Convert to best possible dtypes
         for col in agg_df.select_dtypes(include=["Int32", "Int64"]).columns:
-            agg_df[col] = agg_df[col].astype("int64")  # Convert nullable integers
+            # Only convert if there are no NULLs
+            if not agg_df[col].isna().any():
+                agg_df[col] = agg_df[col].astype("int64")  # Convert nullable integers
         for col in agg_df.select_dtypes(include=["Float32"]).columns:
             agg_df[col] = agg_df[col].astype("float64")  # Convert nullable floats
 
@@ -602,13 +623,18 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
         agg_df['hasHelped'] = (agg_df['numHelped'] > 0).astype(int)
         agg_df['lnNumHelped'] = np.log(agg_df['numHelped'] + 1)
 
-        # Calculate fixed effects (user and question-level deviations)
+        # Calculate fixed effects (user, question, and month-level deviations)
         agg_df['userFeNumHelped'] = agg_df.groupby("user_id")["numHelped"].transform(lambda x: x - x.mean())
         agg_df['questionFeNumHelped'] = agg_df.groupby("event_id")["numHelped"].transform(lambda x: x - x.mean())
         agg_df['userFeHasHelped'] = agg_df.groupby("user_id")["hasHelped"].transform(lambda x: x - x.mean())
         agg_df['questionFeHasHelped'] = agg_df.groupby("event_id")["hasHelped"].transform(lambda x: x - x.mean())
         agg_df['userFeLnNumHelped'] = agg_df.groupby("user_id")["lnNumHelped"].transform(lambda x: x - x.mean())
         agg_df['questionFeLnNumHelped'] = agg_df.groupby("event_id")["lnNumHelped"].transform(lambda x: x - x.mean())
+
+        # Calculate month fixed effects (seasonal deviations)
+        #agg_df['monthFeNumHelped'] = agg_df.groupby("month")["numHelped"].transform(lambda x: x - x.mean())
+        #agg_df['monthFeHasHelped'] = agg_df.groupby("month")["hasHelped"].transform(lambda x: x - x.mean())
+        #agg_df['monthFeLnNumHelped'] = agg_df.groupby("month")["lnNumHelped"].transform(lambda x: x - x.mean())
 
         # Track processing counts
         chunk_count = len(agg_df)
@@ -624,6 +650,7 @@ def process_question_dataset(input_file: str, output_file: str, chunk_size: int 
             'phase_two_end': 'phaseTwoEnd',
             'has_answer': 'hasAnswer',
             'has_accepted_answer': 'hasAcceptedAnswer',
+            'has_self_answer': 'hasSelfAnswer',
         }
         agg_df = agg_df.rename(columns=column_rename_map)
 
@@ -664,12 +691,21 @@ if __name__ == "__main__":
     output_folder = "../data/study_datasets"
     cutoff_date = "2025-04-01"
 
+    # Set this to True to process test mode files, False for full dataset
+    test_mode = True
+    test_user_limit = 100000  # Should match the limit used in creating script
+
     # Process each question-centered model dataset
     for days in [7]:
-        input_file = f"{input_folder}/question_centered_model_{days}d_all_questions.parquet"
-        output_file = f"{output_folder}/question_centered_model_{days}d_processed.parquet"
+        # Build filename based on test mode
+        if test_mode:
+            input_file = f"{input_folder}/question_centered_model_{days}d_all_questions_TEST{test_user_limit}.parquet"
+            output_file = f"{output_folder}/question_centered_model_{days}d_processed_TEST{test_user_limit}.parquet"
+        else:
+            input_file = f"{input_folder}/question_centered_model_{days}d_all_questions.parquet"
+            output_file = f"{output_folder}/question_centered_model_{days}d_processed.parquet"
 
-        process_question_dataset(
+        process_question_centered_dataset(
             input_file=input_file,
             output_file=output_file,
             chunk_size=100000,
