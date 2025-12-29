@@ -692,7 +692,7 @@ if __name__ == "__main__":
     cutoff_date = "2025-04-01"
 
     # Set this to True to process test mode files, False for full dataset
-    test_mode = True
+    test_mode = False
     test_user_limit = 100000  # Should match the limit used in creating script
 
     # Process each question-centered model dataset
