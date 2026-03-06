@@ -1,6 +1,7 @@
 import os
 import duckdb
 import pandas as pd
+from pathlib import Path
 
 
 def process_accepted_answer_data(
@@ -11,10 +12,17 @@ def process_accepted_answer_data(
         test_mode: bool = False,
         test_user_limit: int = 500000
 ) -> None:
-    con = duckdb.connect(database=':memory:')
-    con.execute("PRAGMA memory_limit='10GB';")
-    con.execute("PRAGMA max_temp_directory_size='200GiB'")
-    con.execute("PRAGMA threads=4;")
+    # Use on-disk DB + temp directory so DuckDB can spill large intermediates.
+    Path(output_folder).mkdir(parents=True, exist_ok=True)
+    duckdb_tmp_dir = Path(output_folder) / "duckdb_tmp"
+    duckdb_tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    con = duckdb.connect(database=str(duckdb_tmp_dir / "working.duckdb"))
+    # Keep memory limit well under total RAM so spilling can happen before OOM.
+    con.execute("PRAGMA memory_limit='5GB';")
+    con.execute(f"PRAGMA temp_directory='{duckdb_tmp_dir}';")
+    con.execute("PRAGMA max_temp_directory_size='200GiB';")
+    con.execute("PRAGMA threads=2;")
     con.execute("PRAGMA enable_progress_bar;")
 
     questions_path = os.path.join(input_folder, 'posts_questions.parquet')
@@ -29,7 +37,8 @@ def process_accepted_answer_data(
             Id AS question_id,
             OwnerUserId AS owner_user_id,
             AcceptedAnswerId AS accepted_answer_id,
-            CAST(CreationDate AS TIMESTAMP) AS creation_date
+            CAST(CreationDate AS TIMESTAMP) AS creation_date,
+            Tags AS tags
         FROM '{questions_path}'
     """)
 
@@ -53,14 +62,15 @@ def process_accepted_answer_data(
         WHERE VoteTypeId = 1;
     """)
 
-    con.execute(f"""
-        CREATE TEMPORARY VIEW autobiography_badges AS
-        SELECT
-            UserId AS user_id,
-            CAST(Date AS TIMESTAMP) AS autobiography_received
-        FROM '{badges_path}'
-        WHERE Name = 'Autobiographer';
-    """)
+    # Autobiographer badge disabled for now
+    # con.execute(f"""
+    #     CREATE TEMPORARY VIEW autobiography_badges AS
+    #     SELECT
+    #         UserId AS user_id,
+    #         CAST(Date AS TIMESTAMP) AS autobiography_received
+    #     FROM '{badges_path}'
+    #     WHERE Name = 'Autobiographer';
+    # """)
 
     con.execute(f"""
         CREATE TEMPORARY VIEW users AS
@@ -89,15 +99,61 @@ def process_accepted_answer_data(
     if include_all_questions:
         con.execute(f"""
             CREATE OR REPLACE TEMPORARY VIEW eligible_questions AS
-            WITH first_answers AS (
+            WITH answers_with_votes AS (
                 SELECT
                     a.parent_question_id AS question_id,
-                    MIN(a.creation_date) AS first_answer_timestamp
+                    a.answer_id,
+                    a.creation_date,
+                    a.score,
+                    q.creation_date AS question_timestamp,
+                    COUNT(v.post_id) AS vote_count
                 FROM answers a
                 JOIN questions q ON a.parent_question_id = q.question_id
-                WHERE a.score >= 0  -- Only consider non-negative score answers
-                  AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)  -- Exclude self-answers
-                GROUP BY a.parent_question_id
+                LEFT JOIN votes v ON a.answer_id = v.post_id
+                WHERE (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)  -- Exclude self-answers
+                GROUP BY a.parent_question_id, a.answer_id, a.creation_date, a.score, q.creation_date
+            ),
+            non_downvoted_within_7d AS (
+                SELECT
+                    question_id,
+                    answer_id,
+                    creation_date,
+                    score,
+                    vote_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY question_id
+                        ORDER BY creation_date
+                    ) AS rn
+                FROM answers_with_votes
+                WHERE score >= 0  -- Non-downvoted
+                  AND creation_date <= question_timestamp + INTERVAL '7 DAYS'  -- Within 7 days
+            ),
+            first_answer_fallback AS (
+                SELECT
+                    question_id,
+                    answer_id,
+                    creation_date,
+                    score,
+                    vote_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY question_id
+                        ORDER BY creation_date
+                    ) AS rn
+                FROM answers_with_votes
+                WHERE question_id NOT IN (SELECT question_id FROM non_downvoted_within_7d WHERE rn = 1)
+            ),
+            first_answer_candidates AS (
+                SELECT * FROM non_downvoted_within_7d WHERE rn = 1
+                UNION ALL
+                SELECT * FROM first_answer_fallback WHERE rn = 1
+            ),
+            first_answers AS (
+                SELECT
+                    question_id,
+                    creation_date AS first_answer_timestamp,
+                    score AS first_answer_score,
+                    vote_count AS first_answer_vote_count
+                FROM first_answer_candidates
             ),
             accepted_answers AS (
                 SELECT
@@ -136,6 +192,8 @@ def process_accepted_answer_data(
                 aa.accepted_answer_timestamp IS NOT NULL AS has_accepted_answer,
                 COALESCE(sa.self_answer_count > 0, FALSE) AS has_self_answer,
                 fa.first_answer_timestamp,
+                fa.first_answer_score,
+                fa.first_answer_vote_count,
                 aa.accepted_answer_timestamp,
                 aa.accepted_answer_vote_timestamp
             FROM questions q
@@ -150,15 +208,61 @@ def process_accepted_answer_data(
     else:
         con.execute(f"""
             CREATE OR REPLACE TEMPORARY VIEW eligible_questions AS
-            WITH first_answers AS (
+            WITH answers_with_votes AS (
                 SELECT
                     a.parent_question_id AS question_id,
-                    MIN(a.creation_date) AS first_answer_timestamp
+                    a.answer_id,
+                    a.creation_date,
+                    a.score,
+                    q.creation_date AS question_timestamp,
+                    COUNT(v.post_id) AS vote_count
                 FROM answers a
                 JOIN questions q ON a.parent_question_id = q.question_id
-                WHERE a.score >= 0  -- Only consider non-negative score answers
-                  AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)  -- Exclude self-answers
-                GROUP BY a.parent_question_id
+                LEFT JOIN votes v ON a.answer_id = v.post_id
+                WHERE (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)  -- Exclude self-answers
+                GROUP BY a.parent_question_id, a.answer_id, a.creation_date, a.score, q.creation_date
+            ),
+            non_downvoted_within_7d AS (
+                SELECT
+                    question_id,
+                    answer_id,
+                    creation_date,
+                    score,
+                    vote_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY question_id
+                        ORDER BY creation_date
+                    ) AS rn
+                FROM answers_with_votes
+                WHERE score >= 0  -- Non-downvoted
+                  AND creation_date <= question_timestamp + INTERVAL '7 DAYS'  -- Within 7 days
+            ),
+            first_answer_fallback AS (
+                SELECT
+                    question_id,
+                    answer_id,
+                    creation_date,
+                    score,
+                    vote_count,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY question_id
+                        ORDER BY creation_date
+                    ) AS rn
+                FROM answers_with_votes
+                WHERE question_id NOT IN (SELECT question_id FROM non_downvoted_within_7d WHERE rn = 1)
+            ),
+            first_answer_candidates AS (
+                SELECT * FROM non_downvoted_within_7d WHERE rn = 1
+                UNION ALL
+                SELECT * FROM first_answer_fallback WHERE rn = 1
+            ),
+            first_answers AS (
+                SELECT
+                    question_id,
+                    creation_date AS first_answer_timestamp,
+                    score AS first_answer_score,
+                    vote_count AS first_answer_vote_count
+                FROM first_answer_candidates
             ),
             accepted_answers AS (
                 SELECT
@@ -198,6 +302,8 @@ def process_accepted_answer_data(
                     q.accepted_answer_id IS NOT NULL AS has_accepted_answer,
                     COALESCE(sa.self_answer_count > 0, FALSE) AS has_self_answer,
                     fa.first_answer_timestamp,
+                    fa.first_answer_score,
+                    fa.first_answer_vote_count,
                     aa.accepted_answer_timestamp,
                     aa.accepted_answer_vote_timestamp,
                     ROW_NUMBER() OVER (
@@ -251,25 +357,108 @@ def process_accepted_answer_data(
     if test_mode:
         print(f"  - TEST MODE ACTIVE: Limited to {test_user_limit} users")
 
-    # Calculate helps_given_between_question_and_first_answer and join autobiography badge
+    # Build tag dictionary and per-question tag ID lists based on eligible questions
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE question_tags_clean AS
+        SELECT
+            q.question_id,
+            REGEXP_REPLACE(
+                REGEXP_REPLACE(
+                    REGEXP_REPLACE(q.tags, '\\\\[|\\\\]', ''),
+                    '''',
+                    ''
+                ),
+                '\\\\s+',
+                ''
+            ) AS tags_clean
+        FROM questions q
+        JOIN eligible_questions eq ON q.question_id = eq.question_id
+        WHERE q.tags IS NOT NULL;
+    """)
+
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE tag_exploded AS
+        SELECT
+            question_id,
+            UNNEST(STRING_SPLIT(tags_clean, ',')) AS tag_name
+        FROM question_tags_clean;
+    """)
+
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE tag_dictionary AS
+        SELECT
+            ROW_NUMBER() OVER (ORDER BY tag_name) AS tag_id,
+            tag_name,
+            COUNT(*) AS tag_frequency
+        FROM tag_exploded
+        GROUP BY tag_name;
+    """)
+
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE question_tag_ids AS
+        SELECT
+            t.question_id,
+            LIST(td.tag_id ORDER BY td.tag_id) AS tag_ids
+        FROM tag_exploded t
+        JOIN tag_dictionary td ON t.tag_name = td.tag_name
+        GROUP BY t.question_id;
+    """)
+
+    # Compute helps_given in user batches to avoid OOM (never join all questions to answers at once).
+    HELPS_GIVEN_BATCH_SIZE = 200_000  # users per batch
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE user_batches AS
+        SELECT
+            owner_user_id,
+            CAST(FLOOR((ROW_NUMBER() OVER (ORDER BY owner_user_id) - 1) / %d) AS INTEGER) AS batch_id
+        FROM (SELECT DISTINCT owner_user_id FROM eligible_questions) t;
+    """ % HELPS_GIVEN_BATCH_SIZE)
+    max_batch_id = con.execute("SELECT COALESCE(MAX(batch_id), 0) FROM user_batches").fetchone()[0]
+
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE helps_given (
+            question_id BIGINT,
+            helps_given_between_question_and_answer INTEGER
+        );
+    """)
+
+    for batch_id in range(0, int(max_batch_id) + 1):
+        print(f"  helps_given batch %d / %d ..." % (batch_id, int(max_batch_id)))
+        con.execute("""
+            INSERT INTO helps_given (question_id, helps_given_between_question_and_answer)
+            WITH batch_eq AS (
+                SELECT eq.*
+                FROM eligible_questions eq
+                JOIN user_batches ub ON eq.owner_user_id = ub.owner_user_id
+                WHERE ub.batch_id = %d
+            ),
+            batch_answers AS (
+                SELECT a.*
+                FROM answers a
+                JOIN user_batches ub ON a.owner_user_id = ub.owner_user_id
+                WHERE ub.batch_id = %d
+            ),
+            h AS (
+                SELECT
+                    batch_eq.question_id,
+                    COUNT(a.answer_id) AS helps_given_between_question_and_answer
+                FROM batch_eq
+                LEFT JOIN batch_answers a
+                  ON a.owner_user_id = batch_eq.owner_user_id
+                 AND a.creation_date >= batch_eq.question_timestamp
+                 AND a.creation_date < batch_eq.first_answer_timestamp
+                LEFT JOIN questions q ON a.parent_question_id = q.question_id
+                WHERE (a.owner_user_id IS NULL
+                       OR a.owner_user_id <> q.owner_user_id
+                       OR q.owner_user_id IS NULL)
+                GROUP BY batch_eq.question_id
+            )
+            SELECT question_id, helps_given_between_question_and_answer FROM h;
+        """ % (batch_id, batch_id))
+
+    # Build phase_definitions from pre-computed helps_given (no heavy join).
     con.execute("""
         CREATE OR REPLACE TEMPORARY TABLE phase_definitions AS
-        WITH helps_given AS (
-            SELECT
-                eq.question_id,
-                COUNT(a.answer_id) AS helps_given_between_question_and_answer
-            FROM eligible_questions eq
-            LEFT JOIN answers a
-              ON a.owner_user_id = eq.owner_user_id
-             AND a.creation_date >= eq.question_timestamp
-             AND a.creation_date < eq.first_answer_timestamp
-            LEFT JOIN questions q
-              ON a.parent_question_id = q.question_id
-            WHERE (a.owner_user_id IS NULL
-                   OR a.owner_user_id <> q.owner_user_id
-                   OR q.owner_user_id IS NULL)  -- Exclude self-answers
-            GROUP BY eq.question_id
-        )
         SELECT
             eq.question_id,
             eq.owner_user_id,
@@ -278,17 +467,19 @@ def process_accepted_answer_data(
             eq.has_accepted_answer,
             eq.has_self_answer,
             eq.first_answer_timestamp,
+            eq.first_answer_score,
+            eq.first_answer_vote_count,
             eq.accepted_answer_timestamp,
             eq.accepted_answer_vote_timestamp,
             COALESCE(hg.helps_given_between_question_and_answer, 0) AS helps_given_between_question_and_answer,
-            ab.autobiography_received,
             u.registration_date,
+            qt.tag_ids,
             DENSE_RANK() OVER (ORDER BY eq.owner_user_id, eq.question_id) AS event_id,
-            eq.question_timestamp AS phase_two_start  -- Phase 2 starts when question is posted
+            eq.question_timestamp AS phase_two_start
         FROM eligible_questions eq
         LEFT JOIN helps_given hg ON eq.question_id = hg.question_id
-        LEFT JOIN autobiography_badges ab ON eq.owner_user_id = ab.user_id
-        LEFT JOIN users u ON eq.owner_user_id = u.user_id;
+        LEFT JOIN users u ON eq.owner_user_id = u.user_id
+        LEFT JOIN question_tag_ids qt ON eq.question_id = qt.question_id;
     """)
 
     # Add phase boundaries based on question posted timestamp
@@ -298,18 +489,6 @@ def process_accepted_answer_data(
             *,
             (phase_two_start - INTERVAL '{window_length} DAYS') AS phase_one_start,
             (phase_two_start + INTERVAL '{window_length} DAYS') AS phase_two_end,
-            CASE
-                WHEN autobiography_received IS NOT NULL
-                     AND autobiography_received <= (phase_two_start - INTERVAL '{window_length} DAYS')
-                THEN 1
-                ELSE 0
-            END AS autobiography_active_phase_one_start,
-            CASE
-                WHEN autobiography_received IS NOT NULL
-                     AND autobiography_received <= phase_two_start
-                THEN 1
-                ELSE 0
-            END AS autobiography_active_phase_two_start,
             CASE
                 WHEN registration_date IS NOT NULL
                 THEN CAST(EXTRACT(EPOCH FROM ((phase_two_start - INTERVAL '{window_length} DAYS') - registration_date)) / 86400 AS INTEGER)
@@ -323,25 +502,25 @@ def process_accepted_answer_data(
                                      SELECT NULL            AS event_id,
                                             q.owner_user_id AS user_id,
                                             q.creation_date AS timestamp,
-            'Question' AS event,
-            NULL AS question_id,
-            NULL AS phase_one_start,
-            NULL AS phase_two_end,
-            'Question' AS event_history,
-            1 AS is_history,
-            NULL AS has_answer,
-            NULL AS has_accepted_answer,
-            NULL AS has_self_answer,
-            NULL AS first_answer_timestamp,
-            NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp,
-            NULL AS question_timestamp,
-            NULL AS helps_given_between_question_and_answer,
-            NULL AS autobiography_received,
-            NULL AS registration_date,
-            NULL AS autobiography_active_phase_one_start,
-            NULL AS autobiography_active_phase_two_start,
-            NULL AS days_since_registration_at_phase_one_start
+                                            'Question' AS event,
+                                            NULL AS question_id,
+                                            NULL AS phase_one_start,
+                                            NULL AS phase_two_end,
+                                            'Question' AS event_history,
+                                            1 AS is_history,
+                                            NULL AS has_answer,
+                                            NULL AS has_accepted_answer,
+                                            NULL AS has_self_answer,
+                                            NULL AS first_answer_timestamp,
+                                            NULL AS first_answer_score,
+                                            NULL AS first_answer_vote_count,
+                                            NULL AS accepted_answer_timestamp,
+                                            NULL AS accepted_answer_vote_timestamp,
+                                            NULL AS question_timestamp,
+                                            NULL AS helps_given_between_question_and_answer,
+                                            NULL AS registration_date,
+                                            NULL AS days_since_registration_at_phase_one_start,
+                                            NULL AS tag_ids
                                      FROM questions q
                                      WHERE q.owner_user_id IN (
                                          SELECT DISTINCT owner_user_id FROM eligible_questions
@@ -353,25 +532,25 @@ def process_accepted_answer_data(
                                       SELECT NULL            AS event_id,
                                              a.owner_user_id AS user_id,
                                              a.creation_date AS timestamp,
-            'Answer' AS event,
-            NULL AS question_id,
-            NULL AS phase_one_start,
-            NULL AS phase_two_end,
-            'Answer' AS event_history,
-            1 AS is_history,
-            NULL AS has_answer,
-            NULL AS has_accepted_answer,
-            NULL AS has_self_answer,
-            NULL AS first_answer_timestamp,
-            NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp,
-            NULL AS question_timestamp,
-            NULL AS helps_given_between_question_and_answer,
-            NULL AS autobiography_received,
-            NULL AS registration_date,
-            NULL AS autobiography_active_phase_one_start,
-            NULL AS autobiography_active_phase_two_start,
-            NULL AS days_since_registration_at_phase_one_start
+                                             'Answer' AS event,
+                                             NULL AS question_id,
+                                             NULL AS phase_one_start,
+                                             NULL AS phase_two_end,
+                                             'Answer' AS event_history,
+                                             1 AS is_history,
+                                             NULL AS has_answer,
+                                             NULL AS has_accepted_answer,
+                                             NULL AS has_self_answer,
+                                             NULL AS first_answer_timestamp,
+                                             NULL AS first_answer_score,
+                                             NULL AS first_answer_vote_count,
+                                             NULL AS accepted_answer_timestamp,
+                                             NULL AS accepted_answer_vote_timestamp,
+                                             NULL AS question_timestamp,
+                                             NULL AS helps_given_between_question_and_answer,
+                                             NULL AS registration_date,
+                                             NULL AS days_since_registration_at_phase_one_start,
+                                             NULL AS tag_ids
                                       FROM answers a
                                           JOIN questions q
                                       ON a.parent_question_id = q.question_id
@@ -387,25 +566,25 @@ def process_accepted_answer_data(
                                       SELECT NULL            AS event_id,
                                              q.owner_user_id AS user_id,
                                              a.creation_date AS timestamp,
-            'AcceptedAnswer' AS event,
-            NULL AS question_id,
-            NULL AS phase_one_start,
-            NULL AS phase_two_end,
-            'AcceptedAnswer' AS event_history,
-            1 AS is_history,
-            NULL AS has_answer,
-            NULL AS has_accepted_answer,
-            NULL AS has_self_answer,
-            NULL AS first_answer_timestamp,
-            NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp,
-            NULL AS question_timestamp,
-            NULL AS helps_given_between_question_and_answer,
-            NULL AS autobiography_received,
-            NULL AS registration_date,
-            NULL AS autobiography_active_phase_one_start,
-            NULL AS autobiography_active_phase_two_start,
-            NULL AS days_since_registration_at_phase_one_start
+                                      'AcceptedAnswer' AS event,
+                                      NULL AS question_id,
+                                      NULL AS phase_one_start,
+                                      NULL AS phase_two_end,
+                                      'AcceptedAnswer' AS event_history,
+                                      1 AS is_history,
+                                      NULL AS has_answer,
+                                      NULL AS has_accepted_answer,
+                                      NULL AS has_self_answer,
+                                      NULL AS first_answer_timestamp,
+                                      NULL AS first_answer_score,
+                                      NULL AS first_answer_vote_count,
+                                      NULL AS accepted_answer_timestamp,
+                                      NULL AS accepted_answer_vote_timestamp,
+                                      NULL AS question_timestamp,
+                                      NULL AS helps_given_between_question_and_answer,
+                                      NULL AS registration_date,
+                                      NULL AS days_since_registration_at_phase_one_start,
+                                      NULL AS tag_ids
                                       FROM questions q
                                           JOIN answers a
                                       ON q.accepted_answer_id = a.answer_id
@@ -419,25 +598,25 @@ def process_accepted_answer_data(
                                   SELECT NULL            AS event_id,
                                          a.owner_user_id AS user_id,
                                          v.vote_date AS timestamp,
-            'AcceptedAnswerVote' AS event,
-            NULL AS question_id,
-            NULL AS phase_one_start,
-            NULL AS phase_two_end,
-            'AcceptedAnswerVote' AS event_history,
-            1 AS is_history,
-            NULL AS has_answer,
-            NULL AS has_accepted_answer,
-            NULL AS has_self_answer,
-            NULL AS first_answer_timestamp,
-            NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp,
-            NULL AS question_timestamp,
-            NULL AS helps_given_between_question_and_answer,
-            NULL AS autobiography_received,
-            NULL AS registration_date,
-            NULL AS autobiography_active_phase_one_start,
-            NULL AS autobiography_active_phase_two_start,
-            NULL AS days_since_registration_at_phase_one_start
+                                  'AcceptedAnswerVote' AS event,
+                                  NULL AS question_id,
+                                  NULL AS phase_one_start,
+                                  NULL AS phase_two_end,
+                                  'AcceptedAnswerVote' AS event_history,
+                                  1 AS is_history,
+                                  NULL AS has_answer,
+                                  NULL AS has_accepted_answer,
+                                  NULL AS has_self_answer,
+                                  NULL AS first_answer_timestamp,
+                                  NULL AS first_answer_score,
+                                  NULL AS first_answer_vote_count,
+                                  NULL AS accepted_answer_timestamp,
+                                  NULL AS accepted_answer_vote_timestamp,
+                                  NULL AS question_timestamp,
+                                  NULL AS helps_given_between_question_and_answer,
+                                  NULL AS registration_date,
+                                  NULL AS days_since_registration_at_phase_one_start,
+                                  NULL AS tag_ids
                                   FROM answers a
                                       JOIN votes v
                                   ON a.answer_id = v.post_id
@@ -451,25 +630,25 @@ def process_accepted_answer_data(
                                              SELECT NULL            AS event_id,
                                                     a.owner_user_id AS user_id,
                                                     a.creation_date AS timestamp,
-            'AcceptedAnswerPosted' AS event,
-            NULL AS question_id,
-            NULL AS phase_one_start,
-            NULL AS phase_two_end,
-            'AcceptedAnswerPosted' AS event_history,
-            1 AS is_history,
-            NULL AS has_answer,
-            NULL AS has_accepted_answer,
-            NULL AS has_self_answer,
-            NULL AS first_answer_timestamp,
-            NULL AS accepted_answer_timestamp,
-            NULL AS accepted_answer_vote_timestamp,
-            NULL AS question_timestamp,
-            NULL AS helps_given_between_question_and_answer,
-            NULL AS autobiography_received,
-            NULL AS registration_date,
-            NULL AS autobiography_active_phase_one_start,
-            NULL AS autobiography_active_phase_two_start,
-            NULL AS days_since_registration_at_phase_one_start
+                                             'AcceptedAnswerPosted' AS event,
+                                             NULL AS question_id,
+                                             NULL AS phase_one_start,
+                                             NULL AS phase_two_end,
+                                             'AcceptedAnswerPosted' AS event_history,
+                                             1 AS is_history,
+                                             NULL AS has_answer,
+                                             NULL AS has_accepted_answer,
+                                             NULL AS has_self_answer,
+                                             NULL AS first_answer_timestamp,
+                                             NULL AS first_answer_score,
+                                             NULL AS first_answer_vote_count,
+                                             NULL AS accepted_answer_timestamp,
+                                             NULL AS accepted_answer_vote_timestamp,
+                                             NULL AS question_timestamp,
+                                             NULL AS helps_given_between_question_and_answer,
+                                             NULL AS registration_date,
+                                             NULL AS days_since_registration_at_phase_one_start,
+                                             NULL AS tag_ids
                                              FROM answers a
                                                  JOIN questions q
                                              ON q.accepted_answer_id = a.answer_id
@@ -508,15 +687,15 @@ def process_accepted_answer_data(
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
+            first_answer_score,
+            first_answer_vote_count,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
             helps_given_between_question_and_answer,
-            autobiography_received,
             registration_date,
-            autobiography_active_phase_one_start,
-            autobiography_active_phase_two_start,
-            days_since_registration_at_phase_one_start
+            days_since_registration_at_phase_one_start,
+            tag_ids
         FROM phase_definitions;
     """)
 
@@ -536,15 +715,15 @@ def process_accepted_answer_data(
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
+            first_answer_score,
+            first_answer_vote_count,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
             helps_given_between_question_and_answer,
-            autobiography_received,
             registration_date,
-            autobiography_active_phase_one_start,
-            autobiography_active_phase_two_start,
-            days_since_registration_at_phase_one_start
+            days_since_registration_at_phase_one_start,
+            tag_ids
         FROM phase_definitions;
     """)
 
@@ -564,15 +743,15 @@ def process_accepted_answer_data(
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
+            first_answer_score,
+            first_answer_vote_count,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
             helps_given_between_question_and_answer,
-            autobiography_received,
             registration_date,
-            autobiography_active_phase_one_start,
-            autobiography_active_phase_two_start,
-            days_since_registration_at_phase_one_start
+            days_since_registration_at_phase_one_start,
+            tag_ids
         FROM phase_definitions;
     """)
 
@@ -592,15 +771,15 @@ def process_accepted_answer_data(
             p.has_accepted_answer,
             p.has_self_answer,
             p.first_answer_timestamp,
+            p.first_answer_score,
+            p.first_answer_vote_count,
             p.accepted_answer_timestamp,
             p.accepted_answer_vote_timestamp,
             p.question_timestamp,
             p.helps_given_between_question_and_answer,
-            p.autobiography_received,
             p.registration_date,
-            p.autobiography_active_phase_one_start,
-            p.autobiography_active_phase_two_start,
-            p.days_since_registration_at_phase_one_start
+            p.days_since_registration_at_phase_one_start,
+            p.tag_ids
                 FROM phase_definitions p
                     JOIN answers a
                 ON a.owner_user_id = p.owner_user_id
@@ -635,6 +814,11 @@ def process_accepted_answer_data(
         f"question_centered_model_{window_length}d_{'all_questions' if include_all_questions else 'one_question'}{test_suffix}.parquet"
     )
 
+    tag_output_path = os.path.join(
+        output_folder,
+        f"question_centered_model_{window_length}d_{'all_questions' if include_all_questions else 'one_question'}{test_suffix}_tags.parquet"
+    )
+
     con.execute(f"""
         COPY (
             SELECT
@@ -651,28 +835,43 @@ def process_accepted_answer_data(
                 has_accepted_answer,
                 has_self_answer,
                 first_answer_timestamp,
+                first_answer_score,
+                first_answer_vote_count,
                 accepted_answer_timestamp,
                 accepted_answer_vote_timestamp,
                 question_timestamp,
                 helps_given_between_question_and_answer,
-                autobiography_received,
                 registration_date,
-                autobiography_active_phase_one_start,
-                autobiography_active_phase_two_start,
-                days_since_registration_at_phase_one_start
+                days_since_registration_at_phase_one_start,
+                tag_ids
             FROM all_events
         )
         TO '{output_path}'
         (FORMAT PARQUET, COMPRESSION 'GZIP');
     """)
 
+    con.execute(f"""
+        COPY (
+            SELECT
+                tag_id,
+                tag_name,
+                tag_frequency
+            FROM tag_dictionary
+        )
+        TO '{tag_output_path}'
+        (FORMAT PARQUET, COMPRESSION 'GZIP');
+    """)
+
     con.close()
     print(f"Done! Saved dataset to {output_path}")
+    print(f"Saved tag dictionary to {tag_output_path}")
 
 
 if __name__ == "__main__":
-    input_data_folder = r"..\data\input"
-    output_data_folder = r"..\data\input"
+    # Resolve base directory relative to this file so paths work reliably on Linux
+    base_dir = Path(__file__).resolve().parent.parent
+    input_data_folder = base_dir / "data" / "input"
+    output_data_folder = base_dir / "data" / "input"
     os.makedirs(output_data_folder, exist_ok=True)
 
     # Test mode - run with random sample of 100k users first
