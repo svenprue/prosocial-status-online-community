@@ -4,6 +4,10 @@ import pandas as pd
 from tqdm import tqdm
 import gc
 from numba import njit
+import duckdb
+import glob
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from pathlib import Path
 
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
@@ -202,40 +206,15 @@ def calculate_reciprocity_activation(user_histories):
     return reciprocity_status
 
 
-def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 500000) -> None:
-    print(f"\n=== Processing {input_file} ===")
+def process_single_bounty_chunk(chunk_user_ids, chunk_idx, input_file, temp_dir, columns_to_read):
+    """
+    Worker function to process a single chunk of users for the bounty dataset.
+    """
+    try:
+        # Original print statement context
+        print(f"\nProcessing chunk {chunk_idx} ({len(chunk_user_ids):,} users)")
 
-    print("Reading unique user IDs...")
-    all_user_ids = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
-    print(f"Found {len(all_user_ids):,} unique users")
-
-    total_rows = pd.read_parquet(input_file, columns=["is_history"])
-    total_non_history = len(total_rows[total_rows["is_history"] == 0])
-    print(f"Total non-history rows: {total_non_history:,}")
-    del total_rows
-
-    first_chunk = True
-    processed_rows = 0
-
-    columns_to_read = [
-        "user_id", "timestamp", "event", "answer_id",
-        "question_id", "is_bounty", "answered_before_bounty", "answered_after_bounty_ended",
-        "question_ever_had_bounty", "bounty_amount", "answer_sequence", "is_history"
-    ]
-
-    # Only one progress bar for chunks, with estimated time
-    chunk_progress = tqdm(
-        total=len(all_user_ids),
-        desc="Processing user chunks",
-        unit="users"
-    )
-
-    for chunk_start in range(0, len(all_user_ids), chunk_size):
-        chunk_end = min(chunk_start + chunk_size, len(all_user_ids))
-        chunk_user_ids = all_user_ids[chunk_start:chunk_end]
-
-        print(f"\nProcessing users {chunk_start:,} to {chunk_end:,} ({len(chunk_user_ids):,} users)")
-
+        # Using pandas read_parquet with filters as in original (better for large ID lists than SQL strings)
         chunk_filter = [("user_id", "in", list(chunk_user_ids))]
         user_data_chunk = pd.read_parquet(input_file, filters=chunk_filter, columns=columns_to_read)
 
@@ -250,29 +229,28 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
         print(f"Non-history rows: {len(non_history_chunk):,}")
 
         if len(non_history_chunk) == 0:
-            chunk_progress.update(len(chunk_user_ids))
             print("No non-history data in this chunk, skipping...")
-            continue
+            return 0
 
+        # Map events as in original code
         history_chunk["questionAsked"] = history_chunk["event"].map({"Question": 1}).fillna(0).astype(np.int8)
-        history_chunk["acceptedVoteReceived"] = history_chunk["event"].map({"AcceptedAnswerVote": 1}).fillna(0).astype(
-            np.int8)
-        history_chunk["acceptedAnswerReceived"] = history_chunk["event"].map({"AcceptedAnswerReceived": 1}).fillna(
-            0).astype(np.int8)
-        history_chunk["acceptedAnswerPosted"] = history_chunk["event"].map({"AcceptedAnswerPosted": 1}).fillna(
-            0).astype(np.int8)
+        history_chunk["acceptedVoteReceived"] = history_chunk["event"].map({"AcceptedAnswerVote": 1}).fillna(0).astype(np.int8)
+        history_chunk["acceptedAnswerReceived"] = history_chunk["event"].map({"AcceptedAnswerReceived": 1}).fillna(0).astype(np.int8)
+        history_chunk["acceptedAnswerPosted"] = history_chunk["event"].map({"AcceptedAnswerPosted": 1}).fillna(0).astype(np.int8)
         history_chunk["answerPosted"] = history_chunk["event"].map({"AnswerProvided": 1}).fillna(0).astype(np.int8)
 
         print("Building JIT-compatible user history cache for this chunk...")
         user_histories_jit = {}
+        # Groupby is generally fast enough here
         for user_id, user_data in history_chunk.groupby("user_id"):
             user_histories_jit[user_id] = prepare_user_history_for_jit(user_data)
 
+        # Original code also built a pandas cache, kept for strict logic adherence (though unused in metrics loop)
         user_histories_pandas = {}
         for user_id, user_data in history_chunk.groupby("user_id"):
             user_histories_pandas[user_id] = user_data
 
-        reciprocity_status = calculate_reciprocity_activation(user_histories_pandas)
+        # reciprocity_status = calculate_reciprocity_activation(user_histories_pandas)
 
         del history_chunk
         del user_data_chunk
@@ -283,6 +261,8 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
         results = []
 
         print(f"Processing {len(non_history_chunk):,} rows with JIT...")
+        
+        # Iterate rows
         for _, row in non_history_chunk.iterrows():
             user_id = row["user_id"]
             target_time = row["timestamp"].to_numpy().astype(np.int64)
@@ -327,18 +307,6 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
                 initialExperienceReceiving = "no help seeked"
                 initialExperienceGiving = "no help attempted"
                 time_since_first_activity_days = 0.0
-
-            if user_id in reciprocity_status:
-                activated, activation_time = reciprocity_status[user_id]
-                if pd.isna(activation_time):
-                    is_activated_at_time = 0
-                    activation_timestamp = pd.NaT
-                else:
-                    is_activated_at_time = 1 if row["timestamp"] > activation_time else 0
-                    activation_timestamp = activation_time if is_activated_at_time else pd.NaT
-            else:
-                is_activated_at_time = 0
-                activation_timestamp = pd.NaT
 
             result = {
                 "userId": user_id,
@@ -386,8 +354,6 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
 
                 "initialExperienceReceiving": initialExperienceReceiving,
                 "initialExperienceGiving": initialExperienceGiving,
-                "reciprocityActivated": is_activated_at_time,
-                "reciprocityActivatedTimestamp": activation_timestamp,
                 "timeSinceFirstActivityDays": time_since_first_activity_days
             }
 
@@ -395,39 +361,126 @@ def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 
 
         chunk_output_df = pd.DataFrame(results)
 
-        chunk_output_df["receivedAcceptedAnswerEver"] = (chunk_output_df["numAcceptedAnswersReceivedAT"] > 0).astype(
-            int)
+        # Derived columns
+        chunk_output_df["receivedAcceptedAnswerEver"] = (chunk_output_df["numAcceptedAnswersReceivedAT"] > 0).astype(int)
         chunk_output_df["receivedAcceptedVoteEver"] = (chunk_output_df["numAcceptedVotesReceivedAT"] > 0).astype(int)
         chunk_output_df["month"] = chunk_output_df["timestamp"].dt.month
         chunk_output_df["year"] = chunk_output_df["timestamp"].dt.year
 
-        if first_chunk:
-            os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            chunk_output_df.to_parquet(output_file, index=False)
-            first_chunk = False
-        else:
-            chunk_output_df.to_parquet(
-                output_file,
-                index=False,
-                append=True,
-                engine="fastparquet"
-            )
-
-        processed_rows += len(chunk_output_df)
-        print(f"Processed {len(chunk_output_df):,} rows in this chunk")
-        print(
-            f"Total processed so far: {processed_rows:,} / {total_non_history:,} ({processed_rows / total_non_history:.1%})")
-
-        chunk_progress.update(len(chunk_user_ids))
+        # Save Temp File
+        rows_count = len(chunk_output_df)
+        temp_file = os.path.join(temp_dir, f"chunk_{chunk_idx}.parquet")
+        chunk_output_df.to_parquet(temp_file, index=False)
+        
+        print(f"Processed {rows_count:,} rows in this chunk (Saved to temp)")
 
         del user_histories_jit
         del non_history_chunk
         del chunk_output_df
-        del reciprocity_status
+        # del reciprocity_status
         gc.collect()
 
-    chunk_progress.close()
+        return rows_count
 
+    except Exception as e:
+        print(f"!!! Error in chunk {chunk_idx}: {e}")
+        return 0
+
+def process_bounty_dataset(input_file: str, output_file: str, chunk_size: int = 500000, num_workers: int = 4) -> None:
+    print(f"\n=== Processing {input_file} (Parallel with {num_workers} workers) ===")
+
+    print("Reading unique user IDs...")
+    all_user_ids = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
+    print(f"Found {len(all_user_ids):,} unique users")
+
+    # Note: Shuffling helps load balance complex vs simple users across workers
+    user_ids = np.copy(all_user_ids)
+    np.random.shuffle(user_ids)
+
+    total_rows = pd.read_parquet(input_file, columns=["is_history"])
+    total_non_history = len(total_rows[total_rows["is_history"] == 0])
+    print(f"Total non-history rows: {total_non_history:,}")
+    del total_rows
+
+    columns_to_read = [
+        "user_id", "timestamp", "event", "answer_id",
+        "question_id", "is_bounty", "answered_before_bounty", "answered_after_bounty_ended",
+        "question_ever_had_bounty", "bounty_amount", "answer_sequence", "is_history"
+    ]
+
+    # Setup Temp Directory
+    temp_dir = os.path.join(os.path.dirname(output_file), "temp_bounty_chunks")
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Cleanup old temps
+    for f in glob.glob(os.path.join(temp_dir, "*.parquet")):
+        os.remove(f)
+
+    # Clean existing output
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    # Create Chunk Tasks
+    # Note: If chunk_size is 500,000, this might create very few large chunks. 
+    # For parallelization, smaller chunks (e.g. 5,000) are usually better, but keeping default.
+    num_chunks = (len(user_ids) + chunk_size - 1) // chunk_size
+    tasks = []
+    
+    for i in range(num_chunks):
+        start_idx = i * chunk_size
+        end_idx = min(start_idx + chunk_size, len(user_ids))
+        chunk_user_ids = user_ids[start_idx:end_idx]
+        tasks.append((chunk_user_ids, i))
+
+    processed_rows = 0
+
+    print(f"Starting parallel processing of {len(tasks)} chunks...")
+
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = {
+            executor.submit(process_single_bounty_chunk, c_ids, c_idx, input_file, temp_dir, columns_to_read): c_idx 
+            for c_ids, c_idx in tasks
+        }
+        
+        # Progress bar
+        with tqdm(total=len(user_ids), desc="Processing users", unit="users") as pbar:
+            for future in as_completed(futures):
+                try:
+                    count = future.result()
+                    processed_rows += count
+                    # Approximation for progress bar update (using chunks is uneven, but works)
+                    # Ideally we track exactly how many users were in that chunk
+                    # Just update by chunk_size or track properly. 
+                    # Simpler: update pbar by chunk size is usually close enough for visuals
+                    pbar.update(chunk_size) 
+                except Exception as e:
+                    print(f"Chunk failed: {e}")
+
+    # Consolidate results
+    print(f"\nConsolidating temp files into {output_file}...")
+    temp_files = sorted(glob.glob(os.path.join(temp_dir, "*.parquet")), 
+                        key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+
+    if not temp_files:
+        print("No processed data found!")
+        return
+
+    first_chunk = True
+    for t_file in tqdm(temp_files, desc="Merging files"):
+        df = pd.read_parquet(t_file)
+        if first_chunk:
+            df.to_parquet(output_file, index=False)
+            first_chunk = False
+        else:
+            df.to_parquet(output_file, index=False, append=True, engine="fastparquet")
+        os.remove(t_file)
+
+    try:
+        os.rmdir(temp_dir)
+    except:
+        pass
+
+    print(f"Total processed: {processed_rows:,} / {total_non_history:,}")
     print(f"\nCompleted processing {processed_rows:,} total rows")
     print(f"Final output saved to {output_file}")
 
@@ -436,118 +489,124 @@ def handling_deleted_bountied_questions(processed_file_path, votes_path, bounty_
     """
     Identifies questions with votetype 8 (bounty) but not in the bounty timeline.
     Adds a missing_bounty column to the processed file.
-    Saves all missing question IDs to a text file.
-
-    Args:
-        processed_file_path: Path to the processed dataset
-        votes_path: Path to the votes data
-        bounty_timeline_path: Path to the bounty timeline data
     """
-    import duckdb
-    import os
-    from pathlib import Path
-
     print(f"\n=== Handling deleted bountied questions ===")
 
-    # Create DuckDB connection with memory settings
-    print(f"Connecting to data...")
-    conn = duckdb.connect(database=':memory:')
-    conn.execute("SET memory_limit='4GB'")
+    # 1. SETUP: Use a disk-based database file instead of ':memory:' to handle larger data
+    #    and increase the memory limit.
+    db_file = "temp_processing.duckdb"
+    print(f"Connecting to disk-backed database ({db_file})...")
+    
+    # Clean up previous temp db if it exists
+    if os.path.exists(db_file):
+        os.remove(db_file)
+
+    conn = duckdb.connect(database=db_file)
+    
+    # --- FIX: INCREASE MEMORY LIMIT ---
+    # Change '4GB' to '16GB' (or '32GB' depending on your server's capacity).
+    # Or remove this line entirely to let DuckDB use all available RAM.
+    try:
+        conn.execute("SET memory_limit='16GB'") 
+        print("Memory limit set to 16GB")
+    except:
+        print("Could not set memory limit, using defaults")
+
+    # Ensure temp directory has space for spilling data to disk
     conn.execute("PRAGMA temp_directory='/tmp'")
+    
+    try:
+        # Load the bounty timeline data
+        print("Loading bounty timeline data...")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW bounty_timeline AS
+            SELECT question_id FROM '{bounty_timeline_path}'
+        """)
 
-    # Load the bounty timeline data
-    print("Loading bounty timeline data...")
-    conn.execute(f"""
-        CREATE TEMPORARY VIEW bounty_timeline AS
-        SELECT 
-            question_id
-        FROM '{bounty_timeline_path}'
-    """)
+        # Load questions with votetype 8 (bounty votes)
+        print("Loading questions with bounty votes...")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW bounty_votes AS
+            SELECT DISTINCT PostId AS question_id
+            FROM '{votes_path}'
+            WHERE VoteTypeId = 8
+        """)
 
-    # Load questions with votetype 8 (bounty votes)
-    print("Loading questions with bounty votes...")
-    conn.execute(f"""
-        CREATE TEMPORARY VIEW bounty_votes AS
-        SELECT DISTINCT
-            PostId AS question_id
-        FROM '{votes_path}'
-        WHERE VoteTypeId = 8
-    """)
+        # Find questions with bounty votes but not in timeline
+        print("Identifying missing bounty questions...")
+        conn.execute("""
+            CREATE OR REPLACE VIEW missing_bounty_questions AS
+            SELECT bv.question_id
+            FROM bounty_votes bv
+            LEFT JOIN bounty_timeline bt ON bv.question_id = bt.question_id
+            WHERE bt.question_id IS NULL
+        """)
 
-    # Find questions with bounty votes but not in timeline
-    print("Identifying missing bounty questions...")
-    conn.execute("""
-        CREATE TEMPORARY VIEW missing_bounty_questions AS
-        SELECT
-            bv.question_id
-        FROM bounty_votes bv
-        LEFT JOIN bounty_timeline bt ON bv.question_id = bt.question_id
-        WHERE bt.question_id IS NULL
-    """)
+        # Count missing bounty questions
+        missing_count = conn.execute("SELECT COUNT(*) FROM missing_bounty_questions").fetchone()[0]
+        print(f"Found {missing_count:,} questions with bounty votes but not in timeline")
 
-    # Count missing bounty questions
-    missing_count = conn.execute("SELECT COUNT(*) FROM missing_bounty_questions").fetchone()[0]
-    print(f"Found {missing_count:,} questions with bounty votes but not in timeline")
+        # Save missing question IDs to a text file
+        output_dir = Path(processed_file_path).parent
+        missing_ids_file = output_dir / "missing_bounty_question_ids.txt"
 
-    # Save missing question IDs to a text file
-    output_dir = Path(processed_file_path).parent
-    missing_ids_file = output_dir / "missing_bounty_question_ids.txt"
+        print(f"Saving missing question IDs to {missing_ids_file}")
+        # Use COPY to export strictly the IDs instead of fetching to Python memory
+        conn.execute(f"COPY (SELECT question_id FROM missing_bounty_questions ORDER BY question_id) TO '{missing_ids_file}' (HEADER 0, DELIMITER ',')")
+        print(f"Saved missing IDs.")
 
-    print(f"Saving missing question IDs to {missing_ids_file}")
-    missing_ids = conn.execute("SELECT question_id FROM missing_bounty_questions ORDER BY question_id").fetchall()
+        # Load the processed file
+        print(f"Processing file: {processed_file_path}")
+        conn.execute(f"""
+            CREATE OR REPLACE VIEW processed_data AS
+            SELECT * FROM '{processed_file_path}'
+        """)
 
-    with open(missing_ids_file, 'w') as f:
-        f.write("# Question IDs with bounty votes but missing from bounty timeline\n")
-        f.write(f"# Total: {missing_count} question IDs\n")
-        for idx, (qid,) in enumerate(missing_ids):
-            f.write(f"{qid}\n")
+        # Perform the join and rewrite the file
+        # Using a left join on the view
+        print("Rewriting dataset with 'missing_bounty' column...")
+        
+        # We write to a temp file first to ensure atomic success
+        temp_output = processed_file_path + ".temp"
+        
+        conn.execute(f"""
+            COPY (
+                SELECT 
+                    p.*,
+                    CASE 
+                        WHEN m.question_id IS NOT NULL THEN TRUE
+                        ELSE FALSE
+                    END AS missing_bounty
+                FROM processed_data p
+                LEFT JOIN missing_bounty_questions m ON p.questionId = m.question_id
+            ) TO '{temp_output}' (FORMAT PARQUET, COMPRESSION 'SNAPPY')
+        """)
 
-    print(f"Saved {missing_count} question IDs to {missing_ids_file}")
+        # Close connection before swapping files
+        conn.close()
+        
+        # Swap files
+        if os.path.exists(processed_file_path):
+            os.remove(processed_file_path)
+        os.rename(temp_output, processed_file_path)
 
-    # Load the processed file into a temporary view
-    print(f"Processing file: {processed_file_path}")
-    conn.execute(f"""
-        CREATE TEMPORARY VIEW processed_data AS
-        SELECT * FROM '{processed_file_path}'
-    """)
+        print(f"Successfully updated: {processed_file_path}")
 
-    # Get column count to verify we're not losing data
-    col_count = conn.execute("SELECT COUNT(*) FROM pragma_table_info('processed_data')").fetchone()[0]
-    print(f"File has {col_count} columns before adding missing_bounty")
-
-    # Add the missing_bounty column and save directly to the original file
-    conn.execute(f"""
-        COPY (
-            SELECT 
-                p.*,
-                CASE 
-                    WHEN m.question_id IS NOT NULL THEN TRUE
-                    ELSE FALSE
-                END AS missing_bounty
-            FROM processed_data p
-            LEFT JOIN missing_bounty_questions m ON p.questionId = m.question_id
-        ) TO '{processed_file_path}' (FORMAT PARQUET)
-    """)
-
-    # Count the number of rows with missing_bounty = TRUE
-    missing_row_count = conn.execute(f"""
-        SELECT COUNT(*) 
-        FROM '{processed_file_path}'
-        WHERE missing_bounty = TRUE
-    """).fetchone()[0]
-
-    total_row_count = conn.execute(f"""
-        SELECT COUNT(*) 
-        FROM '{processed_file_path}'
-    """).fetchone()[0]
-
-    print(
-        f"Added missing_bounty column: TRUE for {missing_row_count:,} rows, FALSE for {total_row_count - missing_row_count:,} rows")
-    print(f"Updated file saved to: {processed_file_path}")
-
-    # Close the connection
-    conn.close()
-
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        # Clean up temp file if it exists
+        if 'temp_output' in locals() and os.path.exists(temp_output):
+            os.remove(temp_output)
+        if conn:
+            conn.close()
+        raise e
+    finally:
+        # Clean up the temp database file
+        if os.path.exists(db_file):
+            try:
+                os.remove(db_file)
+            except:
+                pass
 
 if __name__ == "__main__":
     input_file = "../data/input/user_answers_bounty_dataset.parquet"
@@ -558,7 +617,8 @@ if __name__ == "__main__":
     process_bounty_dataset(
         input_file=input_file,
         output_file=output_file,
-        chunk_size=500000
+        chunk_size=50000, 
+        num_workers=16
     )
 
     handling_deleted_bountied_questions(

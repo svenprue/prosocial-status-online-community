@@ -1,7 +1,7 @@
 import os
 import duckdb
 import pandas as pd
-
+from pathlib import Path
 
 def calculate_helping_for_matched_questions(
         matched_questions_path: str,
@@ -228,9 +228,9 @@ def calculate_helping_for_matched_questions(
 
 if __name__ == "__main__":
     # Define paths
-    matched_questions_path = r"..\data\study_datasets\matched_questions.parquet"
-    input_data_folder = r"..\data\input"
-    output_data_folder = r"..\data\study_datasets"
+    matched_questions_path = Path("..") / "data" / "input" / "matched_questions.parquet"
+    input_data_folder = Path("..") / "data" / "input"
+    output_data_folder = Path("..") / "data" / "study_datasets"
 
     # Run the calculation
     calculate_helping_for_matched_questions(

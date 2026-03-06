@@ -1,8 +1,8 @@
 import os
 from pathlib import Path
-import creating_raw_bounty_dataset
+# import creating_raw_bounty_dataset
 import creating_raw_reciprocity_dataset
-import processing_bounty_dataset
+# import processing_bounty_dataset
 import processing_reciprocity_dataset
 
 
@@ -19,18 +19,18 @@ def main():
 
     # Configuration parameters
     config = {
-        "bounty_timeline_path": str(input_data_folder / "bounty_timeline.parquet"),
+        # "bounty_timeline_path": str(input_data_folder / "bounty_timeline.parquet"),
         "window_days": [7],
         "chunk_size": 100000,
         "cutoff_date": "2025-04-01"
     }
 
     # Step 1: Create raw bounty dataset
-    creating_raw_bounty_dataset.create_user_answers_dataset(
-        input_folder=str(input_data_folder),
-        output_folder=str(input_data_folder),
-        bounty_timeline_path=config["bounty_timeline_path"]
-    )
+    # creating_raw_bounty_dataset.create_user_answers_dataset(
+    #     input_folder=str(input_data_folder),
+    #     output_folder=str(input_data_folder),
+    #     bounty_timeline_path=config["bounty_timeline_path"]
+    # )
 
     # Step 2: Create reciprocity dataset
     for days in config["window_days"]:
@@ -42,11 +42,11 @@ def main():
         )
 
     # Step 3: Process bounty dataset
-    processing_bounty_dataset.process_bounty_dataset(
-        input_file=str(input_data_folder / "user_answers_bounty_dataset.parquet"),
-        output_file=str(study_datasets_folder / "user_answers_bounty_processed.parquet"),
-        chunk_size=config["chunk_size"]
-    )
+    # processing_bounty_dataset.process_bounty_dataset(
+    #     input_file=str(input_data_folder / "user_answers_bounty_dataset.parquet"),
+    #     output_file=str(study_datasets_folder / "user_answers_bounty_processed.parquet"),
+    #     chunk_size=config["chunk_size"]
+    # )
 
     # Step 4: Process reciprocity dataset
     for days in config["window_days"]:

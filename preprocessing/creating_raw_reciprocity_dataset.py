@@ -18,11 +18,11 @@ def process_accepted_answer_data(
     duckdb_tmp_dir.mkdir(parents=True, exist_ok=True)
 
     con = duckdb.connect(database=str(duckdb_tmp_dir / "working.duckdb"))
-    # Keep memory limit well under total RAM so spilling can happen before OOM.
-    con.execute("PRAGMA memory_limit='5GB';")
+    # Machine has plenty of RAM (e.g. 1TB); allow DuckDB to use a large chunk, leave headroom for OS/spilling.
+    con.execute("PRAGMA memory_limit='200GB';")
     con.execute(f"PRAGMA temp_directory='{duckdb_tmp_dir}';")
     con.execute("PRAGMA max_temp_directory_size='200GiB';")
-    con.execute("PRAGMA threads=2;")
+    con.execute("PRAGMA threads=28;")
     con.execute("PRAGMA enable_progress_bar;")
 
     questions_path = os.path.join(input_folder, 'posts_questions.parquet')
@@ -183,12 +183,21 @@ def process_accepted_answer_data(
                 JOIN questions q ON a.parent_question_id = q.question_id
                 WHERE a.owner_user_id = q.owner_user_id  -- Only self-answers
                 GROUP BY a.parent_question_id
+            ),
+            downvoted_within_7d AS (
+                SELECT DISTINCT q.question_id
+                FROM questions q
+                JOIN answers a ON a.parent_question_id = q.question_id
+                WHERE (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+                  AND a.score < 0
+                  AND a.creation_date <= q.creation_date + INTERVAL '7 DAYS'
             )
             SELECT
                 q.question_id,
                 q.owner_user_id,
                 q.creation_date AS question_timestamp,
                 COALESCE(ac.answer_count > 0, FALSE) AS has_answer,
+                (NOT COALESCE(ac.answer_count > 0, FALSE) AND d.question_id IS NOT NULL) AS has_unhelpful_answer,
                 aa.accepted_answer_timestamp IS NOT NULL AS has_accepted_answer,
                 COALESCE(sa.self_answer_count > 0, FALSE) AS has_self_answer,
                 fa.first_answer_timestamp,
@@ -202,6 +211,7 @@ def process_accepted_answer_data(
             LEFT JOIN accepted_answers aa ON q.question_id = aa.question_id
             LEFT JOIN answer_counts ac ON q.question_id = ac.question_id
             LEFT JOIN self_answers sa ON q.question_id = sa.question_id
+            LEFT JOIN downvoted_within_7d d ON q.question_id = d.question_id
             WHERE q.owner_user_id IS NOT NULL
               {user_filter};
         """)
@@ -293,12 +303,21 @@ def process_accepted_answer_data(
                 WHERE a.owner_user_id = q.owner_user_id  -- Only self-answers
                 GROUP BY a.parent_question_id
             ),
+            downvoted_within_7d AS (
+                SELECT DISTINCT q.question_id
+                FROM questions q
+                JOIN answers a ON a.parent_question_id = q.question_id
+                WHERE (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+                  AND a.score < 0
+                  AND a.creation_date <= q.creation_date + INTERVAL '7 DAYS'
+            ),
             raw AS (
                 SELECT
                     q.question_id,
                     q.owner_user_id,
                     q.creation_date AS question_timestamp,
                     COALESCE(ac.answer_count > 0, FALSE) AS has_answer,
+                    (NOT COALESCE(ac.answer_count > 0, FALSE) AND d.question_id IS NOT NULL) AS has_unhelpful_answer,
                     q.accepted_answer_id IS NOT NULL AS has_accepted_answer,
                     COALESCE(sa.self_answer_count > 0, FALSE) AS has_self_answer,
                     fa.first_answer_timestamp,
@@ -316,6 +335,7 @@ def process_accepted_answer_data(
                 LEFT JOIN accepted_answers aa ON q.question_id = aa.question_id
                 LEFT JOIN answer_counts ac ON q.question_id = ac.question_id
                 LEFT JOIN self_answers sa ON q.question_id = sa.question_id
+                LEFT JOIN downvoted_within_7d d ON q.question_id = d.question_id
                 WHERE q.owner_user_id IS NOT NULL
                   {user_filter}
             )
@@ -324,6 +344,7 @@ def process_accepted_answer_data(
                 owner_user_id,
                 question_timestamp,
                 has_answer,
+                has_unhelpful_answer,
                 has_accepted_answer,
                 has_self_answer,
                 first_answer_timestamp,
@@ -357,19 +378,23 @@ def process_accepted_answer_data(
     if test_mode:
         print(f"  - TEST MODE ACTIVE: Limited to {test_user_limit} users")
 
-    # Build tag dictionary and per-question tag ID lists based on eligible questions
+    # Build tag dictionary and per-question tag ID lists based on eligible questions.
+    # Tags in posts_questions are angle-bracket delimited, e.g. <android><listview>.
+    # Normalize to comma-separated (replace '><' with ',', strip '<' and '>'), then split.
     con.execute("""
         CREATE OR REPLACE TEMPORARY TABLE question_tags_clean AS
         SELECT
             q.question_id,
-            REGEXP_REPLACE(
+            TRIM(
                 REGEXP_REPLACE(
-                    REGEXP_REPLACE(q.tags, '\\\\[|\\\\]', ''),
+                    REGEXP_REPLACE(
+                        REPLACE(REPLACE(REPLACE(q.tags, '><', ','), '<', ''), '>', ''),
+                        '\\\\[|\\\\]',
+                        ''
+                    ),
                     '''',
                     ''
-                ),
-                '\\\\s+',
-                ''
+                )
             ) AS tags_clean
         FROM questions q
         JOIN eligible_questions eq ON q.question_id = eq.question_id
@@ -380,8 +405,10 @@ def process_accepted_answer_data(
         CREATE OR REPLACE TEMPORARY TABLE tag_exploded AS
         SELECT
             question_id,
-            UNNEST(STRING_SPLIT(tags_clean, ',')) AS tag_name
-        FROM question_tags_clean;
+            TRIM(t.tag_val) AS tag_name
+        FROM question_tags_clean,
+             UNNEST(STRING_SPLIT(tags_clean, ',')) AS t(tag_val)
+        WHERE TRIM(t.tag_val) != '';
     """)
 
     con.execute("""
@@ -404,7 +431,7 @@ def process_accepted_answer_data(
         GROUP BY t.question_id;
     """)
 
-    # Compute helps_given in user batches to avoid OOM (never join all questions to answers at once).
+    # Compute helps_given in user batches (with ample RAM we can use larger batches for speed).
     HELPS_GIVEN_BATCH_SIZE = 200_000  # users per batch
     con.execute("""
         CREATE OR REPLACE TEMPORARY TABLE user_batches AS
@@ -431,6 +458,7 @@ def process_accepted_answer_data(
                 FROM eligible_questions eq
                 JOIN user_batches ub ON eq.owner_user_id = ub.owner_user_id
                 WHERE ub.batch_id = %d
+                  AND eq.first_answer_timestamp IS NOT NULL
             ),
             batch_answers AS (
                 SELECT a.*
@@ -464,6 +492,7 @@ def process_accepted_answer_data(
             eq.owner_user_id,
             eq.question_timestamp,
             eq.has_answer,
+            eq.has_unhelpful_answer,
             eq.has_accepted_answer,
             eq.has_self_answer,
             eq.first_answer_timestamp,
@@ -509,6 +538,7 @@ def process_accepted_answer_data(
                                             'Question' AS event_history,
                                             1 AS is_history,
                                             NULL AS has_answer,
+                                            NULL AS has_unhelpful_answer,
                                             NULL AS has_accepted_answer,
                                             NULL AS has_self_answer,
                                             NULL AS first_answer_timestamp,
@@ -539,6 +569,7 @@ def process_accepted_answer_data(
                                              'Answer' AS event_history,
                                              1 AS is_history,
                                              NULL AS has_answer,
+                                             NULL AS has_unhelpful_answer,
                                              NULL AS has_accepted_answer,
                                              NULL AS has_self_answer,
                                              NULL AS first_answer_timestamp,
@@ -573,6 +604,7 @@ def process_accepted_answer_data(
                                       'AcceptedAnswer' AS event_history,
                                       1 AS is_history,
                                       NULL AS has_answer,
+                                      NULL AS has_unhelpful_answer,
                                       NULL AS has_accepted_answer,
                                       NULL AS has_self_answer,
                                       NULL AS first_answer_timestamp,
@@ -605,6 +637,7 @@ def process_accepted_answer_data(
                                   'AcceptedAnswerVote' AS event_history,
                                   1 AS is_history,
                                   NULL AS has_answer,
+                                  NULL AS has_unhelpful_answer,
                                   NULL AS has_accepted_answer,
                                   NULL AS has_self_answer,
                                   NULL AS first_answer_timestamp,
@@ -637,6 +670,7 @@ def process_accepted_answer_data(
                                              'AcceptedAnswerPosted' AS event_history,
                                              1 AS is_history,
                                              NULL AS has_answer,
+                                             NULL AS has_unhelpful_answer,
                                              NULL AS has_accepted_answer,
                                              NULL AS has_self_answer,
                                              NULL AS first_answer_timestamp,
@@ -684,6 +718,7 @@ def process_accepted_answer_data(
             'Phase_One_Start' AS event_history,
             0 AS is_history,
             has_answer,
+            has_unhelpful_answer,
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
@@ -712,6 +747,7 @@ def process_accepted_answer_data(
             'Phase_Two_Start' AS event_history,
             0 AS is_history,
             has_answer,
+            has_unhelpful_answer,
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
@@ -740,6 +776,7 @@ def process_accepted_answer_data(
             'Phase_Two_End' AS event_history,
             0 AS is_history,
             has_answer,
+            has_unhelpful_answer,
             has_accepted_answer,
             has_self_answer,
             first_answer_timestamp,
@@ -768,6 +805,7 @@ def process_accepted_answer_data(
             'Window_Answer' AS event_history,
             0 AS is_history,
             p.has_answer,
+            p.has_unhelpful_answer,
             p.has_accepted_answer,
             p.has_self_answer,
             p.first_answer_timestamp,
@@ -832,6 +870,7 @@ def process_accepted_answer_data(
                 event_history,
                 is_history,
                 has_answer,
+                has_unhelpful_answer,
                 has_accepted_answer,
                 has_self_answer,
                 first_answer_timestamp,
@@ -866,6 +905,9 @@ def process_accepted_answer_data(
     print(f"Done! Saved dataset to {output_path}")
     print(f"Saved tag dictionary to {tag_output_path}")
 
+
+# Alias for main.py which calls process_question_data
+process_question_data = process_accepted_answer_data
 
 if __name__ == "__main__":
     # Resolve base directory relative to this file so paths work reliably on Linux

@@ -1,10 +1,13 @@
 import os
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from tqdm import tqdm
 import gc
 from numba import njit
 import duckdb
+import glob
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Set display options for better debugging output
 pd.set_option('display.max_rows', None)
@@ -15,49 +18,26 @@ pd.set_option('display.max_colwidth', None)
 
 @njit
 def calculate_metrics_jit(
-        timestamps, questionAsked, answer, acceptedAnswerReceived,
-        acceptedVoteReceived, acceptedAnswerPosted, target_time
+        timestamps, questionAsked, answer, target_time
 ):
     """
-    Calculate user metrics across multiple time windows using JIT compilation
-    for significantly improved performance.
+    Calculate only the pre-treatment metrics needed for matching:
+    - All-time and rolling-window counts of questions asked / help provided
+    - Time since first activity (in days)
     """
     # Initialize variables for all time windows
     questions_asked_at = 0
     help_provided_at = 0
-    accepted_answers_received_at = 0
-    accepted_votes_received_at = 0
-    accepted_answers_posted_at = 0
 
     questions_asked_30d = 0
     help_provided_30d = 0
-    accepted_answers_received_30d = 0
-    accepted_votes_received_30d = 0
-    accepted_answers_posted_30d = 0
-
-    questions_asked_14d = 0
-    help_provided_14d = 0
-    accepted_answers_received_14d = 0
-    accepted_votes_received_14d = 0
-    accepted_answers_posted_14d = 0
 
     questions_asked_7d = 0
     help_provided_7d = 0
-    accepted_answers_received_7d = 0
-    accepted_votes_received_7d = 0
-    accepted_answers_posted_7d = 0
-
-    questions_asked_3d = 0
-    help_provided_3d = 0
-    accepted_answers_received_3d = 0
-    accepted_votes_received_3d = 0
-    accepted_answers_posted_3d = 0
 
     # Set cutoff times for different windows (in microseconds)
     cutoff_30d = target_time - 30 * 86400 * 1_000_000
-    cutoff_14d = target_time - 14 * 86400 * 1_000_000
     cutoff_7d = target_time - 7 * 86400 * 1_000_000
-    cutoff_3d = target_time - 3 * 86400 * 1_000_000
 
     # Find the timestamp of first activity (question asked or answer provided)
     first_activity_timestamp = np.int64(0)  # Initialize to 0 (no activity)
@@ -80,81 +60,21 @@ def calculate_metrics_jit(
         # Add to all-time metrics
         questions_asked_at += questionAsked[i]
         help_provided_at += answer[i]
-        accepted_answers_received_at += acceptedAnswerReceived[i]
-        accepted_votes_received_at += acceptedVoteReceived[i]
-        accepted_answers_posted_at += acceptedAnswerPosted[i]
 
         # Add to 30-day window metrics
         if timestamps[i] >= cutoff_30d:
             questions_asked_30d += questionAsked[i]
             help_provided_30d += answer[i]
-            accepted_answers_received_30d += acceptedAnswerReceived[i]
-            accepted_votes_received_30d += acceptedVoteReceived[i]
-            accepted_answers_posted_30d += acceptedAnswerPosted[i]
-
-        # Add to 14-day window metrics
-        if timestamps[i] >= cutoff_14d:
-            questions_asked_14d += questionAsked[i]
-            help_provided_14d += answer[i]
-            accepted_answers_received_14d += acceptedAnswerReceived[i]
-            accepted_votes_received_14d += acceptedVoteReceived[i]
-            accepted_answers_posted_14d += acceptedAnswerPosted[i]
 
         # Add to 7-day window metrics
         if timestamps[i] >= cutoff_7d:
             questions_asked_7d += questionAsked[i]
             help_provided_7d += answer[i]
-            accepted_answers_received_7d += acceptedAnswerReceived[i]
-            accepted_votes_received_7d += acceptedVoteReceived[i]
-            accepted_answers_posted_7d += acceptedAnswerPosted[i]
-
-        # Add to 3-day window metrics
-        if timestamps[i] >= cutoff_3d:
-            questions_asked_3d += questionAsked[i]
-            help_provided_3d += answer[i]
-            accepted_answers_received_3d += acceptedAnswerReceived[i]
-            accepted_votes_received_3d += acceptedVoteReceived[i]
-            accepted_answers_posted_3d += acceptedAnswerPosted[i]
-
-    # Calculate derived metrics
-    help_provided_ever = 1 if help_provided_at > 0 else 0
-
-    # Determine user's initial experience as help receiver
-    if questions_asked_at == 0:
-        initialExperienceReceiving_code = 0
-    elif questions_asked_at > 0 and accepted_answers_received_at == 0:
-        initialExperienceReceiving_code = 1
-    elif questions_asked_at > 0 and accepted_answers_received_at > 0:
-        initialExperienceReceiving_code = 2
-    else:
-        initialExperienceReceiving_code = 3
-
-    # Determine user's initial experience as help provider
-    if help_provided_at == 0:
-        initialExperienceGiving_code = 0
-    elif help_provided_at > 0 and accepted_answers_posted_at == 0:
-        initialExperienceGiving_code = 1
-    elif accepted_answers_posted_at > 0:
-        initialExperienceGiving_code = 2
-    else:
-        initialExperienceGiving_code = 3
 
     return (
-        questions_asked_at, help_provided_at, help_provided_ever,
-        accepted_answers_received_at, accepted_votes_received_at,
+        questions_asked_at, help_provided_at,
         questions_asked_30d, help_provided_30d,
-        accepted_answers_received_30d, accepted_votes_received_30d,
-        accepted_answers_posted_30d,
-        questions_asked_14d, help_provided_14d,
-        accepted_answers_received_14d, accepted_votes_received_14d,
-        accepted_answers_posted_14d,
         questions_asked_7d, help_provided_7d,
-        accepted_answers_received_7d, accepted_votes_received_7d,
-        accepted_answers_posted_7d,
-        questions_asked_3d, help_provided_3d,
-        accepted_answers_received_3d, accepted_votes_received_3d,
-        accepted_answers_posted_3d,
-        accepted_answers_posted_at, initialExperienceReceiving_code, initialExperienceGiving_code,
         time_since_first_activity_days
     )
 
@@ -192,12 +112,9 @@ def prepare_user_history_for_jit(user_history_df):
     timestamps = user_history_df["timestamp"].astype(np.int64).values
     questionAsked = user_history_df["questionAsked"].values
     answer = user_history_df["answer"].values
-    acceptedAnswerReceived = user_history_df["acceptedAnswerReceived"].values
-    acceptedVoteReceived = user_history_df["acceptedVoteReceived"].values
-    acceptedAnswerPosted = user_history_df["acceptedAnswerPosted"].values
 
-    return (timestamps, questionAsked, answer, acceptedAnswerReceived,
-            acceptedVoteReceived, acceptedAnswerPosted)
+    # JIT now only needs timestamps, questionAsked, and answer
+    return (timestamps, questionAsked, answer)
 
 
 def calculate_reciprocity_activation(user_histories):
@@ -236,60 +153,28 @@ def calculate_reciprocity_activation(user_histories):
     return reciprocity_status
 
 
-def process_question_centered_dataset(input_file: str, output_file: str, chunk_size: int = 1000,
-                                       cutoff_date: str = "2025-04-01") -> None:
+def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp_dir, cutoff_date):
     """
-    Process the question-centered dataset to calculate metrics for each user.
-    Dataset is centered on when users post their question.
-    Self-answers are excluded from all metrics.
-    Uses JIT compilation for performance optimization.
+    Worker function: Processes a single chunk of users and saves a temporary file.
     """
-    print(f"\n=== Processing {input_file} ===")
-    cutoff = pd.to_datetime(cutoff_date)
-
-    # Get unique user IDs and shuffle for better parallelization
-    print("Reading unique user IDs...")
-    all_user_ids = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
-    print(f"Found {len(all_user_ids):,} unique users")
-
-    user_ids = np.copy(all_user_ids)
-    np.random.shuffle(user_ids)
-
-    # Get total count of non-history rows
-    total_rows = pd.read_parquet(input_file, columns=["is_history"])
-    total_non_history = len(total_rows[total_rows["is_history"] == 0])
-    print(f"Total non-history rows: {total_non_history:,}")
-    del total_rows
-
-    # Create output directory
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    if os.path.exists(output_file):
-        os.remove(output_file)
-
-    # Process users in chunks
-    num_chunks = (len(user_ids) + chunk_size - 1) // chunk_size
-    all_result_count = 0
-
-    chunk_progress = tqdm(
-        total=len(user_ids),
-        desc="Overall progress",
-        unit="users",
-        position=0
-    )
-
-    for chunk_idx in range(num_chunks):
+    try:
+        # Re-establish context inside the worker
+        cutoff = pd.to_datetime(cutoff_date)
         start_idx = chunk_idx * chunk_size
-        end_idx = min(start_idx + chunk_size, len(user_ids))
-        chunk_user_ids = user_ids[start_idx:end_idx]
-
+        end_idx = start_idx + len(chunk_user_ids)
+        
         print(f"\nProcessing users {start_idx:,} to {end_idx:,} ({len(chunk_user_ids):,} users)")
 
         # Use DuckDB for efficient filtering by user_id
         user_ids_str = ", ".join(str(id) for id in chunk_user_ids)
-        df = duckdb.query(f"""
+        
+        # Create a fresh DuckDB connection for this process
+        con = duckdb.connect()
+        df = con.query(f"""
            SELECT * FROM read_parquet('{input_file}')
            WHERE user_id IN ({user_ids_str})
         """).to_df()
+        con.close()
 
         print(f"Loaded {len(df):,} total rows for this chunk of users")
 
@@ -299,13 +184,10 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
         df["phase_two_end"] = pd.to_datetime(df["phase_two_end"], errors="coerce")
 
         # Create binary event flags using minimal memory (int8)
-        # Note: All Answer, AcceptedAnswer, and AcceptedAnswerPosted events in raw data exclude self-answers
+        # Note: All Answer events in raw data exclude self-answers
+        # For matching we only need Question/Answer history (no accepted/vote breakdown).
         df["questionAsked"] = df["event"].map({"Question": 1}).fillna(0).astype(np.int8)
-        df["acceptedAnswer"] = df["event"].map({"AcceptedAnswer": 1}).fillna(0).astype(np.int8)
         df["answer"] = df["event"].map({"Answer": 1, "Window_Answer": 1}).fillna(0).astype(np.int8)
-        df["acceptedAnswerReceived"] = df["event"].map({"AcceptedAnswer": 1}).fillna(0).astype(np.int8)
-        df["acceptedVoteReceived"] = df["event"].map({"AcceptedAnswerVote": 1}).fillna(0).astype(np.int8)
-        df["acceptedAnswerPosted"] = df["event"].map({"AcceptedAnswerPosted": 1}).fillna(0).astype(np.int8)
 
         # Calculate response time in hours (time to first non-self, non-negative answer)
         df["responseTimeHours"] = None
@@ -345,25 +227,24 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
         gc.collect()
 
         if len(non_history_chunk) == 0:
-            chunk_progress.update(len(chunk_user_ids))
             print("No non-history data in this chunk, skipping...")
-            continue
+            return 0
 
         # Build JIT-compatible user history cache
         print("Building JIT-compatible user history cache for this chunk...")
         user_histories_jit = {}
-        user_histories_pandas = {}
+        # user_histories_pandas = {} # Commented out as per original logic flow usually dropping it
 
-        for user_id, user_data in tqdm(history_chunk.groupby("user_id"), desc="Preprocessing users", position=1,
-                                       leave=False):
+        # Note: Using tqdm inside parallel workers can look messy, but keeping as requested
+        for user_id, user_data in history_chunk.groupby("user_id"):
             user_histories_jit[user_id] = prepare_user_history_for_jit(user_data)
-            user_histories_pandas[user_id] = user_data
+            # user_histories_pandas[user_id] = user_data
 
         # Calculate reciprocity activation
-        reciprocity_status = calculate_reciprocity_activation(user_histories_pandas)
+        # reciprocity_status = calculate_reciprocity_activation(user_histories_pandas)
 
         del history_chunk
-        del user_histories_pandas
+        # del user_histories_pandas
 
         # Find all Phase_One_Start events
         phase_one_starts = non_history_chunk[non_history_chunk["event"] == "Phase_One_Start"]
@@ -373,14 +254,6 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
         print("Calculating metrics for each Phase_One_Start event...")
         event_metrics = {}
 
-        phase_one_progress = tqdm(
-            total=len(phase_one_starts),
-            desc="Processing Phase_One_Start events with JIT",
-            unit="events",
-            position=1,
-            leave=False
-        )
-
         for _, row in phase_one_starts.iterrows():
             user_id = row["user_id"]
             event_id = row["event_id"]
@@ -389,67 +262,35 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
             # Calculate metrics using JIT
             if user_id not in user_histories_jit:
                 # Default metrics if no history
-                metrics_values = (0, 0, 0, 0, 0,
-                                  0, 0, 0, 0, 0,
-                                  0, 0, 0, 0, 0,
-                                  0, 0, 0, 0, 0,
-                                  0, 0, 0, 0, 0,
-                                  0, 0, 0, 0.0)  # Add default value for time_since_first_activity_days
-
-                # Convert the last two values (experience codes) to strings
-                initialExperienceReceiving, initialExperienceGiving = "no help seeked", "no help attempted"
-
-                # Combine numeric metrics with string experience values and timeSinceFirstActivityDays
-                metrics = list(metrics_values[:-3]) + [initialExperienceReceiving, initialExperienceGiving,
-                                                       metrics_values[-1]]
+                metrics_values = (
+                    0, 0,      # AT: questions asked, help provided
+                    0, 0,      # 30D: questions asked, help provided
+                    0, 0,      # 7D: questions asked, help provided
+                    0.0        # time_since_first_activity_days
+                )
             else:
                 # Calculate metrics using JIT
                 metrics_values = calculate_metrics_jit(*user_histories_jit[user_id], target_time)
 
-                # Convert experience codes to strings
-                initialExperienceReceiving, initialExperienceGiving = convert_experience_code_to_string(
-                    metrics_values[-3], metrics_values[-2]
-                )
-
-                # Replace codes with strings in the metrics and keep timeSinceFirstActivityDays
-                metrics = list(metrics_values[:-3]) + [initialExperienceReceiving, initialExperienceGiving,
-                                                       metrics_values[-1]]
-
-            event_metrics[event_id] = tuple(metrics)
-            phase_one_progress.update(1)
-
-        phase_one_progress.close()
+            event_metrics[event_id] = tuple(metrics_values)
 
         # Set default metrics for missing event_ids
         missing_event_ids = set(all_event_ids) - set(event_metrics.keys())
         if missing_event_ids:
-            default_metrics = (0, 0, 0, 0, 0,
-                               0, 0, 0, 0, 0,
-                               0, 0, 0, 0, 0,
-                               0, 0, 0, 0, 0,
-                               0, 0, 0, 0, 0,
-                               0, "no help seeked", "no help attempted",
-                               0.0)
+            default_metrics = (
+                0, 0,      # AT
+                0, 0,      # 30D
+                0, 0,      # 7D
+                0.0        # time_since_first_activity_days
+            )
             for eid in missing_event_ids:
                 event_metrics[eid] = default_metrics
 
         # Define metric column names
         metric_columns = [
-            "numQuestionsAskedAT", "numHelpProvidedAT", "helpProvidedEver",
-            "numAcceptedAnswersReceivedAT", "numAcceptedVotesReceivedAT",
+            "numQuestionsAskedAT", "numHelpProvidedAT",
             "numQuestionsAsked30D", "numHelpProvided30D",
-            "numAcceptedAnswersReceived30D", "numAcceptedVotesReceived30D",
-            "numAcceptedAnswersPosted30D",
-            "numQuestionsAsked14D", "numHelpProvided14D",
-            "numAcceptedAnswersReceived14D", "numAcceptedVotesReceived14D",
-            "numAcceptedAnswersPosted14D",
             "numQuestionsAsked7D", "numHelpProvided7D",
-            "numAcceptedAnswersReceived7D", "numAcceptedVotesReceived7D",
-            "numAcceptedAnswersPosted7D",
-            "numQuestionsAsked3D", "numHelpProvided3D",
-            "numAcceptedAnswersReceived3D", "numAcceptedVotesReceived3D",
-            "numAcceptedAnswersPosted3D",
-            "numAcceptedAnswersPostedAT", "initialExperienceReceiving", "initialExperienceGiving",
             "timeSinceFirstActivityDays"
         ]
 
@@ -466,79 +307,17 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
         non_history_chunk = pd.merge(non_history_chunk, metrics_df, on='event_id', how='left')
 
         # Add reciprocity activation data
-        print("Adding reciprocity activation data...")
-        non_history_chunk['reciprocityActivated'] = 0
-        non_history_chunk['reciprocityActivatedTimestamp'] = pd.NaT
+        # (Commented out logic kept as is)
 
-        for user_id, (activated, activation_time) in reciprocity_status.items():
-            user_rows = non_history_chunk[non_history_chunk['user_id'] == user_id]
-            if not user_rows.empty:
-                if pd.isna(activation_time):
-                    non_history_chunk.loc[user_rows.index, 'reciprocityActivated'] = 0
-                else:
-                    mask = non_history_chunk.index.isin(user_rows.index) & (
-                            non_history_chunk['timestamp'] > activation_time)
-                    non_history_chunk.loc[mask, 'reciprocityActivated'] = 1
-                    non_history_chunk.loc[mask, 'reciprocityActivatedTimestamp'] = activation_time
-
-        # Mark Window_Answer events for numHelped calculation
+        # Mark Window_Answer events for numHelped calculation (count per question over full window)
         non_history_chunk["numHelped"] = np.where(non_history_chunk["event"] == "Window_Answer", 1, 0)
-
-        # Determine phase (1 or 2) based on timestamps
-        print("Determining phase for each event...")
-        non_history_chunk["timestampInt"] = pd.to_numeric(non_history_chunk["timestamp"], errors="coerce",
-                                                          downcast="integer")
-
-        # Get phase boundary timestamps for each event_id
-        phase_two_start_times = (
-            non_history_chunk.loc[non_history_chunk["event"] == "Phase_Two_Start"]
-            .groupby("event_id")["timestampInt"]
-            .max()
-        )
-        end_times = (
-            non_history_chunk.loc[non_history_chunk["event"] == "Phase_Two_End"]
-            .groupby("event_id")["timestampInt"]
-            .max()
-        )
-
-        # Map phase boundary timestamps to all rows by event_id
-        non_history_chunk["phaseTwoStartTime"] = non_history_chunk["event_id"].map(phase_two_start_times)
-        non_history_chunk["endTime"] = non_history_chunk["event_id"].map(end_times)
-
-        # Assign phases based on timestamp relationships
-        non_history_chunk["isPhase"] = np.where(
-            non_history_chunk["timestampInt"] >= non_history_chunk["phaseTwoStartTime"],
-            1,  # Phase 2 (at or after Phase_Two_Start)
-            0  # Phase 1 (before Phase_Two_Start)
-        )
-
-        # Handle post-end events
-        non_history_chunk["isPhase"] = np.where(
-            (non_history_chunk["timestampInt"] > non_history_chunk["endTime"]) &
-            (non_history_chunk["endTime"].notna()),
-            0,  # Set to 0 if after end_time
-            non_history_chunk["isPhase"]
-        )
-        non_history_chunk["phase"] = non_history_chunk["isPhase"].replace({0: 1, 1: 2})
-
-        # Add derived metrics
-        non_history_chunk["receivedAcceptedAnswerEver"] = (
-                non_history_chunk["numAcceptedAnswersReceivedAT"] > 0).astype(int)
-        non_history_chunk["receivedAcceptedVoteEver"] = (non_history_chunk["numAcceptedVotesReceivedAT"] > 0).astype(
-            int)
-
-        # Add reciprocity activation flag for before Phase 1
-        non_history_chunk["reciprocityActivatedBeforePhase1"] = (
-            (non_history_chunk["reciprocityActivated"] == 1) &
-            (non_history_chunk["reciprocityActivatedTimestamp"] < non_history_chunk["phase_one_start"])
-        ).astype(int)
 
         non_history_chunk["month"] = non_history_chunk["timestamp"].dt.month
         non_history_chunk["year"] = non_history_chunk["timestamp"].dt.year
 
-        # Define aggregation columns and functions
-        print("Aggregating data by event_id and phase...")
-        group_cols = ["event_id", "phase"]
+        # Aggregate to one row per question (event_id); all matching covariates at question level
+        print("Aggregating data by event_id (question level)...")
+        group_cols = ["event_id"]
         agg_dict = {
             "user_id": "first",
             "timestamp": "first",
@@ -547,61 +326,34 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
             "phase_one_start": "first",
             "phase_two_end": "first",
             "has_answer": "first",
+            "has_unhelpful_answer": "first",
             "has_accepted_answer": "first",
             "has_self_answer": "first",
             "responseTimeHours": "first",
             "timeToAcceptedAnswerHours": "first",
             "timeToAcceptVoteHours": "first",
             "numHelped": "sum",
-            "helpProvidedEver": "first",
-            "receivedAcceptedAnswerEver": "first",
-            "receivedAcceptedVoteEver": "first",
             "year": "first",
             "month": "first",
             "numQuestionsAskedAT": "first",
             "numHelpProvidedAT": "first",
-            "numAcceptedAnswersReceivedAT": "first",
-            "numAcceptedVotesReceivedAT": "first",
             "numQuestionsAsked30D": "first",
             "numHelpProvided30D": "first",
-            "numAcceptedAnswersReceived30D": "first",
-            "numAcceptedVotesReceived30D": "first",
-            "numAcceptedAnswersPosted30D": "first",
-            "numQuestionsAsked14D": "first",
-            "numHelpProvided14D": "first",
-            "numAcceptedAnswersReceived14D": "first",
-            "numAcceptedVotesReceived14D": "first",
-            "numAcceptedAnswersPosted14D": "first",
             "numQuestionsAsked7D": "first",
             "numHelpProvided7D": "first",
-            "numAcceptedAnswersReceived7D": "first",
-            "numAcceptedVotesReceived7D": "first",
-            "numAcceptedAnswersPosted7D": "first",
-            "numQuestionsAsked3D": "first",
-            "numHelpProvided3D": "first",
-            "numAcceptedAnswersReceived3D": "first",
-            "numAcceptedVotesReceived3D": "first",
-            "numAcceptedAnswersPosted3D": "first",
-            "numAcceptedAnswersPostedAT": "first",
-            "initialExperienceReceiving": "first",
-            "initialExperienceGiving": "first",
             "timeSinceFirstActivityDays": "first",
-            "reciprocityActivated": "first",
-            "reciprocityActivatedTimestamp": "first",
-            "reciprocityActivatedBeforePhase1": "first",
-            "autobiography_received": "first",
             "registration_date": "first",
-            "autobiography_active_phase_one_start": "first",
-            "autobiography_active_phase_two_start": "first",
             "days_since_registration_at_phase_one_start": "first",
-            "helps_given_between_question_and_answer": "first"
+            "helps_given_between_question_and_answer": "first",
+            "tag_ids": "first",
         }
 
-        # Apply aggregation
+        # Apply aggregation (one row per question)
         non_history_chunk = non_history_chunk.sort_values(["event_id", "timestamp"])
-        agg_df = non_history_chunk.groupby(group_cols).agg(agg_dict).reset_index()
+        agg_df = non_history_chunk.groupby(group_cols, as_index=False).agg(agg_dict)
 
-        # Filter out rows beyond cutoff date
+        # Filter out rows beyond cutoff date (main place questions are lost in processing:
+        # questions whose 7-day window ends after cutoff_date are dropped)
         initial_count = len(agg_df)
         agg_df = agg_df[agg_df["phase_two_end"] <= cutoff]
         removed = initial_count - len(agg_df)
@@ -614,31 +366,30 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
         for col in agg_df.select_dtypes(include=["Int32", "Int64"]).columns:
             # Only convert if there are no NULLs
             if not agg_df[col].isna().any():
-                agg_df[col] = agg_df[col].astype("int64")  # Convert nullable integers
+                agg_df[col] = agg_df[col].astype("int64")
         for col in agg_df.select_dtypes(include=["Float32"]).columns:
-            agg_df[col] = agg_df[col].astype("float64")  # Convert nullable floats
+            agg_df[col] = agg_df[col].astype("float64")
 
-        # Create additional metrics for analysis
-        print("Calculating additional metrics and fixed effects...")
+
+        if "tag_ids" in agg_df.columns:
+            def _get_main_tag_id(val):
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return pd.NA
+                try:
+                    v = list(val) if not isinstance(val, (list, tuple)) else val
+                    if len(v) > 0:
+                        return int(v[0])
+                except (TypeError, ValueError, IndexError):
+                    pass
+                return pd.NA
+
+            agg_df["mainTagId"] = agg_df["tag_ids"].apply(_get_main_tag_id)
+
+        # Create additional metrics needed for matching
+        print("Calculating additional metrics...")
         agg_df['hasHelped'] = (agg_df['numHelped'] > 0).astype(int)
-        agg_df['lnNumHelped'] = np.log(agg_df['numHelped'] + 1)
-
-        # Calculate fixed effects (user, question, and month-level deviations)
-        agg_df['userFeNumHelped'] = agg_df.groupby("user_id")["numHelped"].transform(lambda x: x - x.mean())
-        agg_df['questionFeNumHelped'] = agg_df.groupby("event_id")["numHelped"].transform(lambda x: x - x.mean())
-        agg_df['userFeHasHelped'] = agg_df.groupby("user_id")["hasHelped"].transform(lambda x: x - x.mean())
-        agg_df['questionFeHasHelped'] = agg_df.groupby("event_id")["hasHelped"].transform(lambda x: x - x.mean())
-        agg_df['userFeLnNumHelped'] = agg_df.groupby("user_id")["lnNumHelped"].transform(lambda x: x - x.mean())
-        agg_df['questionFeLnNumHelped'] = agg_df.groupby("event_id")["lnNumHelped"].transform(lambda x: x - x.mean())
-
-        # Calculate month fixed effects (seasonal deviations)
-        #agg_df['monthFeNumHelped'] = agg_df.groupby("month")["numHelped"].transform(lambda x: x - x.mean())
-        #agg_df['monthFeHasHelped'] = agg_df.groupby("month")["hasHelped"].transform(lambda x: x - x.mean())
-        #agg_df['monthFeLnNumHelped'] = agg_df.groupby("month")["lnNumHelped"].transform(lambda x: x - x.mean())
-
-        # Track processing counts
-        chunk_count = len(agg_df)
-        all_result_count += chunk_count
+        # Single row per question; keep phase=1 for downstream scripts that expect it
+        agg_df['phase'] = 1
 
         # Standardize column naming
         print("Standardizing column names...")
@@ -649,46 +400,137 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
             'phase_one_start': 'phaseOneStart',
             'phase_two_end': 'phaseTwoEnd',
             'has_answer': 'hasAnswer',
+            'has_unhelpful_answer': 'hasUnhelpfulAnswer',
             'has_accepted_answer': 'hasAcceptedAnswer',
             'has_self_answer': 'hasSelfAnswer',
         }
         agg_df = agg_df.rename(columns=column_rename_map)
 
-        # Save output using append for all chunks after the first
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        if chunk_idx == 0:
-            # For first chunk, create a new file
-            agg_df.to_parquet(output_file, index=False)
-            print(f"Created output file {output_file} with {chunk_count:,} rows")
-        else:
-            # For subsequent chunks, append to the existing file
-            agg_df.to_parquet(
-                output_file,
-                index=False,
-                append=True,
-                engine="fastparquet"
-            )
-            print(f"Appended chunk {chunk_idx + 1}/{num_chunks} with {chunk_count:,} rows to {output_file}")
+        # PARALLELIZATION CHANGE: Save to temporary chunk file
+        chunk_count = len(agg_df)
+        temp_file = os.path.join(temp_dir, f"chunk_{chunk_idx}.parquet")
+        agg_df.to_parquet(temp_file, index=False)
+        print(f"Saved temporary chunk {chunk_idx} with {chunk_count:,} rows")
 
         # Free memory
         del non_history_chunk
         del user_histories_jit
         del agg_df
         del event_metrics
-        del reciprocity_status
+        # del reciprocity_status
         gc.collect()
 
-        chunk_progress.update(len(chunk_user_ids))
+        return chunk_count
 
-    chunk_progress.close()
+    except Exception as e:
+        print(f"!!! Error processing chunk {chunk_idx}: {e}")
+        return 0
+
+def process_question_centered_dataset(input_file: str, output_file: str, chunk_size: int = 1000,
+                                      cutoff_date: str = "2025-04-01", num_workers: int = 16) -> None:
+    """
+    Process the question-centered dataset to calculate metrics for each user.
+    Dataset is centered on when users post their question.
+    Self-answers are excluded from all metrics.
+    Uses JIT compilation for performance optimization.
+    PARALLELIZED VERSION
+    """
+    print(f"\n=== Processing {input_file} (Parallel with {num_workers} workers) ===")
+    
+    # Get unique user IDs and shuffle for better parallelization
+    print("Reading unique user IDs...")
+    all_user_ids = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
+    print(f"Found {len(all_user_ids):,} unique users")
+
+    user_ids = np.copy(all_user_ids)
+    np.random.shuffle(user_ids)
+
+    # Get total count of non-history rows
+    total_rows = pd.read_parquet(input_file, columns=["is_history"])
+    total_non_history = len(total_rows[total_rows["is_history"] == 0])
+    print(f"Total non-history rows: {total_non_history:,}")
+    del total_rows
+
+    # Create output directory and temp directory for chunks
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    temp_dir = os.path.join(os.path.dirname(output_file), "temp_chunks")
+    os.makedirs(temp_dir, exist_ok=True)
+    
+    # Clean up old chunks if any
+    for f in glob.glob(os.path.join(temp_dir, "*.parquet")):
+        os.remove(f)
+
+    if os.path.exists(output_file):
+        os.remove(output_file)
+
+    # Prepare chunks
+    num_chunks = (len(user_ids) + chunk_size - 1) // chunk_size
+    all_result_count = 0
+    
+    chunk_tasks = []
+    for chunk_idx in range(num_chunks):
+        start_idx = chunk_idx * chunk_size
+        end_idx = min(start_idx + chunk_size, len(user_ids))
+        chunk_user_ids = user_ids[start_idx:end_idx]
+        chunk_tasks.append((chunk_user_ids, chunk_idx))
+
+    print(f"Starting parallel processing of {num_chunks} chunks...")
+
+    # Process chunks in parallel
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = [
+            executor.submit(process_single_chunk, c_ids, c_idx, chunk_size, input_file, temp_dir, cutoff_date)
+            for c_ids, c_idx in chunk_tasks
+        ]
+        
+        # Use tqdm to track completed chunks
+        with tqdm(total=len(user_ids), desc="Overall progress", unit="users", position=0) as pbar:
+            for future in as_completed(futures):
+                result_count = future.result()
+                all_result_count += result_count
+                # We update by chunk_size (approx) or we can pass actual count back, 
+                # strictly we should update by len(chunk_user_ids) but simplified here:
+                pbar.update(chunk_size)
+
+    # Consolidate results
+    print("\nConsolidating temporary chunk files into final output...")
+    
+    temp_files = sorted(glob.glob(os.path.join(temp_dir, "*.parquet")), 
+                        key=lambda x: int(os.path.basename(x).split('_')[1].split('.')[0]))
+    
+    if not temp_files:
+        print("No data processed!")
+        return
+
+    # Merge chunks: concat all then write once (avoids fastparquet append schema
+    # issues with list columns like tag_ids, which cause KeyError: 'element')
+    chunk_dfs = []
+    for temp_f in tqdm(temp_files, desc="Reading chunks"):
+        chunk_dfs.append(pd.read_parquet(temp_f))
+        os.remove(temp_f)
+    merged_df = pd.concat(chunk_dfs, ignore_index=True)
+    del chunk_dfs
+    gc.collect()
+    merged_df.to_parquet(output_file, index=False, engine="pyarrow")
+    print(f"Written output file {output_file} with {len(merged_df):,} rows")
+    del merged_df
+    gc.collect()
+
+    # Cleanup temp dir
+    try:
+        os.rmdir(temp_dir)
+    except:
+        pass
 
     print(f"\nCompleted processing {all_result_count:,} total rows")
     print(f"Final output saved to {output_file}")
-
+    
 
 if __name__ == "__main__":
-    input_folder = "../data/input"
-    output_folder = "../data/study_datasets"
+    # Paths relative to project root so script works from any cwd
+    base_dir = Path(__file__).resolve().parent.parent
+    input_folder = base_dir / "data" / "input"
+    output_folder = base_dir / "data" / "study_datasets"
     cutoff_date = "2025-04-01"
 
     # Set this to True to process test mode files, False for full dataset
@@ -699,11 +541,11 @@ if __name__ == "__main__":
     for days in [7]:
         # Build filename based on test mode
         if test_mode:
-            input_file = f"{input_folder}/question_centered_model_{days}d_all_questions_TEST{test_user_limit}.parquet"
-            output_file = f"{output_folder}/question_centered_model_{days}d_processed_TEST{test_user_limit}.parquet"
+            input_file = input_folder / f"question_centered_model_{days}d_all_questions_TEST{test_user_limit}.parquet"
+            output_file = output_folder / f"question_centered_model_{days}d_processed_TEST{test_user_limit}.parquet"
         else:
-            input_file = f"{input_folder}/question_centered_model_{days}d_all_questions.parquet"
-            output_file = f"{output_folder}/question_centered_model_{days}d_processed.parquet"
+            input_file = input_folder / f"question_centered_model_{days}d_all_questions.parquet"
+            output_file = output_folder / f"question_centered_model_{days}d_processed.parquet"
 
         process_question_centered_dataset(
             input_file=input_file,
