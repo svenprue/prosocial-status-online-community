@@ -20,7 +20,10 @@ def parse_generic_row_posts(elem):
             'OwnerUserId': attrib.get('OwnerUserId', None),
             'Score': attrib.get('Score', None),
             'AcceptedAnswerId': attrib.get('AcceptedAnswerId', None),
-            'ParentId': attrib.get('ParentId', None)
+            'ParentId': attrib.get('ParentId', None),
+            'Body': attrib.get('Body', None),
+            'Title': attrib.get('Title', None),
+            'Tags': attrib.get('Tags', None)
         }
 
     except Exception as e:
@@ -110,25 +113,32 @@ def convert_xml_to_parquet(xml_path, parquet_path, parse_function, chunk_size=10
 
 def split_parquet_by_column(parquet_file_path, output_folder, column, values, custom_names=None):
     con = duckdb.connect(database=':memory:', read_only=False)
-    con.execute(f"CREATE VIEW data AS SELECT * FROM '{parquet_file_path}'")
+
+    # Configure DuckDB to spill to disk when memory is exceeded
+    con.execute("SET memory_limit='10GB'")
+    con.execute("SET temp_directory='C:/Users/svenp/AppData/Local/Temp/duckdb_temp'")
+    con.execute("SET threads=4")
 
     for i, value in enumerate(values):
-        df = con.execute(f"SELECT * FROM data WHERE {column} = {value}").df()
-
         if custom_names and i < len(custom_names):
             output_filename = custom_names[i]
         else:
             output_filename = f'{column}_{value}.parquet'
 
         output_path = os.path.join(output_folder, output_filename)
-        df.to_parquet(output_path, index=False)
+
+        # Stream directly from source to output
+        con.execute(f"""
+            COPY (SELECT * FROM '{parquet_file_path}' WHERE {column} = {value})
+            TO '{output_path}' (FORMAT PARQUET)
+        """)
 
     con.close()
 
 
 def process_posts(posts_file_path, output_folder):
     posts_parquet_path = os.path.join(output_folder, 'Posts.parquet')
-    convert_xml_to_parquet(posts_file_path, posts_parquet_path, parse_generic_row_posts)
+    # convert_xml_to_parquet(posts_file_path, posts_parquet_path, parse_generic_row_posts)
     split_parquet_by_column(
         posts_parquet_path,
         output_folder,
@@ -181,7 +191,7 @@ def fix_column_types(parquet_file_paths):
 
 
 def main():
-    input_folder = './'  # Specify your input folder here
+    input_folder = 'C:/Users/svenp/Downloads/'  # Specify your input folder here
     output_folder = '../input/'  # Specify your output folder here
 
     posts_file_path = os.path.join(input_folder, 'Posts.xml')
@@ -190,17 +200,17 @@ def main():
     badges_file_path = os.path.join(input_folder, 'Badges.xml')
 
     process_posts(posts_file_path, output_folder)
-    process_votes(votes_file_path, output_folder)
-    process_users(users_file_path, output_folder)
-    process_badges(badges_file_path, output_folder)
+    #process_votes(votes_file_path, output_folder)
+    #process_users(users_file_path, output_folder)
+    #process_badges(badges_file_path, output_folder)
 
     # Fix column types for all processed parquet files
     parquet_files = [
         os.path.join(output_folder, 'posts_answers.parquet'),
         os.path.join(output_folder, 'posts_questions.parquet'),
-        os.path.join(output_folder, 'Votes.parquet'),
-        os.path.join(output_folder, 'Users.parquet'),
-        os.path.join(output_folder, 'Badges.parquet')
+        #os.path.join(output_folder, 'Votes.parquet'),
+        #os.path.join(output_folder, 'Users.parquet'),
+        #os.path.join(output_folder, 'Badges.parquet')
     ]
     fix_column_types(parquet_files)
 
