@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.2.18)  10 MAR 2026 19:58
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.2.18)  10 MAR 2026 20:19
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -896,8 +896,7 @@ Package: tabularx 2020/01/15 v2.11c `tabularx' package (DPC)
 \TX@delta=\dimen315
 \TX@cols=\count343
 \TX@ftn=\toks45
-)
-No file main.aux.
+) (./main.aux)
 \openout1 = `main.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 82.
@@ -919,6 +918,7 @@ LaTeX Font Info:    ... okay on input line 82.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 82.
 LaTeX Font Info:    ... okay on input line 82.
 Package hyperref Info: Link coloring OFF on input line 82.
+
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
 
@@ -933,6 +933,8 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 LaTeX Info: Redefining \ref on input line 82.
 LaTeX Info: Redefining \pageref on input line 82.
 LaTeX Info: Redefining \nameref on input line 82.
+
+(./main.out) (./main.out)
 \@outlinefile=\write4
 \openout4 = `main.out'.
 
@@ -1282,12 +1284,7 @@ on input line 115.
 Package natbib Warning: Citation `andersen_gill_1982' on page 11 undefined on i
 nput line 115.
 
-[11]
-
-LaTeX Warning: Reference `fig:study_design' on page 12 undefined on input line 
-124.
-
-[12]
+[11] [12]
 
 Package natbib Warning: Citation `callaway_santanna_2021' on page 13 undefined 
 on input line 132.
@@ -1301,24 +1298,7 @@ Overfull \hbox (49.46222pt too wide) in paragraph at lines 221--222
 Package natbib Warning: Citation `callaway_santanna_2021' on page 13 undefined 
 on input line 224.
 
-[13]
-
-LaTeX Warning: Reference `sec:results' on page 14 undefined on input line 227.
-
-
-LaTeX Warning: Reference `fig:help_rate_2panel' on page 14 undefined on input l
-ine 227.
-
-[14]
-
-LaTeX Warning: Reference `tab:variables' on page 15 undefined on input line 239
-.
-
-
-LaTeX Warning: Reference `fig:study_design' on page 15 undefined on input line 
-239.
-
-
+[13] [14]
 Underfull \hbox (badness 1831) in paragraph at lines 259--259
 []|\OT1/ppl/m/n/12 Interaction of isTreatedAc-tive $\OMS/cmsy/m/n/12 ^^B$ \OT1/
 ppl/m/n/12 log(responseTime);
@@ -1328,12 +1308,7 @@ ppl/m/n/12 log(responseTime);
 Overfull \vbox (6.71472pt too high) has occurred while \output is active []
 
 
-[16]
-
-LaTeX Warning: Reference `tab:tenure_counts' on page 17 undefined on input line
- 268.
-
-[17]
+[16] [17]
 
 Package natbib Warning: Citation `rosenbaum_rubin_1983' on page 18 undefined on
  input line 296.
@@ -1343,10 +1318,6 @@ Overfull \hbox (23.23894pt too wide) in paragraph at lines 296--297
 \OT1/ppl/m/n/12 Because the re-ceipt of an an-swer (the treat-ment) is cor-re-l
 ated with user characteristics---
  []
-
-
-LaTeX Warning: Reference `tab:covariates' on page 18 undefined on input line 29
-8.
 
 [18]
 Overfull \hbox (3.28683pt too wide) in paragraph at lines 315--315
@@ -1365,14 +1336,14 @@ Overfull \hbox (2.81621pt too wide) in paragraph at lines 323--323
 
 [19]
 
-LaTeX Warning: Reference `tab:balance' on page 20 undefined on input line 345.
-
-
-LaTeX Warning: Reference `tab:balance' on page 20 undefined on input line 345.
-
-
 LaTeX Warning: Reference `sec:balance_plot' on page 20 undefined on input line 
 345.
+
+
+Overfull \hbox (10.09999pt too wide) in paragraph at lines 345--346
+ []\OT1/ppl/b/n/12 Balance Di-ag-nos-tics.[] \OT1/ppl/m/n/12 Ta-ble []4[] dis-p
+lays the co-vari-ate bal-ance be-fore and af-ter match-
+ []
 
 [20]
 Overfull \hbox (2.31644pt too wide) in paragraph at lines 351--363
@@ -1432,42 +1403,20 @@ at-egy rests on the matched difference-in-differences
 Package hyperref Info: bookmark level for unknown todo defaults to 0 on input l
 ine 418.
 
-
-LaTeX Warning: Reference `fig:help_rate_2panel' on page 25 undefined on input l
-ine 423.
-
 (../analysis/output_tables/main_results.tex
 Overfull \hbox (229.43399pt too wide) in paragraph at lines 6--22
  [][] 
  []
 
-) [25]
-
-LaTeX Warning: Reference `fig:help_rate_2panel' on page 26 undefined on input l
-ine 431.
-
-[26]
-
-LaTeX Warning: Reference `fig:strength_rec' on page 27 undefined on input line 
-443.
-
-<../analysis/output_figures/strength_rec.pdf, id=173, 498.31985pt x 280.3958pt>
+) [25] [26]
+<../analysis/output_figures/strength_rec.pdf, id=292, 498.31985pt x 280.3958pt>
 
 File: ../analysis/output_figures/strength_rec.pdf Graphic file (type pdf)
 <use ../analysis/output_figures/strength_rec.pdf>
 Package pdftex.def Info: ../analysis/output_figures/strength_rec.pdf  used on i
-nput line 447.
+nput line 441.
 (pdftex.def)             Requested size: 433.62pt x 243.98943pt.
-[27]
-
-LaTeX Warning: Reference `fig:help_rate_2panel' on page 28 undefined on input l
-ine 454.
-
-[28 <../analysis/output_figures/strength_rec.pdf>]
-
-LaTeX Warning: Reference `tab:speed_results' on page 29 undefined on input line
- 460.
-
+ [27 <../analysis/output_figures/strength_rec.pdf>]
 (../analysis/output_tables/speed_results.tex
 LaTeX Font Info:    Trying to load font information for TS1+ppl on input line 1
 4.
@@ -1479,80 +1428,76 @@ Overfull \hbox (211.91388pt too wide) in paragraph at lines 6--24
  [][] 
  []
 
-) [29]
-Overfull \hbox (2.80444pt too wide) in paragraph at lines 468--469
+) [28]
+Overfull \hbox (2.80444pt too wide) in paragraph at lines 460--461
  []\OT1/ppl/b/n/12 Experienced Users: Slower An-swers In-crease Reci-procity.[]
  \OT1/ppl/m/n/12 For users with greater
  []
 
-<../analysis/output_figures/speed_moderation.pdf, id=273, 498.38445pt x 280.395
+<../analysis/output_figures/speed_moderation.pdf, id=388, 498.38445pt x 280.395
 8pt>
 File: ../analysis/output_figures/speed_moderation.pdf Graphic file (type pdf)
 <use ../analysis/output_figures/speed_moderation.pdf>
 Package pdftex.def Info: ../analysis/output_figures/speed_moderation.pdf  used 
-on input line 472.
+on input line 464.
 (pdftex.def)             Requested size: 433.62pt x 243.95949pt.
-[30 <../analysis/output_figures/speed_moderation.pdf>] [31] [32]
-Overfull \hbox (3.63123pt too wide) in paragraph at lines 509--510
+[29] [30 <../analysis/output_figures/speed_moderation.pdf>] [31]
+Overfull \hbox (3.63123pt too wide) in paragraph at lines 501--502
 \OT1/ppl/m/n/12 of gen-er-al-ized reci-procity on on-line plat-forms. By de-vel
 -op-ing a matched difference-
  []
 
+[32]
+
+Package natbib Warning: Citation `baker_paying_2014' on page 33 undefined on in
+put line 509.
+
+
+Package natbib Warning: Citation `chen_engaging_2018' on page 33 undefined on i
+nput line 509.
+
 [33]
 
-Package natbib Warning: Citation `baker_paying_2014' on page 34 undefined on in
-put line 517.
-
-
-Package natbib Warning: Citation `chen_engaging_2018' on page 34 undefined on i
-nput line 517.
-
-
 Package natbib Warning: Citation `dejean_big_2015' on page 34 undefined on inpu
-t line 523.
+t line 515.
 
 
 Package natbib Warning: Citation `khansa_understanding_2015' on page 34 undefin
-ed on input line 523.
-
-[34]
-
-Package natbib Warning: Citation `tsang_gratitude_2006' on page 35 undefined on
- input line 531.
+ed on input line 515.
 
 
-Package natbib Warning: Citation `bartlett_gratitude_2006' on page 35 undefined
- on input line 531.
+Package natbib Warning: Citation `tsang_gratitude_2006' on page 34 undefined on
+ input line 523.
 
 
-Package natbib Warning: Citation `mccullough_is_2001' on page 35 undefined on i
-nput line 531.
+Package natbib Warning: Citation `bartlett_gratitude_2006' on page 34 undefined
+ on input line 523.
 
-[35] [36] [37]
-Overfull \hbox (19.2067pt too wide) in paragraph at lines 561--562
+
+Package natbib Warning: Citation `mccullough_is_2001' on page 34 undefined on i
+nput line 523.
+
+[34] [35] [36]
+Overfull \hbox (19.2067pt too wide) in paragraph at lines 553--554
 \OT1/ppl/m/n/12 including the tag-level an-swer rate, which ad-dresses ques-tio
 n difficulty---substantially
  []
 
 
-Overfull \hbox (13.8637pt too wide) in paragraph at lines 565--566
+Overfull \hbox (13.8637pt too wide) in paragraph at lines 557--558
 []\OT1/ppl/m/n/12 Fourth, our re-sponse time find-ings re-veal the im-por-tance
  of the return-to-platform
  []
 
-
-Overfull \hbox (3.18736pt too wide) in paragraph at lines 567--568
+[37]
+Overfull \hbox (3.18736pt too wide) in paragraph at lines 559--560
 \OT1/ppl/m/n/12 plat-form whose ac-tiv-ity has de-clined in re-cent years. The 
 core question-and-answer
  []
 
-[38])
+) [38]
 No file main.bbl.
 [39] (./appendix.tex
-
-LaTeX Warning: Reference `fig:common_support' on page 40 undefined on input lin
-e 23.
-
 
 LaTeX Warning: File `common_support.pdf' not found on input line 27.
 
@@ -1575,16 +1520,6 @@ LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 2
 File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
 )
 
-LaTeX Warning: Reference `fig:love_plot' on page 40 undefined on input line 32.
-
-
-
-Overfull \hbox (2.83621pt too wide) in paragraph at lines 32--33
-[]\OT1/ppl/m/n/12 Figure [] dis-plays the stan-dard-ized mean dif-fer-ences (SM
-D) be-tween the match-
- []
-
-
 LaTeX Warning: File `love_plot.pdf' not found on input line 36.
 
 
@@ -1600,10 +1535,6 @@ l.36 ...egraphics[width=\textwidth]{love_plot.pdf}
 Try typing  <return>  to proceed.
 If that doesn't work, type  X <return>  to quit.
 
-
-LaTeX Warning: Reference `tab:quartile_statistics' on page 40 undefined on inpu
-t line 42.
-
 [40] [41])
 
 Package natbib Warning: There were undefined citations.
@@ -1615,20 +1546,14 @@ LaTeX Warning: There were undefined references.
 
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `main.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  EF210E8ECE958BE480212A76A3EB0B7D;6086.
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: EF210E8ECE958BE480212A76A3EB0B7D;6086.
  ) 
 Here is how much of TeX's memory you used:
- 26596 strings out of 480247
- 509418 string characters out of 5896151
- 861964 words of memory out of 5000000
- 43877 multiletter control sequences out of 15000+600000
+ 26635 strings out of 480247
+ 509948 string characters out of 5896151
+ 864713 words of memory out of 5000000
+ 43910 multiletter control sequences out of 15000+600000
  499988 words of font info for 114 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  99i,15n,94p,2045b,839s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -1649,10 +1574,10 @@ f-dist/fonts/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-dist/fonts/
 type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/pa
 latino/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri
 8a.pfb>
-Output written on main.pdf (42 pages, 320226 bytes).
+Output written on main.pdf (42 pages, 322535 bytes).
 PDF statistics:
- 541 PDF objects out of 1000 (max. 8388607)
- 302 compressed objects within 4 object streams
+ 653 PDF objects out of 1000 (max. 8388607)
+ 413 compressed objects within 5 object streams
  106 named destinations out of 1000 (max. 500000)
- 23 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 271 words of extra memory for PDF output out of 10000 (max. 10000000)
 
