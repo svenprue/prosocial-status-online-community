@@ -310,7 +310,7 @@ Exact matching & \\
 calendarYear & Calendar year exact matching indicating the year of the observation, controlling for secular trends in platform activity and answer rates. \\
 topLevelTag & First tag of the question indicating the topic and community that sees the question \\
 
-\multicolumn{1}{2}{Propensity score matching }\\
+\multicolumn{2}{l}{Propensity score matching }\\
 userTenure & Number of days since the user's first recorded activity on the platform, capturing cumulative experience. \\
 numQuestionsAskedAT & Total number of questions asked by the user prior to the observation window. \\
 
@@ -405,7 +405,7 @@ h(t \mid \mathbf{X}(t)) = h_0(t) \exp\left(\boldsymbol{\beta}' \mathbf{X}(t) + \
 \subsection{Descriptive Statistics}
 %----------------------------------------------------------------------
 
-\input{output_tables/desc_stats}
+\input{../analysis/output_tables/desc_stats}
 
 The matched dataset comprises 4,804,183 question-level observations from 908,775 unique users, with a 50\% treatment rate by construction.
 
@@ -413,26 +413,20 @@ The matched dataset comprises 4,804,183 question-level observations from 908,775
 \subsection{Descriptive Evidence: Help Rates Over Time}
 %----------------------------------------------------------------------
 
-Before turning to the formal survival analysis, we present descriptive evidence on how helping behavior evolves over the observation window for treated and control users. Figure~\ref{fig:help_rate_2panel} plots the help rate---normalized to each group's pre-question baseline--- around the time point of the question, separately for newcomers and experienced users.
-
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{output_figures/help_rate_2panel.eps}
+\missingfigure{help\_rate\_2panel: Help Rate Over the Observation Window}
 \caption{Help Rate Over the Observation Window. Each panel plots the help rate (normalized to the pre-question baseline) for treated users (who received an answer, in red) and matched control users (who did not, in blue) over the 14-day observation window. The dashed vertical line marks the question-posting time ($T_Q$); the dotted vertical line marks the median answer arrival time ($T_A$). The top panel shows newcomers (tenure $<$ 1 week); the bottom panel pools experienced users (tenure $\geq$ 1 week). LOESS-smoothed curves are shown with 95\% confidence intervals.}
 \label{fig:help_rate_2panel}
 \end{figure}
 
-The figure serves three purposes. First, it provides a visual check on the comparability of the matched groups. In both panels, the treated and control lines overlap closely during the pre-question phase (days $-7$ to $0$), confirming that propensity score matching has successfully balanced baseline helping activity between the groups within the strata \footnote{This check also holds for the other groups but is not shown here}. This overlap is the graphical counterpart of the low standardized mean differences reported in Table~\ref{tab:balance} and supports the parallel trends assumption that underpins our difference-in-differences design.
-
-Second, the figure provides a clear visual preview of the reciprocity effect documented formally below. Among newcomers (top panel), the treated and control lines begin to diverge after $T_Q$. Treated newcomers show a sustained elevation in help rate relative to controls in the post-answer phase, consistent with a reciprocity response triggered by receiving an answer. Among experienced users (bottom panel), no comparable divergence is apparent: the treated and control lines remain closely interleaved throughout the post-question period, foreshadowing the null treatment effect that the Cox models will confirm for these tenure buckets.
-
-Third, both panels show a pronounced spike in helping activity around $T_Q$ for both treated and control users. This spike reflects active-session dynamics: users who are engaged enough to post a question are also more likely to be browsing and answering during the same session. The spike is particularly large for newcomers, who may be exploring the platform intensively during their initial visits. Importantly, this spike is \textit{symmetric} across treated and control groups, indicating that it reflects the act of being on the platform rather than the receipt of an answer. We can also see that the help rate for more senior users spikes around the time of the question, regardless of them receiving an answer or not. Their willingness to help is unconditional rather than non-responsive to reciprocity. 
+Before turning to the formal survival analysis, we present descriptive evidence on how helping behavior evolves over the observation window for treated and control users. Figure~\ref{fig:help_rate_2panel} plots the help rate---normalized to each group's pre-question baseline---around the time point of the question, separately for newcomers and experienced users.
 
 %----------------------------------------------------------------------
 \subsection{Main Results: The Reciprocity Effect (H1)}
 %----------------------------------------------------------------------
 
-\input{output_tables/main_results}
+\input{../analysis/output_tables/main_results}
 
 We begin with the primary test of generalized reciprocity (H1), formalizing the patterns visible in Figure~\ref{fig:help_rate_2panel}. The coefficient on \textit{isTreatedActive}---which captures the additional lift in helping behavior for treated users after receiving an answer, relative to matched controls---is positive across all tenure buckets and statistically significant for newcomers.
 
@@ -450,14 +444,14 @@ To test Hypothesis 2, we examine how the treatment effect varies across tenure b
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{output_figures/strength_rec.pdf}
+\includegraphics[width=\textwidth]{../analysis/output_figures/strength_rec.pdf}
 \caption{Strength of the Generalized Reciprocity Effect Across User Experience. Bars show the hazard ratio for the treatment effect (receiving an answer $\times$ post-answer phase) from separate Cox models by tenure bucket. Error bars indicate 95\% confidence intervals. The dashed line at HR\,=\,1 indicates no effect.}
 \label{fig:strength_rec}
 \end{figure}
 
 The reciprocity effect is strongest among users with less than one week of tenure (HR\,=\,1.15, $p < .001$) and declines sharply with experience. Users in the one-week-to-one-month bucket still show a significant but much smaller effect (HR\,=\,1.03, $p < .001$). For all buckets from one month through six years, the effect is statistically indistinguishable from zero, with hazard ratios between 1.000 and 1.003. This represents a striking decline: the 15\% increase in helping hazard observed for newcomers vanishes entirely within the first few months of platform tenure. The small but significant effect for users with more than six years of tenure (HR\,=\,1.02, $p < .01$) is an exception that we discuss in the context of the response time moderation analysis below.
 
-These findings support Hypothesis 2. The generalized reciprocity effect is concentrated among newcomers and diminishes as users gain experience on the platform, consistent with the descriptive patterns in Figure~\ref{fig:help_rate_2panel} where the treated--control divergence is visible only for newcomers. This pattern is consistent with our theoretical account: newcomers, who have not yet internalized community-specific norms, are most susceptible to the moral and emotional mechanisms that drive reciprocity. As users become socialized, these mechanisms are displaced by community-specific incentive structures.
+These findings support Hypothesis 2. The generalized reciprocity effect is concentrated among newcomers and diminishes as users gain experience on the platform, consistent with the descriptive patterns in Figure~\ref{fig:help_rate_2panel}, where the treated--control divergence is visible only for newcomers. This pattern is consistent with our theoretical account: newcomers, who have not yet internalized community-specific norms, are most susceptible to the moral and emotional mechanisms that drive reciprocity. As users become socialized, these mechanisms are displaced by community-specific incentive structures.
 
 %----------------------------------------------------------------------
 \subsection{Response Time Moderation (H3)}
@@ -465,7 +459,7 @@ These findings support Hypothesis 2. The generalized reciprocity effect is conce
 
 We hypothesized (H3) that faster responses would strengthen the reciprocity effect, based on the prediction that temporal immediacy intensifies gratitude and reinforces perceptions of community generosity. Table~\ref{tab:speed_results} presents the interaction between the treatment effect and log response time, estimated separately by tenure bucket.
 
-\input{output_tables/speed_results}
+\input{../analysis/output_tables/speed_results}
 
 Our results do not support Hypothesis 3 and instead reveal a counterintuitive pattern.
 
@@ -475,7 +469,7 @@ Our results do not support Hypothesis 3 and instead reveal a counterintuitive pa
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=\textwidth]{output_figures/speed_moderation.pdf}
+\includegraphics[width=\textwidth]{../analysis/output_figures/speed_moderation.pdf}
 \caption{Response Time Moderation Across User Experience. Bars show the interaction coefficient between the treatment effect and log response time, from separate Cox models by tenure bucket. Positive values indicate that longer response times are associated with a stronger reciprocity effect. Error bars indicate 95\% confidence intervals.}
 \label{fig:speed_moderation}
 \end{figure}
