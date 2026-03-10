@@ -1,8 +1,9 @@
 """
 create_figures.py
 ==================
-Loads cached model results and descriptive statistics produced by fit_cox_models.py,
-then generates LaTeX tables and figures for the paper's Results section.
+Loads cached model results and descriptive statistics produced by fit_cox_models.py
+(from model_cache/*.csv and model_cache/descriptives.pkl), then generates LaTeX tables
+and figures for the paper's Results section.
 
 Outputs (written to output_tables/ and output_figures/):
   - desc_stats.tex              Descriptive statistics (Table 2)
@@ -647,12 +648,10 @@ def generate_combined_figure(df_main: pd.DataFrame, df_speed: pd.DataFrame):
 def main():
     _ensure_dirs()
 
-    # --- Load cached results ---
+    # --- Load cached results (all result CSVs live in model_cache) ---
     main_path = os.path.join(CACHE_DIR, "results_main.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
-    pooled_path = os.path.join(TABLE_DIR, "results_pooled_experienced.csv")
-    if not os.path.exists(pooled_path):
-        pooled_path = os.path.join(CACHE_DIR, "results_pooled_experienced.csv")
+    pooled_path = os.path.join(CACHE_DIR, "results_pooled_experienced.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
 
     if not os.path.exists(main_path):

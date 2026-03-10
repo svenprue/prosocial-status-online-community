@@ -13,7 +13,7 @@ Additional analyses:
   - Pooled tenure > 1 week: main, speed, and response-time bin (non-linearity) models.
   - Staggered-treatment descriptive figures: help rate control vs treatment by response-time tertile.
 
-Outputs: model_cache/*.csv, output_tables/*.csv, output_figures/staggered_treatment_help_rate.*, response_time_lift.*
+Outputs: model_cache/*.csv (and *.pkl), output_figures/staggered_treatment_help_rate.*, response_time_lift.*
 
 Usage:
     python fit_cox_models.py [--input <path>] [--sample 200000]
@@ -48,7 +48,6 @@ warnings.filterwarnings("ignore")
 # =====================================================================
 CACHE_DIR = "model_cache"
 DATA_CACHE_DIR = "data_cache"
-TABLE_DIR = "output_tables"
 FIGURE_DIR = "output_figures"
 BUCKET_ORDER = [
     "< 1 Week", "1 Week - 1 Month", "1 - 6 Months",
@@ -688,88 +687,11 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     }]
     df_main_all = pd.DataFrame(results_main_all)
     df_speed_all = pd.DataFrame(results_speed_all)
-    os.makedirs(TABLE_DIR, exist_ok=True)
+    os.makedirs(CACHE_DIR, exist_ok=True)
     df_main_all.to_csv(os.path.join(CACHE_DIR, "results_main_all.csv"), index=False)
     df_speed_all.to_csv(os.path.join(CACHE_DIR, "results_speed_all.csv"), index=False)
-    df_main_all.to_csv(os.path.join(TABLE_DIR, "results_main_all.csv"), index=False)
-    df_speed_all.to_csv(os.path.join(TABLE_DIR, "results_speed_all.csv"), index=False)
-    print(f"✓ Saved results_main_all.csv, results_speed_all.csv")
+    print(f"✓ Saved results_main_all.csv, results_speed_all.csv to {CACHE_DIR}/")
     return df_main_all, df_speed_all
-
-
-def fit_pooled_experienced_models(model_df: pd.DataFrame, use_cache: bool = True):
-    """Pool all users with tenure > 1 week; fit main, speed, and response-time bin (non-linearity) models."""
-    EXPERIENCED_BUCKETS = [b for b in BUCKET_ORDER if b != "< 1 Week"]
-    pooled = model_df[model_df["tenure_bucket"].isin(EXPERIENCED_BUCKETS)].copy()
-    pooled = pooled.drop(columns=["tenure_bucket"], errors="ignore")
-    if "response_time_bin" not in pooled.columns or "treated_bin2" not in pooled.columns:
-        print("  ⚠ Pooled experienced: response_time_bin/treated_bin2/3 missing (re-run without data cache).")
-        return None
-    n_events = int(pooled["event_occurred"].sum())
-    if len(pooled) < 100 or n_events < 10:
-        print("  ⚠ Pooled experienced: too few rows/events.")
-        return None
-
-    print("\n" + "=" * 60)
-    print("  POOLED EXPERIENCED (> 1 Week) — main, speed, non-linearity")
-    print("=" * 60)
-    subset_main = pooled.drop(columns=["response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3"], errors="ignore")
-    res_a = fit_cox_cached(
-        subset_main, "ModelA_PooledExperienced", COVARIATES_MAIN,
-        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
-    )
-    res_b = fit_cox_cached(
-        subset_main, "ModelB_PooledExperienced", COVARIATES_SPEED,
-        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
-        initial_point=None,  # cold start for speed model stability
-    )
-    res_c = fit_cox_cached(
-        pooled, "ModelC_PooledExperienced_ResponseTimeBins", COVARIATES_NONLINEAR,
-        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
-        initial_point=None,  # cold start for stability
-    )
-
-    rows = []
-    if res_a is not None:
-        s = res_a.summary_df
-        rows.append({
-            "model": "PooledExperienced_Main",
-            "n_rows": res_a.meta.get("n_rows"), "n_events": res_a.meta.get("n_events"),
-            "treat_coef": s.loc["is_treated_active", "coef"],
-            "treat_hr": np.exp(s.loc["is_treated_active", "coef"]),
-            "treat_p": s.loc["is_treated_active", "p"],
-        })
-    if res_b is not None:
-        s = res_b.summary_df
-        rows.append({
-            "model": "PooledExperienced_Speed",
-            "n_rows": res_b.meta.get("n_rows"), "n_events": res_b.meta.get("n_events"),
-            "treat_coef": s.loc["is_treated_active", "coef"],
-            "speed_coef": s.loc["treated_response_time_interaction", "coef"],
-            "speed_p": s.loc["treated_response_time_interaction", "p"],
-        })
-    if res_c is not None:
-        s = res_c.summary_df
-        # Effect at bin 1 (reference) = is_treated_active; bin2 = +treated_bin2, bin3 = +treated_bin3
-        base_hr = np.exp(s.loc["is_treated_active", "coef"])
-        hr_bin2 = np.exp(s.loc["is_treated_active", "coef"] + s.loc["treated_bin2", "coef"]) if "treated_bin2" in s.index else np.nan
-        hr_bin3 = np.exp(s.loc["is_treated_active", "coef"] + s.loc["treated_bin3", "coef"]) if "treated_bin3" in s.index else np.nan
-        rows.append({
-            "model": "PooledExperienced_ResponseTimeBins",
-            "n_rows": res_c.meta.get("n_rows"), "n_events": res_c.meta.get("n_events"),
-            "treat_hr_bin1": base_hr,
-            "treat_hr_bin2": hr_bin2, "treat_hr_bin3": hr_bin3,
-            "treated_bin2_coef": s.loc["treated_bin2", "coef"] if "treated_bin2" in s.index else np.nan,
-            "treated_bin3_coef": s.loc["treated_bin3", "coef"] if "treated_bin3" in s.index else np.nan,
-            "treated_bin2_p": s.loc["treated_bin2", "p"] if "treated_bin2" in s.index else np.nan,
-            "treated_bin3_p": s.loc["treated_bin3", "p"] if "treated_bin3" in s.index else np.nan,
-        })
-    df_pooled = pd.DataFrame(rows)
-    os.makedirs(TABLE_DIR, exist_ok=True)
-    df_pooled.to_csv(os.path.join(CACHE_DIR, "results_pooled_experienced.csv"), index=False)
-    df_pooled.to_csv(os.path.join(TABLE_DIR, "results_pooled_experienced.csv"), index=False)
-    print(f"✓ Saved results_pooled_experienced.csv")
-    return df_pooled
 
 
 def plot_staggered_treatment_help_rate(model_df: pd.DataFrame, output_dir: str = FIGURE_DIR):
@@ -879,13 +801,6 @@ def main():
     if df_speed_all is not None:
         print("\n=== All-Data Speed Interaction ===")
         print(df_speed_all.to_string(index=False))
-
-    # 2. Pooled > 1 week: non-linearity of response time + staggered-treatment visualization
-    df_pooled = fit_pooled_experienced_models(model_df, use_cache=not args.no_cache)
-    if df_pooled is not None:
-        print("\n=== Pooled Experienced (> 1 Week) ===")
-        print(df_pooled.to_string(index=False))
-    # plot_staggered_treatment_help_rate(model_df)
 
     print("\n=== Main Effect Results (by bucket) ===")
     print(df_main.to_string(index=False))

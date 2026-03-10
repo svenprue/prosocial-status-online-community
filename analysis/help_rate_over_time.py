@@ -175,11 +175,14 @@ def compute_binned_rates_adoption(
     tenure_bucket: str = None,
 ) -> pd.DataFrame:
     """
-    Time-varying treatment: control = no answer yet, treated = answer received by that time.
-    At each time bin we compare help rate for units who had not received an answer before the bin
-    vs units who had already received an answer. Exposure uses person-hours in each state per bin.
+    For each time bin [t_lo, t_hi], compare help rate of:
+      - Treated: units who received an answer *before* the bucket (t_answer <= t_lo).
+      - Control: units who received an answer *after* the end of the bucket (t_answer > t_hi or no answer).
+    Units who receive their answer *during* the bucket (t_lo < t_answer <= t_hi) are excluded from
+    both groups in that bucket, so the comparison is clean (before-bucket vs after-bucket only).
 
-    If tenure_bucket is set, restrict to that tenure bucket.
+    Exposure = n_units * bin_width (full bin for each included unit). If tenure_bucket is set,
+    restrict to that tenure bucket.
 
     Returns DataFrame with columns:
       time_center_hours, time_center_days, group (control/treated),
@@ -195,11 +198,6 @@ def compute_binned_rates_adoption(
     ev = events.merge(tl, on=["match_id", "question_id"], how="inner")
     ev = ev[(ev["t_event"] >= time_min_hours) & (ev["t_event"] <= time_max_hours)]
 
-    # Assign each event to control (no answer yet at t_event) or treated (answer by t_event)
-    ev["at_event_control"] = (ev["t_answer"] > ev["t_event"]) | ev["t_answer"].isna()
-    ev["at_event_treated"] = (~ev["at_event_control"]) & ev["t_answer"].notna()
-    ev["group"] = np.where(ev["at_event_treated"], "treated", "control")
-
     bin_edges = np.arange(0, time_max_hours + bin_width_hours * 0.5, bin_width_hours)
     time_centers_h = (bin_edges[:-1] + bin_edges[1:]) / 2
     bin_widths_h = np.diff(bin_edges)
@@ -208,40 +206,45 @@ def compute_binned_rates_adoption(
     ev["bin_idx"] = np.searchsorted(bin_edges, ev["t_event"].values, side="right") - 1
     ev["bin_idx"] = ev["bin_idx"].clip(0, len(bin_edges) - 2)
 
-    # Event counts per (group, bin)
+    # For each bin [t_lo, t_hi]: treated = got answer before bucket (t_answer <= t_lo),
+    # control = got answer after bucket (t_answer > t_hi or no answer). Exclude during-bucket.
+    bi = ev["bin_idx"].values.astype(int)
+    t_lo = np.asarray(bin_edges)[bi]
+    t_hi = np.asarray(bin_edges)[bi + 1]
+    ta = ev["t_answer"].values
+    ev = ev.copy()
+    ev["group"] = pd.NA
+    ev.loc[np.isnan(ta) | (ta > t_hi), "group"] = "control"
+    ev.loc[(~np.isnan(ta)) & (ta <= t_lo), "group"] = "treated"
+    ev = ev[ev["group"].notna()]  # drop events from units who got answer during this bin
+
     counts = (
         ev.groupby(["group", "bin_idx"])
         .agg(event_count=("t_event", "count"))
         .reset_index()
     )
 
-    # Person-hours exposure per bin: for each unit, hours in [t_lo,t_hi] in control vs treated
+    # Exposure: only units with t_answer <= t_lo (treated) or t_answer > t_hi / no answer (control)
     t_answer = tl["t_answer"].values
     rows = []
     for bi in range(len(time_centers_h)):
         t_lo = float(bin_edges[bi])
         t_hi = float(bin_edges[bi + 1])
         width = float(bin_widths_h[bi])
-        # Vectorized: no answer or answer after bin -> full width control
         no_ans = np.isnan(t_answer)
         after_bin = t_answer > t_hi
-        control_full = no_ans | after_bin
-        # Answer before or at start of bin -> full width treated
-        treated_full = (~no_ans) & (t_answer <= t_lo)
-        # Answer inside bin: control from t_lo to t_answer, treated from t_answer to t_hi
-        inside = (~no_ans) & (t_answer > t_lo) & (t_answer <= t_hi)
-        control_hours = (np.sum(control_full) * width
-                        + np.sum(np.where(inside, t_answer - t_lo, 0)))
-        treated_hours = (np.sum(treated_full) * width
-                         + np.sum(np.where(inside, t_hi - t_answer, 0)))
+        control_units = no_ans | after_bin
+        treated_units = (~no_ans) & (t_answer <= t_lo)
+        control_hours = np.sum(control_units) * width
+        treated_hours = np.sum(treated_units) * width
         rows.append({"bin_idx": bi, "control_hours": control_hours, "treated_hours": treated_hours})
     exposure_df = pd.DataFrame(rows)
 
-    # Build result: one row per (group, bin)
+    # Build result: one row per (group, bin). Skip first bin (0 to bin_width): no one has help before t=0.
     result = []
     for g in ["control", "treated"]:
         exp_col = "control_hours" if g == "control" else "treated_hours"
-        for bi in range(len(time_centers_h)):
+        for bi in range(1, len(time_centers_h)):
             exp = exposure_df.loc[exposure_df["bin_idx"] == bi, exp_col].iloc[0]
             cnt = counts[(counts["group"] == g) & (counts["bin_idx"] == bi)]["event_count"]
             cnt = cnt.iloc[0] if len(cnt) else 0
