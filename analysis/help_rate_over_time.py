@@ -4,17 +4,18 @@ help_rate_over_time.py
 Plots empirical help rate over the study window (question-relative time),
 separately for treated and control, by tenure bucket.
 
-For each tenure bucket (or key ones: newcomers vs experienced):
+All plots use 15-minute bins (configurable via --bin-hours).
+Stable groups: pooled figure (all tenure) + by-tenure small multiples for appendix.
+Continuous treatment: one figure with 7 tenure panels, 0–12h, joint legend.
   - X-axis: time relative to question (day 0 = question posted).
   - Y-axis: help rate (answers per user per hour, optionally normalized to pre-question baseline).
-  - Vertical line at TQ (question time = 0).
-  - For treated: vertical line at median (or mean) answer arrival time (TAT_A).
-  - Binned rates plotted as points connected by lines (no smoothing).
+  - Vertical line at TQ (question time = 0); for treated, median answer time (TAT_A).
   - 95% CI error bars from Poisson SE: SE(rate) = sqrt(rate / exposure).
 
 Outputs:
-  - help_rate_2panel.eps/.png/.pdf   — 2×1 layout: newcomers (<1 week) vs experienced (pooled).
-  - help_rate_all_buckets.eps/.png/.pdf — Small multiples for all tenure buckets (optional).
+  - help_rate_pooled.eps/.png/.pdf   — Pooled help rate (all tenure buckets).
+  - help_rate_by_tenure.eps/.png/.pdf — Small multiples by tenure bucket (appendix).
+  - help_rate_adoption_by_tenure.eps/.png/.pdf — Continuous treatment adoption, 7 panels, 0–12h, joint legend.
 
 Usage:
     python help_rate_over_time.py [--input ../data/event_history] [--sample 200000]
@@ -166,6 +167,98 @@ def compute_binned_rates(
     return full_df.drop(columns=["bin_idx", "bin_width_h"], errors="ignore")
 
 
+def compute_binned_rates_adoption(
+    timelines: pd.DataFrame,
+    events: pd.DataFrame,
+    bin_width_hours: float = 2.0,
+    time_max_hours: float = 24.0,
+    tenure_bucket: str = None,
+) -> pd.DataFrame:
+    """
+    Time-varying treatment: control = no answer yet, treated = answer received by that time.
+    At each time bin we compare help rate for units who had not received an answer before the bin
+    vs units who had already received an answer. Exposure uses person-hours in each state per bin.
+
+    If tenure_bucket is set, restrict to that tenure bucket.
+
+    Returns DataFrame with columns:
+      time_center_hours, time_center_days, group (control/treated),
+      n_obs (person-hours), event_count, rate_raw, rate_raw_se.
+    """
+    time_min_hours = 0.0
+    if tenure_bucket is not None and "tenure_bucket" in timelines.columns:
+        tl = timelines[timelines["tenure_bucket"] == tenure_bucket][["match_id", "question_id", "t_answer"]].copy()
+    else:
+        tl = timelines[["match_id", "question_id", "t_answer"]].copy()
+    tl["t_answer"] = pd.to_numeric(tl["t_answer"], errors="coerce")
+
+    ev = events.merge(tl, on=["match_id", "question_id"], how="inner")
+    ev = ev[(ev["t_event"] >= time_min_hours) & (ev["t_event"] <= time_max_hours)]
+
+    # Assign each event to control (no answer yet at t_event) or treated (answer by t_event)
+    ev["at_event_control"] = (ev["t_answer"] > ev["t_event"]) | ev["t_answer"].isna()
+    ev["at_event_treated"] = (~ev["at_event_control"]) & ev["t_answer"].notna()
+    ev["group"] = np.where(ev["at_event_treated"], "treated", "control")
+
+    bin_edges = np.arange(0, time_max_hours + bin_width_hours * 0.5, bin_width_hours)
+    time_centers_h = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_widths_h = np.diff(bin_edges)
+    time_centers_d = time_centers_h / 24.0
+
+    ev["bin_idx"] = np.searchsorted(bin_edges, ev["t_event"].values, side="right") - 1
+    ev["bin_idx"] = ev["bin_idx"].clip(0, len(bin_edges) - 2)
+
+    # Event counts per (group, bin)
+    counts = (
+        ev.groupby(["group", "bin_idx"])
+        .agg(event_count=("t_event", "count"))
+        .reset_index()
+    )
+
+    # Person-hours exposure per bin: for each unit, hours in [t_lo,t_hi] in control vs treated
+    t_answer = tl["t_answer"].values
+    rows = []
+    for bi in range(len(time_centers_h)):
+        t_lo = float(bin_edges[bi])
+        t_hi = float(bin_edges[bi + 1])
+        width = float(bin_widths_h[bi])
+        # Vectorized: no answer or answer after bin -> full width control
+        no_ans = np.isnan(t_answer)
+        after_bin = t_answer > t_hi
+        control_full = no_ans | after_bin
+        # Answer before or at start of bin -> full width treated
+        treated_full = (~no_ans) & (t_answer <= t_lo)
+        # Answer inside bin: control from t_lo to t_answer, treated from t_answer to t_hi
+        inside = (~no_ans) & (t_answer > t_lo) & (t_answer <= t_hi)
+        control_hours = (np.sum(control_full) * width
+                        + np.sum(np.where(inside, t_answer - t_lo, 0)))
+        treated_hours = (np.sum(treated_full) * width
+                         + np.sum(np.where(inside, t_hi - t_answer, 0)))
+        rows.append({"bin_idx": bi, "control_hours": control_hours, "treated_hours": treated_hours})
+    exposure_df = pd.DataFrame(rows)
+
+    # Build result: one row per (group, bin)
+    result = []
+    for g in ["control", "treated"]:
+        exp_col = "control_hours" if g == "control" else "treated_hours"
+        for bi in range(len(time_centers_h)):
+            exp = exposure_df.loc[exposure_df["bin_idx"] == bi, exp_col].iloc[0]
+            cnt = counts[(counts["group"] == g) & (counts["bin_idx"] == bi)]["event_count"]
+            cnt = cnt.iloc[0] if len(cnt) else 0
+            rate = cnt / exp if exp > 0 else 0.0
+            rate_se = np.sqrt(rate / exp) if exp > 0 else 0.0
+            result.append({
+                "time_center_hours": time_centers_h[bi],
+                "time_center_days": time_centers_d[bi],
+                "group": g,
+                "n_obs": exp,
+                "event_count": cnt,
+                "rate_raw": rate,
+                "rate_raw_se": rate_se,
+            })
+    return pd.DataFrame(result)
+
+
 def normalize_to_baseline(df: pd.DataFrame) -> pd.DataFrame:
     """Add column rate_norm = rate_raw / pre_question_mean (per group), with SE propagation."""
     df = df.copy()
@@ -273,14 +366,14 @@ def plot_help_rate_one_panel(
                 yerr = np.maximum(yerr, min_yerr)
         ax.errorbar(
             x, y, yerr=yerr,
-            color=color, linestyle=ls, marker="o", markersize=4, label=label, linewidth=1.5,
-            capsize=3, capthick=1,
+            color=color, linestyle=ls, marker="o", markersize=2.5, label=label, linewidth=0.8,
+            capsize=2, capthick=0.8,
         )
 
-    ax.axvline(0, color="black", linestyle="--", linewidth=1, alpha=0.8, label="Question (TQ)")
+    ax.axvline(0, color="black", linestyle="--", linewidth=0.6, alpha=0.8, label="Question (TQ)")
     if median_ta_hours is not None and not np.isnan(median_ta_hours):
         ta_days = median_ta_hours / 24.0
-        ax.axvline(ta_days, color="gray", linestyle=":", linewidth=1.2, alpha=0.9, label=f"Median answer (TAT_A)")
+        ax.axvline(ta_days, color="gray", linestyle=":", linewidth=0.7, alpha=0.9, label=f"Median answer (TAT_A)")
 
     ax.set_xlabel("Time relative to question (days)")
     ax.set_ylabel("Help rate (norm. to baseline)" if use_normalized else "Help rate (answers per user per hour)")
@@ -293,7 +386,7 @@ def plot_help_rate_one_panel(
     ax.set_xlim(xlim_days[0], xlim_days[1])
 
 
-def plot_2panel(
+def plot_help_rate_pooled(
     rates_df: pd.DataFrame,
     timelines: pd.DataFrame,
     use_normalized: bool = True,
@@ -302,46 +395,29 @@ def plot_2panel(
     show_ci: bool = True,
     min_yerr_frac: float = 0.02,
 ):
-    """2×1 layout: newcomers (<1 week) on top, experienced (pooled) on bottom."""
+    """Single panel: help rate pooled over all tenure buckets."""
     os.makedirs(output_dir, exist_ok=True)
-
-    experienced_buckets = [b for b in BUCKET_ORDER if b != NEWCOMER_BUCKET]
-    median_ta_newcomer = median_answer_time_hours(timelines, NEWCOMER_BUCKET)
-    # Median TAT_A for experienced: pool treated from all experienced buckets
-    treated_exp = timelines[(timelines["tenure_bucket"].isin(experienced_buckets)) & (timelines["hasAnswer"] == 1)]
-    median_ta_experienced = float(treated_exp["t_answer"].median()) if len(treated_exp) else np.nan
-
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 7), sharex=True)
-
+    treated = timelines[timelines["hasAnswer"] == 1]
+    median_ta = float(treated["t_answer"].median()) if len(treated) else np.nan
+    fig, ax = plt.subplots(figsize=(8, 4.5))
     plot_help_rate_one_panel(
-        ax1, rates_df, timelines,
-        tenure_label=f"Newcomers ({NEWCOMER_BUCKET})",
-        tenure_bucket_or_buckets=NEWCOMER_BUCKET,
+        ax, rates_df, timelines,
+        tenure_label="All tenure buckets (pooled)",
+        tenure_bucket_or_buckets=BUCKET_ORDER,
         use_normalized=use_normalized,
-        median_ta_hours=median_ta_newcomer,
+        median_ta_hours=median_ta,
         xlim_days=xlim_days,
         show_ci=show_ci,
         min_yerr_frac=min_yerr_frac,
     )
-    plot_help_rate_one_panel(
-        ax2, rates_df, timelines,
-        tenure_label=EXPERIENCED_LABEL,
-        tenure_bucket_or_buckets=experienced_buckets,
-        use_normalized=use_normalized,
-        median_ta_hours=median_ta_experienced,
-        xlim_days=xlim_days,
-        show_ci=show_ci,
-        min_yerr_frac=min_yerr_frac,
-    )
-
     plt.tight_layout()
     for ext in ["eps", "png", "pdf"]:
-        fig.savefig(os.path.join(output_dir, f"help_rate_2panel.{ext}"), dpi=300, bbox_inches="tight")
+        fig.savefig(os.path.join(output_dir, f"help_rate_pooled.{ext}"), dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved help_rate_2panel.[eps/png/pdf]")
+    print("✓ Saved help_rate_pooled.[eps/png/pdf]")
 
 
-def plot_all_buckets(
+def plot_help_rate_by_tenure(
     rates_df: pd.DataFrame,
     timelines: pd.DataFrame,
     use_normalized: bool = True,
@@ -350,9 +426,8 @@ def plot_all_buckets(
     show_ci: bool = True,
     min_yerr_frac: float = 0.02,
 ):
-    """Small multiples: one panel per tenure bucket."""
+    """Small multiples: one panel per tenure bucket (appendix)."""
     os.makedirs(output_dir, exist_ok=True)
-
     n_buckets = len(BUCKET_ORDER)
     n_cols = 2
     n_rows = (n_buckets + n_cols - 1) // n_cols
@@ -373,28 +448,153 @@ def plot_all_buckets(
             min_yerr_frac=min_yerr_frac,
         )
 
-    # Hide unused subplots
-    for j in range(i + 1, len(axes.flat)):
+    for j in range(n_buckets, len(axes.flat)):
         axes.flat[j].set_visible(False)
 
     plt.tight_layout()
     for ext in ["eps", "png", "pdf"]:
-        fig.savefig(os.path.join(output_dir, f"help_rate_all_buckets.{ext}"), dpi=300, bbox_inches="tight")
+        fig.savefig(os.path.join(output_dir, f"help_rate_by_tenure.{ext}"), dpi=300, bbox_inches="tight")
     plt.close(fig)
-    print(f"✓ Saved help_rate_all_buckets.[eps/png/pdf]")
+    print("✓ Saved help_rate_by_tenure.[eps/png/pdf]")
+
+
+def _plot_adoption_one_panel(
+    ax,
+    rates_adoption: pd.DataFrame,
+    timelines_bucket: pd.DataFrame,
+    show_ci: bool,
+    title: str,
+    show_legend: bool = True,
+    show_share_ylabel: bool = True,
+    xlim_hours: tuple = (0, 24),
+):
+    """Draw one adoption panel on ax: help rate (control/treated) + share with answer on twin axis."""
+    colors = {"control": "#2166ac", "treated": "#b2182b"}
+    labels = {"control": "No answer yet", "treated": "Answer received"}
+
+    for g in ["control", "treated"]:
+        sub = rates_adoption[rates_adoption["group"] == g].sort_values("time_center_hours")
+        if sub.empty:
+            continue
+        x = sub["time_center_hours"].values
+        y = sub["rate_raw"].values
+        yerr = (1.96 * sub["rate_raw_se"].values) if show_ci and "rate_raw_se" in sub.columns else None
+        ax.plot(
+            x, y,
+            color=colors[g], linestyle="-", linewidth=2, marker="o", markersize=4,
+            label=labels[g], zorder=2,
+        )
+        if yerr is not None:
+            ax.fill_between(x, y - yerr, y + yerr, color=colors[g], alpha=0.2, zorder=1)
+
+    t_answer = pd.to_numeric(timelines_bucket["t_answer"], errors="coerce")
+    time_points = np.sort(rates_adoption["time_center_hours"].unique())
+    share = np.array([(t_answer <= t).mean() for t in time_points])
+
+    ax2 = ax.twinx()
+    ax2.plot(
+        time_points, share,
+        color="#2d7a3e", linestyle="--", linewidth=1.5, marker="s", markersize=3,
+        label="Share with answer", zorder=2,
+    )
+    if show_share_ylabel:
+        ax2.set_ylabel("Share with answer", fontsize=9, color="#2d7a3e")
+    ax2.tick_params(axis="y", labelcolor="#2d7a3e", labelsize=8)
+    ax2.set_ylim(0, 1.05)
+    ax2.spines["right"].set_visible(True)
+    ax2.spines["right"].set_color("#2d7a3e")
+
+    ax.axvline(0, color="black", linestyle="--", linewidth=0.8, alpha=0.7)
+    ax.set_xlabel("Hours since question", fontsize=9)
+    ax.set_ylabel("Help rate (per user per hour)", fontsize=9)
+    ax.set_title(title, fontsize=10)
+    if show_legend:
+        lines1, labels1 = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7)
+    ax.set_xlim(xlim_hours[0], xlim_hours[1])
+    ax.set_ylim(bottom=0)
+    ax.grid(True, alpha=0.3, linestyle="-")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=8)
+
+
+def plot_adoption_by_tenure(
+    timelines: pd.DataFrame,
+    events: pd.DataFrame,
+    output_dir: str = FIGURE_DIR,
+    show_ci: bool = True,
+    bin_width_hours: float = 0.25,
+    time_max_hours: float = 12.0,
+):
+    """
+    One figure: 7 panels (one per tenure bucket), continuous treatment adoption.
+    X-axis 0 to 12 hours. One joint legend for all panels.
+    Saves help_rate_adoption_by_tenure.[eps/png/pdf].
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    n_buckets = len(BUCKET_ORDER)
+    n_cols = 2
+    n_rows = (n_buckets + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=(10, 3.5 * n_rows), sharex=True)
+    axes = np.atleast_2d(axes)
+
+    for i, bucket in enumerate(BUCKET_ORDER):
+        ax = axes.flat[i]
+        tl_b = timelines[timelines["tenure_bucket"] == bucket]
+        if tl_b.empty:
+            ax.set_title(bucket)
+            ax.set_visible(True)
+            continue
+        rates_b = compute_binned_rates_adoption(
+            timelines, events,
+            bin_width_hours=bin_width_hours,
+            time_max_hours=time_max_hours,
+            tenure_bucket=bucket,
+        )
+        show_share_ylabel = (i % n_cols == 1)
+        _plot_adoption_one_panel(
+            ax, rates_b, tl_b, show_ci,
+            title=bucket,
+            show_legend=False,
+            show_share_ylabel=show_share_ylabel,
+            xlim_hours=(0, time_max_hours),
+        )
+    for j in range(n_buckets, len(axes.flat)):
+        axes.flat[j].set_visible(False)
+
+    # Joint legend: use handles/labels from first panel (need to get them including twin)
+    # Re-get from first panel: iterate axes and get legend_handles from the one that has them
+    h, l = [], []
+    for idx in range(n_buckets):
+        h, l = axes.flat[idx].get_legend_handles_labels()
+        if h:
+            break
+    from matplotlib.lines import Line2D
+    proxy_share = Line2D([0], [0], color="#2d7a3e", linestyle="--", linewidth=1.5, label="Share with answer")
+    fig.legend(h + [proxy_share], l + ["Share with answer"], loc="lower center", ncol=3, fontsize=10, bbox_to_anchor=(0.5, -0.02))
+    plt.tight_layout(rect=[0, 0.06, 1, 1])  # leave space for legend below
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(
+            os.path.join(output_dir, "help_rate_adoption_by_tenure.{}".format(ext)),
+            dpi=300, bbox_inches="tight",
+        )
+    plt.close(fig)
+    print("✓ Saved help_rate_adoption_by_tenure.[eps/png/pdf]")
 
 
 def main():
     parser = argparse.ArgumentParser(description="Plot empirical help rate over time by tenure")
     parser.add_argument("--input", default="../data/event_history", help="Folder with study_timelines.parquet, study_events.parquet")
     parser.add_argument("--sample", type=int, default=None, help="Subsample N matched pairs")
-    parser.add_argument("--bin-hours", type=float, default=4.0, help="Bin width in hours (smaller = more bins)")
+    parser.add_argument("--bin-hours", type=float, default=0.25, help="Bin width in hours (default 0.25 = 15 min)")
     parser.add_argument("--no-normalize", action="store_true", help="Plot raw rate instead of normalized to pre-question baseline")
-    parser.add_argument("--all-buckets", action="store_true", help="Also create small-multiples figure for all tenure buckets")
     parser.add_argument("--no-ci", action="store_true", help="Do not plot 95%% CI error bars")
     parser.add_argument("--min-errorbar-pct", type=float, default=2.0, metavar="PCT", help="Minimum error bar length as %% of y-range (for visibility when SE is tiny; 0 = true scale)")
     parser.add_argument("--output-dir", default=FIGURE_DIR, help="Output directory for figures")
     parser.add_argument("--window-days", type=float, default=WINDOW_DAYS, help="Plot and bin from -N to +N days relative to question (default 7)")
+    parser.add_argument("--no-adoption", action="store_true", help="Skip adoption-over-time figure (first 24h, time-varying control/treated)")
     args = parser.parse_args()
 
     window_days = args.window_days
@@ -423,12 +623,20 @@ def main():
 
     show_ci = not args.no_ci
     min_yerr_frac = (args.min_errorbar_pct / 100.0) if args.min_errorbar_pct else 0.0
-    print("Generating 2-panel figure (newcomers vs experienced)…")
-    plot_2panel(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
+    print("Generating pooled help rate figure…")
+    plot_help_rate_pooled(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
+    print("Generating help rate by tenure (appendix)…")
+    plot_help_rate_by_tenure(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
 
-    if args.all_buckets:
-        print("Generating small-multiples (all buckets)…")
-        plot_all_buckets(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
+    if not args.no_adoption:
+        print("Generating adoption-by-tenure figure (0–12h, joint legend)…")
+        plot_adoption_by_tenure(
+            timelines, events,
+            output_dir=args.output_dir,
+            show_ci=show_ci,
+            bin_width_hours=0.25,
+            time_max_hours=12.0,
+        )
 
     print("Done.")
 

@@ -63,7 +63,7 @@ CONTINUOUS_COVARIATES = [
     "treated_post_question_response_time_interaction",
 ]
 # Max rows passed to Cox fitter; if exceeded, stratified subsample to avoid nan/inf in large risk sets
-MAX_FIT_ROWS = 4_000_000
+MAX_FIT_ROWS = 8_000_000
 SUBSAMPLE_SEED = 42
 
 # =====================================================================
