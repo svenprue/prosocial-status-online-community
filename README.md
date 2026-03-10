@@ -24,7 +24,26 @@ There are two options to use this code:
 
 ## Code Environment
 
-Make sure the following python packages are installed before running the code:
+### Python (analysis, preprocessing, matching)
 
-```python
-pip install "tidyverse", "data.table", "ggplot2", "lme4", "broom", "sandwich", "lmtest", "stargazer"
+1. **Create and activate a virtual environment** (recommended):
+
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate   # Linux/macOS
+   # or: .venv\Scripts\activate  # Windows
+   ```
+
+2. **Install dependencies**:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Use the venv**: With the venv activated, run any script, e.g.:
+
+   ```bash
+   python analysis/help_rate_over_time.py --input ../data/event_history
+   ```
+
+All required packages are listed in `requirements.txt` (pandas, numpy, duckdb, lifelines, scikit-learn, matplotlib, etc.).

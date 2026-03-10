@@ -1,0 +1,134 @@
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Template for a conference paper, prepared for the
+%% Food and Resource Economics Department - IFAS
+%% UNIVERSITY OF FLORIDA
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Version 1.0 // November 2019
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Ariel Soto-Caro
+%%  - asotocaro@students.uu.nl
+%%  - arielsotocaro@gmail.com
+%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\documentclass[12pt]{article}
+\usepackage{UF_FRED_paper_style}
+
+% inline comments
+\usepackage[colorinlistoftodos]{todonotes}
+
+\usepackage{lipsum}  %% Package to create dummy text (comment or erase before start)
+\usepackage{verbatim}
+\usepackage{float}
+\usepackage{import}
+
+
+% Graphics rendering using TikZ
+% See: https://en.wikibooks.org/wiki/LaTeX/PGF/TikZ
+\usepackage{tikz}
+% Include required TikZ libraries here, some exemplary libraries are pre-included
+\usetikzlibrary{calc}
+\usetikzlibrary{matrix}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shapes.geometric}
+\usepackage{pdflscape} 
+
+
+% self added
+\usepackage{multicol}
+\usepackage{threeparttable}
+\usepackage{lscape}
+\usepackage{longtable}
+\usepackage{verbatim}
+\usepackage{graphics}
+\usepackage{placeins}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{dcolumn}
+%\usepackage[margin=1in]{geometry} % Adjust page margins
+\usepackage{float}               % For [H] float specifier
+\usepackage{tabularx}            % For flexible table widths
+\usepackage{booktabs}            % For professional table formatting
+
+% --- Placeholder command ---
+\newcommand{\placeholder}[1]{\textcolor{red}{[#1]}}
+
+% --- Hyperlink targets for hypotheses ---
+\newcommand{\hypmark}[1]{\hypertarget{#1}{}}
+
+%% ===============================================
+%% Setting the line spacing (3 options: only pick one)
+ \doublespacing
+%  \singlespacing
+%  \onehalfspacing
+%% ===============================================
+
+\setlength{\droptitle}{-5em} %% Don't touch
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SET THE TITLE
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% TITLE:
+\title{Help Converts Newcomers, Not Veterans: Generalized Reciprocity and Platform Engagement on Stack Overflow}
+
+% AUTHORS:
+%\author{}
+% DATE:
+\date{\today}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ABSTRACT
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+{\setstretch{.8}
+\maketitle
+
+% %%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+\noindent Generalized reciprocity — the tendency to help others after receiving help oneself — is widely theorized as a mechanism sustaining cooperation on online knowledge-sharing platforms. Yet robust empirical evidence from field settings remains surprisingly scarce. Prior studies relying on survey self-reports struggle to distinguish reciprocity from other prosocial motives, while observational designs confound reciprocity with baseline user activity, producing upward-biased estimates. We address these empirical challenges by developing a matched difference-in-differences survival analysis that leverages the temporal structure of help-seeking and help-giving on Stack Overflow. Using Cox proportional hazards models on over 21 million questions, we compare the helping hazard between matched users who receive an answer and those who do not. We find that receiving an answer significantly increases a user's propensity to help others, but this effect is concentrated among newcomers and declines sharply with platform experience. Extending theory on generalized reciprocity, we examine how the speed of the helping experience shapes the strength of reciprocity. Drawing on reciprocity theory, we theorize that faster responses should amplify the effect by heightening gratitude. Our results challenge this prediction. For newcomers, response time does not moderate the reciprocity effect — fast and slow answers produce equivalent boosts in helping behavior. More surprisingly, among experienced users, longer response times are associated with a stronger reciprocity effect. We attribute this counterintuitive finding to a platform re-engagement mechanism: experienced users who wait longer for an answer are more likely to have left the platform in the interim, and the eventual arrival of an answer draws them back, creating an occasion for helping that would not have occurred otherwise. These findings make contributions to the theory on reciprocity and have implications for platform design.
+
+
+% END CONTENT ABS------------------------------------------
+\noindent
+%\textit{\textbf{Keywords: }%
+%Labour Force Participation; Mothers; Economic Motive; Cultural Motive; In-cash policies; In-child policies.} \\ %% <-- Keywords HERE!
+%\noindent
+%\textit{\textbf{JEL Classification: }%
+%Q12; C22; D81.} %% <-- JEL code HERE!
+\textbf{Keywords:} generalized reciprocity, online communities, knowledge sharing, survival analysis, platform design, Stack Overflow
+
+\end{abstract}
+\newpage
+}
+
+%\todo[inline]{Diff-in-Diff Analyse: Community Volume and Complexity; \\ Reciprocity-activated: lifetime comments, answers, accepted answers}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BODY OF THE DOCUMENT
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\input{body}
+
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% REFERENCES SECTION
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\medskip
+
+\bibliography{references.bib, references-2} 
+
+
+\newpage
+\appendix
+\input{appendix}
+
+\end{document}
+

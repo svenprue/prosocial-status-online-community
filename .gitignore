@@ -16,6 +16,7 @@ data/event_history/
 # ---------------------------------------------------------------------------
 model_cache/
 analysis/model_cache/
+analysis/data_cache/
 
 # Pickle / serialized objects (often large)
 *.pkl
@@ -29,6 +30,8 @@ analysis/model_cache/
 # ---------------------------------------------------------------------------
 # Python
 # ---------------------------------------------------------------------------
+.venv/
+venv/
 __pycache__/
 *.py[cod]
 *$py.class

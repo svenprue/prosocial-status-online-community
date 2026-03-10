@@ -1,0 +1,32 @@
+# Data & numerics
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Database & parquet
+duckdb>=0.9.0
+pyarrow>=14.0.0
+fastparquet>=2024.1.0
+
+# XML (processing_data_dump.py)
+lxml>=4.9.0
+
+# Stats & survival analysis
+lifelines>=0.27.0
+statsmodels>=0.14.0
+scipy>=1.11.0
+
+# ML & matching
+scikit-learn>=1.3.0
+joblib>=1.3.0
+numba>=0.58.0
+
+# Plotting
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+tqdm>=4.66.0
+
+# Optional (used in archive scripts)
+stargazer>=0.0.5
+IPython>=8.0.0

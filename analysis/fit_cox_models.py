@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import json
 import time as timer
+from multiprocessing import Pool, cpu_count
 import pandas as pd
 import numpy as np
 from lifelines import CoxTimeVaryingFitter
@@ -53,6 +54,17 @@ BUCKET_ORDER = [
     "< 1 Week", "1 Week - 1 Month", "1 - 6 Months",
     "6 - 12 Months", "1 - 3 Years", "3 - 6 Years", "> 6 Years",
 ]
+# Interval boundaries rounded to this many hours (phase/treatment from original times).
+# Use 1h to reduce ties and Hessian issues; 6h is faster but can trigger nan/inf in lifelines.
+ROUND_TO_HOURS = 1
+# Covariates with continuous scale: standardize and clip to stabilize Cox fit (avoid nan/inf in Hessian)
+CONTINUOUS_COVARIATES = [
+    "treated_response_time_interaction",
+    "treated_post_question_response_time_interaction",
+]
+# Max rows passed to Cox fitter; if exceeded, stratified subsample to avoid nan/inf in large risk sets
+MAX_FIT_ROWS = 4_000_000
+SUBSAMPLE_SEED = 42
 
 # =====================================================================
 # Caching helpers
@@ -94,18 +106,29 @@ def fit_cox_cached(
     covariates: list,
     penalizer: float = 0.0,
     use_cache: bool = True,
+    round_to_hours: float = None,
+    initial_point=None,
 ) -> CachedCoxResult:
     """
     Fit a CoxTimeVaryingFitter on *subset_df* with the given covariates.
-    Uses a tiny penalizer (1e-6) when penalizer=0 for numerical stability.
+    Uses a small L2 penalizer for numerical stability (stronger when round_to_hours >= 1).
+    Phase/treatment indicators are taken from the dataframe (computed from original
+    start/t_answer); only start/stop are rounded, so pre-treatment is never moved
+    past treatment. Continuous covariates (see CONTINUOUS_COVARIATES) are clipped
+    to 0.01/0.99 quantiles and z-scored to avoid nan/inf in the Hessian; their
+    coefficients are then per standard deviation. Optional warm start via initial_point.
     Returns a CachedCoxResult (loaded from disk if available).
     """
+    if round_to_hours is None:
+        round_to_hours = ROUND_TO_HOURS
+    base_suffix = f"_{round_to_hours}h" if round_to_hours and round_to_hours != 0.1 else ""
+    cache_name = f"{model_name}{base_suffix}"
     os.makedirs(CACHE_DIR, exist_ok=True)
-    path = _model_path(model_name)
+    path = _model_path(cache_name)
 
     # --- Check cache ---
     if use_cache and os.path.exists(path):
-        print(f"  ✓ Cache hit: '{model_name}'")
+        print(f"  ✓ Cache hit: '{cache_name}'")
         try:
             with open(path, "rb") as f:
                 return pickle.load(f)
@@ -114,24 +137,98 @@ def fit_cox_cached(
 
     # --- Prepare data ---
     keep = ["unique_id", "start", "stop", "event_occurred"] + covariates
-    fit_df = subset_df[keep].copy()
-    fit_df["start"] = fit_df["start"].round(1)
-    fit_df["stop"] = fit_df["stop"].round(1)
+    extra = ["match_id"] if "match_id" in subset_df.columns else []
+    fit_df = subset_df[[c for c in keep + extra if c in subset_df.columns]].copy()
+    # Round only interval boundaries; phase/treatment already from original start (no reclassification)
+    if round_to_hours and round_to_hours > 0:
+        fit_df["start"] = (fit_df["start"] / round_to_hours).round() * round_to_hours
+        fit_df["stop"] = (fit_df["stop"] / round_to_hours).round() * round_to_hours
+    else:
+        fit_df["start"] = fit_df["start"].round(1)
+        fit_df["stop"] = fit_df["stop"].round(1)
     fit_df = fit_df[fit_df["start"] < fit_df["stop"]]
     fit_df = fit_df.replace([np.inf, -np.inf], np.nan)
     fit_df = fit_df.dropna(subset=keep)
 
+    # Subsample by match_id when over cap to preserve matched pairs and full trajectories
+    subsampled = False
+    n_rows_original = len(fit_df)
+    if len(fit_df) > MAX_FIT_ROWS:
+        rng = np.random.default_rng(SUBSAMPLE_SEED)
+        if "match_id" in fit_df.columns:
+            match_ids = fit_df["match_id"].unique()
+            n_matches = len(match_ids)
+            target_n_matches = max(1, int(MAX_FIT_ROWS * n_matches / len(fit_df)))
+            target_n_matches = min(target_n_matches, n_matches)
+            sampled_matches = rng.choice(match_ids, size=target_n_matches, replace=False)
+            fit_df = fit_df[fit_df["match_id"].isin(sampled_matches)].copy()
+            fit_df = fit_df.drop(columns=["match_id"])
+            print(f"  (subsampled to {len(fit_df):,} rows from {target_n_matches:,} matches for numerical stability)")
+        else:
+            unique_ids = fit_df["unique_id"].unique()
+            n_ids = len(unique_ids)
+            target_n_ids = max(1, int(MAX_FIT_ROWS * n_ids / len(fit_df)))
+            target_n_ids = min(target_n_ids, n_ids)
+            sampled_ids = rng.choice(unique_ids, size=target_n_ids, replace=False)
+            fit_df = fit_df[fit_df["unique_id"].isin(sampled_ids)].copy()
+            print(f"  (subsampled to {len(fit_df):,} rows from {target_n_ids:,} questions for numerical stability)")
+        subsampled = True
+
+    # Clip and standardize continuous covariates to avoid nan/inf in Hessian/gradient
+    for col in covariates:
+        if col not in fit_df.columns or col not in CONTINUOUS_COVARIATES:
+            continue
+        q05, q95 = fit_df[col].quantile([0.05, 0.95])
+        fit_df[col] = fit_df[col].clip(lower=q05, upper=q95)
+        mu, sigma = fit_df[col].mean(), fit_df[col].std()
+        if sigma > 0:
+            fit_df[col] = (fit_df[col] - mu) / sigma
+
+    # Center all covariates (mean 0) so linear predictor stays bounded in large risk sets
+    for col in covariates:
+        if col in fit_df.columns:
+            fit_df[col] = fit_df[col] - fit_df[col].mean()
+
+    # Jitter zero-variance covariates to avoid singular Hessian (keep same model for result extraction)
+    rng = np.random.default_rng(SUBSAMPLE_SEED)
+    for col in covariates:
+        if col in fit_df.columns and fit_df[col].std() < 1e-10:
+            fit_df[col] = fit_df[col] + rng.standard_normal(len(fit_df)) * 1e-8
+
     n_events = int(fit_df["event_occurred"].sum())
-    print(f"  Fitting '{model_name}' — {len(fit_df):,} rows, {n_events:,} events …")
+    print(f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events:,} events …")
 
     if n_events < 10:
         print("  ⚠ Too few events, skipping.")
         return None
 
+    # Build initial_point array in covariate order for warm start
+    if initial_point is not None:
+        if hasattr(initial_point, "get"):
+            init_arr = np.array([float(initial_point.get(c, 0.0)) for c in covariates], dtype=float)
+        else:
+            init_arr = np.asarray(initial_point, dtype=float)
+        if len(init_arr) != len(covariates):
+            init_arr = None
+    else:
+        init_arr = None
+
     t0 = timer.time()
-    # Small penalizer to stabilize Hessian (avoids singular matrix / inf in optimization)
-    effective_penalizer = penalizer if penalizer > 0 else 1e-6
+    has_continuous = any(c in covariates for c in CONTINUOUS_COVARIATES)
+    if penalizer > 0:
+        effective_penalizer = penalizer
+    elif has_continuous:
+        effective_penalizer = 1e-2  # stronger when response-time interactions in model
+    elif round_to_hours and round_to_hours >= 1:
+        effective_penalizer = 5e-3
+    else:
+        effective_penalizer = 1e-6
     ctv = CoxTimeVaryingFitter(penalizer=effective_penalizer)
+    if round_to_hours and round_to_hours >= 1:
+        step = 0.25 if has_continuous else 0.5
+        fit_opts = {"step_size": step, "max_steps": 1000}
+    else:
+        fit_opts = None
     try:
         ctv.fit(
             fit_df,
@@ -140,16 +237,21 @@ def fit_cox_cached(
             start_col="start",
             stop_col="stop",
             show_progress=False,
+            initial_point=init_arr,
+            fit_options=fit_opts,
+            robust=False,  # avoid sandwich estimator nan/inf with many ties
         )
     except ConvergenceError as e:
-        print(f"  ⚠ Convergence failed: {e}. Skipping '{model_name}'.")
+        print(f"  ⚠ Convergence failed: {e}. Skipping '{cache_name}'.")
         return None
     elapsed = timer.time() - t0
     print(f"  ✓ Fit in {elapsed:.1f}s")
 
-    result = CachedCoxResult(ctv, meta={"n_events": n_events, "n_rows": len(fit_df)})
+    meta = {"n_events": n_events, "n_rows": len(fit_df)}
+    if subsampled:
+        meta["n_rows_original"] = n_rows_original
+    result = CachedCoxResult(ctv, meta=meta)
 
-    # --- Save ---
     try:
         with open(path, "wb") as f:
             pickle.dump(result, f)
@@ -176,7 +278,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     """Load parquet files, optionally subsample, build interval dataframe."""
 
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
-    cache_version = "v2"  # bump when adding columns (e.g. response_time_bin)
+    cache_version = "v3"  # bump when adding columns (v3: match_id for match-level subsampling)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}_{cache_version}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}_{cache_version}.pkl")
@@ -306,7 +408,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     full_df["treated_bin3"] = ((full_df["response_time_bin"] == 3) & (full_df["is_treated_active"] == 1)).astype(int)
 
     cols_to_keep = [
-        "unique_id", "start", "stop", "event_occurred",
+        "match_id", "unique_id", "start", "stop", "event_occurred",
         "hasAnswer",
         "phase_post_question", "treated_post_question",
         "phase_post", "is_treated_active",
@@ -430,95 +532,101 @@ COVARIATES_NONLINEAR = [
 ]
 
 
-def fit_all_models(model_df: pd.DataFrame, use_cache: bool = True):
-    """Fit Model A (main) and Model B (speed) for each tenure bucket."""
+def _fit_one_tenure_bucket(args):
+    """
+    Worker for parallel tenure-bucket fits. Fits Model A then Model B (with warm start from A).
+    args: (bucket, subset_df, use_cache, round_to_hours)
+    Returns: (bucket, main_row_dict or None, speed_row_dict or None)
+    """
+    bucket, subset_df, use_cache, round_to_hours = args
+    subset = subset_df.copy()
+    if "tenure_bucket" in subset.columns:
+        subset = subset.drop(columns=["tenure_bucket"])
+    n_events = int(subset["event_occurred"].sum())
+    if len(subset) < 100 or n_events < 10:
+        return (bucket, None, None)
 
-    results_main = []
-    results_speed = []
+    name_a = f"ModelA_{bucket}"
+    res_a = fit_cox_cached(
+        subset, name_a, COVARIATES_MAIN,
+        use_cache=use_cache, round_to_hours=round_to_hours,
+    )
+    if res_a is None:
+        return (bucket, None, None)
+    s_a = res_a.summary_df
+    main_row = {
+        "bucket": bucket,
+        "n_rows": res_a.meta.get("n_rows", len(subset)),
+        "n_events": res_a.meta.get("n_events", n_events),
+        "treat_coef": s_a.loc["is_treated_active", "coef"],
+        "treat_hr": np.exp(s_a.loc["is_treated_active", "coef"]),
+        "treat_se": s_a.loc["is_treated_active", "se(coef)"],
+        "treat_p": s_a.loc["is_treated_active", "p"],
+        "treat_ci_lo": np.exp(s_a.loc["is_treated_active", "coef lower 95%"]),
+        "treat_ci_hi": np.exp(s_a.loc["is_treated_active", "coef upper 95%"]),
+        "gap_coef": s_a.loc["treated_post_question", "coef"],
+        "gap_hr": np.exp(s_a.loc["treated_post_question", "coef"]),
+        "gap_p": s_a.loc["treated_post_question", "p"],
+        "phase_post_q_coef": s_a.loc["phase_post_question", "coef"],
+        "phase_post_coef": s_a.loc["phase_post", "coef"],
+        "hasAnswer_coef": s_a.loc["hasAnswer", "coef"],
+    }
 
+    name_b = f"ModelB_{bucket}"
+    res_b = fit_cox_cached(
+        subset, name_b, COVARIATES_SPEED,
+        use_cache=use_cache, round_to_hours=round_to_hours,
+        initial_point=None,  # cold start to avoid nan/inf with extra covariates
+    )
+    if res_b is None:
+        return (bucket, main_row, None)
+    s_b = res_b.summary_df
+    speed_row = {
+        "bucket": bucket,
+        "n_rows": res_b.meta.get("n_rows", len(subset)),
+        "n_events": res_b.meta.get("n_events", n_events),
+        "treat_coef": s_b.loc["is_treated_active", "coef"],
+        "treat_hr": np.exp(s_b.loc["is_treated_active", "coef"]),
+        "treat_se": s_b.loc["is_treated_active", "se(coef)"],
+        "treat_p": s_b.loc["is_treated_active", "p"],
+        "speed_coef": s_b.loc["treated_response_time_interaction", "coef"],
+        "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],
+        "speed_p": s_b.loc["treated_response_time_interaction", "p"],
+        "gap_speed_coef": s_b.loc["treated_post_question_response_time_interaction", "coef"],
+        "gap_speed_p": s_b.loc["treated_post_question_response_time_interaction", "p"],
+    }
+    return (bucket, main_row, speed_row)
+
+
+def fit_all_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None):
+    """Fit Model A (main) and Model B (speed) for each tenure bucket in parallel with warm start."""
+    round_to_hours = ROUND_TO_HOURS
+    n_workers = n_jobs if n_jobs is not None else min(cpu_count() or 4, len(BUCKET_ORDER))
+    tasks = []
     for bucket in BUCKET_ORDER:
-        print(f"\n{'='*60}")
-        print(f"  BUCKET: {bucket}")
-        print(f"{'='*60}")
-
         subset = model_df[model_df["tenure_bucket"] == bucket].copy()
-        if "tenure_bucket" in subset.columns:
-            subset = subset.drop(columns=["tenure_bucket"])
+        tasks.append((bucket, subset, use_cache, round_to_hours))
 
-        n_events = int(subset["event_occurred"].sum())
-        if len(subset) < 100 or n_events < 10:
-            print(f"  ⚠ Skipping ({len(subset)} rows, {n_events} events)")
-            continue
+    print(f"\nFitting tenure-bucket models in parallel (n_jobs={n_workers}, {round_to_hours}h windows) …")
+    if n_workers <= 1:
+        results = [_fit_one_tenure_bucket(t) for t in tasks]
+    else:
+        with Pool(n_workers) as pool:
+            results = pool.map(_fit_one_tenure_bucket, tasks)
 
-        # ---- Model A: Main effect ----
-        name_a = f"ModelA_{bucket}"
-        res_a = fit_cox_cached(subset, name_a, COVARIATES_MAIN, use_cache=use_cache)
-        if res_a is not None:
-            s = res_a.summary_df
-            results_main.append(
-                {
-                    "bucket": bucket,
-                    "n_rows": res_a.meta.get("n_rows", len(subset)),
-                    "n_events": res_a.meta.get("n_events", n_events),
-                    # isTreatedActive
-                    "treat_coef": s.loc["is_treated_active", "coef"],
-                    "treat_hr": np.exp(s.loc["is_treated_active", "coef"]),
-                    "treat_se": s.loc["is_treated_active", "se(coef)"],
-                    "treat_p": s.loc["is_treated_active", "p"],
-                    "treat_ci_lo": np.exp(s.loc["is_treated_active", "coef lower 95%"]),
-                    "treat_ci_hi": np.exp(s.loc["is_treated_active", "coef upper 95%"]),
-                    # Gap placebo
-                    "gap_coef": s.loc["treated_post_question", "coef"],
-                    "gap_hr": np.exp(s.loc["treated_post_question", "coef"]),
-                    "gap_p": s.loc["treated_post_question", "p"],
-                    # Phase controls
-                    "phase_post_q_coef": s.loc["phase_post_question", "coef"],
-                    "phase_post_coef": s.loc["phase_post", "coef"],
-                    "hasAnswer_coef": s.loc["hasAnswer", "coef"],
-                }
-            )
+    results_main = [r[1] for r in results if r[1] is not None]
+    results_speed = [r[2] for r in results if r[2] is not None]
+    # Preserve bucket order
+    results_main.sort(key=lambda x: BUCKET_ORDER.index(x["bucket"]) if x["bucket"] in BUCKET_ORDER else 999)
+    results_speed.sort(key=lambda x: BUCKET_ORDER.index(x["bucket"]) if x["bucket"] in BUCKET_ORDER else 999)
 
-        # ---- Model B: Speed interaction ----
-        name_b = f"ModelB_{bucket}"
-        res_b = fit_cox_cached(subset, name_b, COVARIATES_SPEED, use_cache=use_cache)
-        if res_b is not None:
-            s = res_b.summary_df
-            results_speed.append(
-                {
-                    "bucket": bucket,
-                    "n_rows": res_b.meta.get("n_rows", len(subset)),
-                    "n_events": res_b.meta.get("n_events", n_events),
-                    # Base treatment (at log_response_time=0)
-                    "treat_coef": s.loc["is_treated_active", "coef"],
-                    "treat_hr": np.exp(s.loc["is_treated_active", "coef"]),
-                    "treat_se": s.loc["is_treated_active", "se(coef)"],
-                    "treat_p": s.loc["is_treated_active", "p"],
-                    # Speed interaction
-                    "speed_coef": s.loc["treated_response_time_interaction", "coef"],
-                    "speed_se": s.loc["treated_response_time_interaction", "se(coef)"],
-                    "speed_p": s.loc["treated_response_time_interaction", "p"],
-                    # Gap × speed interaction
-                    "gap_speed_coef": s.loc[
-                        "treated_post_question_response_time_interaction", "coef"
-                    ],
-                    "gap_speed_p": s.loc[
-                        "treated_post_question_response_time_interaction", "p"
-                    ],
-                }
-            )
-
-    # Save summary DataFrames
     os.makedirs(CACHE_DIR, exist_ok=True)
-
     df_main = pd.DataFrame(results_main)
     df_speed = pd.DataFrame(results_speed)
-
     df_main.to_csv(os.path.join(CACHE_DIR, "results_main.csv"), index=False)
     df_speed.to_csv(os.path.join(CACHE_DIR, "results_speed.csv"), index=False)
-
-    print(f"\n✓ Saved results_main.csv ({len(df_main)} buckets)")
+    print(f"✓ Saved results_main.csv ({len(df_main)} buckets)")
     print(f"✓ Saved results_speed.csv ({len(df_speed)} buckets)")
-
     return df_main, df_speed
 
 
@@ -538,8 +646,15 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     print("\n" + "=" * 60)
     print("  ALL DATA (no tenure stratification)")
     print("=" * 60)
-    res_a = fit_cox_cached(subset, "ModelA_AllData", COVARIATES_MAIN, use_cache=use_cache)
-    res_b = fit_cox_cached(subset, "ModelB_AllData", COVARIATES_SPEED, use_cache=use_cache)
+    res_a = fit_cox_cached(
+        subset, "ModelA_AllData", COVARIATES_MAIN,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+    )
+    res_b = fit_cox_cached(
+        subset, "ModelB_AllData", COVARIATES_SPEED,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+        initial_point=None,  # cold start for speed model stability
+    )
     if res_a is None or res_b is None:
         return None, None
 
@@ -599,9 +714,20 @@ def fit_pooled_experienced_models(model_df: pd.DataFrame, use_cache: bool = True
     print("  POOLED EXPERIENCED (> 1 Week) — main, speed, non-linearity")
     print("=" * 60)
     subset_main = pooled.drop(columns=["response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3"], errors="ignore")
-    res_a = fit_cox_cached(subset_main, "ModelA_PooledExperienced", COVARIATES_MAIN, use_cache=use_cache)
-    res_b = fit_cox_cached(subset_main, "ModelB_PooledExperienced", COVARIATES_SPEED, use_cache=use_cache)
-    res_c = fit_cox_cached(pooled, "ModelC_PooledExperienced_ResponseTimeBins", COVARIATES_NONLINEAR, use_cache=use_cache)
+    res_a = fit_cox_cached(
+        subset_main, "ModelA_PooledExperienced", COVARIATES_MAIN,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+    )
+    res_b = fit_cox_cached(
+        subset_main, "ModelB_PooledExperienced", COVARIATES_SPEED,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+        initial_point=None,  # cold start for speed model stability
+    )
+    res_c = fit_cox_cached(
+        pooled, "ModelC_PooledExperienced_ResponseTimeBins", COVARIATES_NONLINEAR,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+        initial_point=None,  # cold start for stability
+    )
 
     rows = []
     if res_a is not None:
@@ -733,6 +859,7 @@ def main():
     parser.add_argument("--input", default=_default_input, help="Input data folder")
     parser.add_argument("--sample", type=int, default=None, help="Subsample N matched pairs")
     parser.add_argument("--no-cache", action="store_true", help="Ignore cached models")
+    parser.add_argument("--n-jobs", type=int, default=None, help="Parallel jobs for tenure-bucket fits (default: min(cpu_count, 7))")
     args = parser.parse_args()
 
     model_df, descriptives = load_and_prepare(args.input, sample_size=args.sample)
@@ -742,7 +869,7 @@ def main():
     with open(os.path.join(CACHE_DIR, "descriptives.pkl"), "wb") as f:
         pickle.dump(descriptives, f)
 
-    df_main, df_speed = fit_all_models(model_df, use_cache=not args.no_cache)
+    df_main, df_speed = fit_all_models(model_df, use_cache=not args.no_cache, n_jobs=args.n_jobs)
 
     # 1. One reciprocity model on all data (not stratified by seniority)
     df_main_all, df_speed_all = fit_all_data_models(model_df, use_cache=not args.no_cache)
@@ -758,7 +885,7 @@ def main():
     if df_pooled is not None:
         print("\n=== Pooled Experienced (> 1 Week) ===")
         print(df_pooled.to_string(index=False))
-    plot_staggered_treatment_help_rate(model_df)
+    # plot_staggered_treatment_help_rate(model_df)
 
     print("\n=== Main Effect Results (by bucket) ===")
     print(df_main.to_string(index=False))

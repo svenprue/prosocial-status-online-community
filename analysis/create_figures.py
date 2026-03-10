@@ -1,18 +1,21 @@
 """
-generate_outputs.py
-====================
-Loads cached model results and descriptive statistics produced by fit_models.py,
-then generates all LaTeX tables and figures for the paper's Results section.
+create_figures.py
+==================
+Loads cached model results and descriptive statistics produced by fit_cox_models.py,
+then generates LaTeX tables and figures for the paper's Results section.
 
 Outputs (written to output_tables/ and output_figures/):
-  - desc_stats.tex          Descriptive statistics (Table 2)
-  - main_results.tex        Cox regression: main reciprocity effect (Table 3)
-  - speed_results.tex       Cox regression: response-time moderation (Table 4)
-  - strength_rec.eps/.png   Reciprocity HR across tenure buckets (Figure 2)
-  - speed_moderation.eps/.png  Speed interaction across buckets (Figure 3)
+  - desc_stats.tex              Descriptive statistics (Table 2)
+  - main_results.tex            Cox regression: main reciprocity effect (Table 3)
+  - speed_results.tex           Cox regression: response-time moderation (Table 4)
+  - pooled_experienced.tex      Pooled (tenure > 1 week): main, speed, response-time bins
+  - strength_rec.*              Reciprocity HR across tenure buckets (Figure 2)
+  - speed_moderation.*          Speed interaction across buckets (Figure 3)
+  - pooled_experienced.*        Pooled model summary figure
+  - response_time_nonlinearity.*  Response time effect by tertile (non-linearity)
 
 Usage:
-    python generate_outputs.py
+    python create_figures.py
 """
 
 import os
@@ -201,12 +204,12 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
         cells_se.append(_fmt_se(se))
         cells_hr.append(f"[{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]")
 
-    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post & " + " & ".join(cells_coef) + r" \\")
+    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Answer Received & " + " & ".join(cells_coef) + r" \\")
     lines.append(rf" & " + " & ".join(cells_se) + r" \\")
     lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(cells_hr) + r" \\[4pt]")
 
-    # Gap placebo
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Gap Period (Placebo)}} \\")
+    # Waiting period (placebo)
+    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period (Placebo)}} \\")
     gap_cells = []
     gap_se_cells = []
     for _, r in df.iterrows():
@@ -272,7 +275,7 @@ def generate_speed_table(df: pd.DataFrame) -> str:
     for _, r in df.iterrows():
         cells.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
         se_cells.append(_fmt_se(r["treat_se"]))
-    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post & " + " & ".join(cells) + r" \\")
+    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Answer Received & " + " & ".join(cells) + r" \\")
     lines.append(rf" & " + " & ".join(se_cells) + r" \\[4pt]")
 
     # Speed interaction
@@ -285,8 +288,8 @@ def generate_speed_table(df: pd.DataFrame) -> str:
     lines.append(rf"\hspace{{1em}}Treatment $\times$ log(Response Time) & " + " & ".join(speed_cells) + r" \\")
     lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[4pt]")
 
-    # Gap × speed (placebo for speed)
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Gap Period $\times$ Response Time}} \\")
+    # Waiting period × speed (placebo for speed)
+    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period $\times$ Response Time}} \\")
     gs_cells = []
     for _, r in df.iterrows():
         gs_cells.append(_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]))
@@ -306,6 +309,146 @@ def generate_speed_table(df: pd.DataFrame) -> str:
         r"\end{table}",
     ]
     return "\n".join(lines)
+
+
+# =====================================================================
+# Pooled Experienced (tenure > 1 week): Main, Speed, Response-Time Bins
+# =====================================================================
+
+def generate_pooled_table(df: pd.DataFrame) -> str:
+    """
+    Generate LaTeX table for pooled experienced models: Main, Speed, and
+    Response-Time Bins (non-linearity). Each column is one model.
+    """
+    if df is None or df.empty:
+        return ""
+    main_df = df[df["model"] == "PooledExperienced_Main"]
+    speed_df = df[df["model"] == "PooledExperienced_Speed"]
+    bins_df = df[df["model"] == "PooledExperienced_ResponseTimeBins"]
+    if main_df.empty or speed_df.empty or bins_df.empty:
+        return ""
+    main_row = main_df.iloc[0]
+    speed_row = speed_df.iloc[0]
+    bins_row = bins_df.iloc[0]
+
+    def _na(v, fmt="{:.3f}"):
+        if pd.isna(v) or v == "":
+            return "—"
+        try:
+            return fmt.format(float(v))
+        except (TypeError, ValueError):
+            return str(v)
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Pooled Models (Tenure $>$ 1 Week): Main, Speed, and Response-Time Bins}",
+        r"\label{tab:pooled_experienced}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lccc@{}}",
+        r"\toprule",
+        r" & \textbf{Main} & \textbf{Speed} & \textbf{Response-Time Bins} \\",
+        r"\midrule",
+        r"\multicolumn{4}{@{}l}{\textit{Treatment effect}} \\",
+        rf"\hspace{{1em}} Received Answer $\times$ Post-Answer Received (HR) & {_na(main_row.get('treat_hr'))} & {_na(np.exp(speed_row['treat_coef']) if pd.notna(speed_row.get('treat_coef')) else None)} & — \\",
+        rf"\hspace{{1em}} ($p$-value) & {_na(main_row.get('treat_p'), '{:.4f}')} & {_na(speed_row.get('treat_p'), '{:.4f}')} & — \\[4pt]",
+        r"\multicolumn{4}{@{}l}{\textit{Response time}} \\",
+        rf"\hspace{{1em}} Treatment $\times$ log(Response Time) & — & {_na(speed_row.get('speed_coef'))} & — \\",
+        rf"\hspace{{1em}} ($p$-value) & — & {_na(speed_row.get('speed_p'), '{:.4f}')} & — \\[4pt]",
+        r"\multicolumn{4}{@{}l}{\textit{Treatment effect by response-time tertile}} \\",
+        rf"\hspace{{1em}} 1st tertile (fast) HR & — & — & {_na(bins_row.get('treat_hr_bin1'))} \\",
+        rf"\hspace{{1em}} 2nd tertile (medium) HR & — & — & {_na(bins_row.get('treat_hr_bin2'))} \\",
+        rf"\hspace{{1em}} 3rd tertile (slow) HR & — & — & {_na(bins_row.get('treat_hr_bin3'))} \\",
+        rf"\hspace{{1em}} 2nd vs 1st ($p$) & — & — & {_na(bins_row.get('treated_bin2_p'), '{:.4f}')} \\",
+        rf"\hspace{{1em}} 3rd vs 1st ($p$) & — & — & {_na(bins_row.get('treated_bin3_p'), '{:.4f}')} \\[4pt]",
+        r"\midrule",
+        rf"Intervals & {_na(main_row.get('n_rows'), '{:,.0f}')} & {_na(speed_row.get('n_rows'), '{:,.0f}')} & {_na(bins_row.get('n_rows'), '{:,.0f}')} \\",
+        rf"Events & {_na(main_row.get('n_events'), '{:,.0f}')} & {_na(speed_row.get('n_events'), '{:,.0f}')} & {_na(bins_row.get('n_events'), '{:,.0f}')} \\",
+        r"\bottomrule",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+def generate_pooled_figure(df: pd.DataFrame):
+    """
+    Simple bar chart: treatment hazard ratio for pooled Main and (base) Speed model,
+    and optionally a single summary bar for the bins model (e.g. average HR).
+    """
+    if df is None or df.empty:
+        return
+    main_df = df[df["model"] == "PooledExperienced_Main"]
+    speed_df = df[df["model"] == "PooledExperienced_Speed"]
+    if main_df.empty or speed_df.empty:
+        return
+    main_row = main_df.iloc[0]
+    speed_row = speed_df.iloc[0]
+    hr_main = float(main_row["treat_hr"])
+    hr_speed_base = np.exp(float(speed_row["treat_coef"]))
+
+    fig, ax = plt.subplots(figsize=(4, 3.5))
+    x = np.arange(2)
+    hrs = [hr_main, hr_speed_base]
+    labels = ["Main\n(no response-time)", "Speed\n(base effect)"]
+    colors = plt.cm.Blues(np.linspace(0.5, 0.85, 2))
+    ax.bar(x, hrs, width=0.5, color=colors, edgecolor="white", linewidth=0.5)
+    ax.axhline(y=1.0, color="#999999", linestyle="--", linewidth=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("Hazard Ratio (Receiving Answer → Helping)", fontsize=10)
+    ax.set_title("Pooled Experienced (Tenure > 1 Week)", fontsize=11, fontweight="bold")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.tight_layout()
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(os.path.join(FIGURE_DIR, f"pooled_experienced.{ext}"), dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print("✓ Saved pooled_experienced.[eps/png/pdf]")
+
+
+def generate_nonlinearity_figure(df: pd.DataFrame):
+    """
+    Bar chart of treatment hazard ratio by response-time tertile (1st = fast,
+    2nd = medium, 3rd = slow) from the ResponseTimeBins model. Shows potential
+    non-linearity of the response time effect.
+    """
+    if df is None or df.empty:
+        return
+    bins_row = df[df["model"] == "PooledExperienced_ResponseTimeBins"]
+    if bins_row.empty:
+        return
+    bins_row = bins_row.iloc[0]
+    hr1 = float(bins_row["treat_hr_bin1"])
+    hr2 = float(bins_row["treat_hr_bin2"])
+    hr3 = float(bins_row["treat_hr_bin3"])
+    p2 = bins_row.get("treated_bin2_p", np.nan)
+    p3 = bins_row.get("treated_bin3_p", np.nan)
+
+    fig, ax = plt.subplots(figsize=(5, 4))
+    x = np.arange(3)
+    hrs = [hr1, hr2, hr3]
+    labels = ["1st tertile\n(fast)", "2nd tertile\n(medium)", "3rd tertile\n(slow)"]
+    colors = plt.cm.viridis(np.linspace(0.2, 0.85, 3))
+    bars = ax.bar(x, hrs, width=0.6, color=colors, edgecolor="white", linewidth=0.5)
+    ax.axhline(y=1.0, color="#999999", linestyle="--", linewidth=0.8, label="No effect (HR=1)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("Hazard Ratio (Receiving Answer → Helping)", fontsize=10)
+    ax.set_xlabel("Response time tertile", fontsize=10)
+    ax.set_title("Non-Linearity of Response Time Effect\n(Pooled, Tenure > 1 Week)", fontsize=11, fontweight="bold")
+    ax.legend(fontsize=8, loc="upper right")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for i, (h, p) in enumerate(zip(hrs, [np.nan, p2, p3])):
+        stars = _sig_stars(p).replace("\\textdagger", "†") if pd.notna(p) else ""
+        if stars:
+            ax.text(i, h + 0.02, stars, ha="center", va="bottom", fontsize=9)
+    plt.tight_layout()
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(os.path.join(FIGURE_DIR, f"response_time_nonlinearity.{ext}"), dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    print("✓ Saved response_time_nonlinearity.[eps/png/pdf]")
 
 
 # =====================================================================
@@ -507,14 +650,18 @@ def main():
     # --- Load cached results ---
     main_path = os.path.join(CACHE_DIR, "results_main.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
+    pooled_path = os.path.join(TABLE_DIR, "results_pooled_experienced.csv")
+    if not os.path.exists(pooled_path):
+        pooled_path = os.path.join(CACHE_DIR, "results_pooled_experienced.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
 
     if not os.path.exists(main_path):
-        print(f"ERROR: {main_path} not found. Run fit_models.py first.")
+        print(f"ERROR: {main_path} not found. Run fit_cox_models.py first.")
         return
 
     df_main = pd.read_csv(main_path)
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
+    df_pooled = pd.read_csv(pooled_path) if os.path.exists(pooled_path) else None
     descriptives = {}
     if os.path.exists(desc_path):
         with open(desc_path, "rb") as f:
@@ -545,6 +692,15 @@ def main():
             f.write(tex)
         print(f"✓ {out}")
 
+    # Pooled experienced (Main, Speed, Response-Time Bins)
+    if df_pooled is not None and not df_pooled.empty:
+        tex = generate_pooled_table(df_pooled)
+        if tex:
+            out = os.path.join(TABLE_DIR, "pooled_experienced.tex")
+            with open(out, "w") as f:
+                f.write(tex)
+            print(f"✓ {out}")
+
     # --- Generate Figures ---
     print("\n=== Generating Figures ===")
 
@@ -553,6 +709,10 @@ def main():
     if not df_speed.empty:
         generate_speed_figure(df_speed)
         generate_combined_figure(df_main, df_speed)
+
+    if df_pooled is not None and not df_pooled.empty:
+        generate_pooled_figure(df_pooled)
+        generate_nonlinearity_figure(df_pooled)
 
     print("\n=== All outputs generated ===")
     print(f"Tables: {TABLE_DIR}/")
