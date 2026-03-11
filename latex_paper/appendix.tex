@@ -19,12 +19,13 @@
 %\placeholder{Include complete regression output for all models across all tenure buckets, including all covariates, standard errors, and model diagnostics.}
 \end{comment}
 
-\section{Matching}
+\section{Matching Diagnostics}
+\label{sec:balance_plot}
 Figure \ref{fig:common_support} shows that there is sufficient common support between the treatment and the control group. The propensity score distribution between the original treated and control groups is similar. The distribution of the matched control is nearly identical to the treated group. 
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\textwidth]{common_support.pdf}
+    \missingfigure{common\_support.pdf}
     \caption{Relationship between user experience and strength of status pursuit}
     \label{fig:common_support}
 \end{figure}
@@ -33,9 +34,19 @@ Figure \ref{fig:love_plot} displays the standardized mean differences (SMD) betw
 
 \begin{figure}[!htbp]
     \centering
-    \includegraphics[width=\textwidth]{love_plot.pdf}
+    \missingfigure{love\_plot.pdf}
     \caption{Visualization of balance in the unmatched and matched dataset}
     \label{fig:love_plot}
+\end{figure}
+
+\section{Help Rate Over the Observation Window by Tenure}
+\label{sec:help_rate_by_tenure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_by_tenure.pdf}
+\caption{Help Rate Over the Observation Window, by Tenure Bucket. Each panel plots the normalized help rate (relative to each group's pre-question baseline) for treated users (red) and matched control users (blue) over the $\pm$2-day window around the question-posting time ($T_Q$, dashed vertical line). The dotted vertical line marks the median answer arrival time ($T_A$). Error bars indicate 95\% confidence intervals. The post-question lift in treated users' help rate is visible across all tenure buckets and is most pronounced among newcomers (tenure $<$ 1 week), consistent with the pattern reported in Table~\ref{tab:main_results} and Figure~\ref{fig:strength_rec}.}
+\label{fig:help_rate_by_tenure}
 \end{figure}
 
 \section{Analysis of Life-Time Contributions \label{sec:lt-contributions}}
