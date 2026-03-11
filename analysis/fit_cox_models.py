@@ -9,11 +9,9 @@ Per tenure bucket:
   Model B – With response-time × treatment interaction
 
 Additional analyses:
-  - One reciprocity model on all data (not stratified by seniority).
-  - Pooled tenure > 1 week: main, speed, and response-time bin (non-linearity) models.
-  - Staggered-treatment descriptive figures: help rate control vs treatment by response-time tertile.
+  - All data: one reciprocity model on all data (no tenure stratification).
 
-Outputs: model_cache/*.csv (and *.pkl), output_figures/staggered_treatment_help_rate.*, response_time_lift.*
+Outputs: model_cache/*.csv (and *.pkl)
 
 Usage:
     python fit_cox_models.py [--input <path>] [--sample 200000]
@@ -58,6 +56,7 @@ BUCKET_ORDER = [
 ROUND_TO_HOURS = 1
 # Covariates with continuous scale: standardize and clip to stabilize Cox fit (avoid nan/inf in Hessian)
 CONTINUOUS_COVARIATES = [
+    "hasAnswer_response_time_interaction",
     "treated_response_time_interaction",
     "treated_post_question_response_time_interaction",
 ]
@@ -277,7 +276,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     """Load parquet files, optionally subsample, build interval dataframe."""
 
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
-    cache_version = "v3"  # bump when adding columns (v3: match_id for match-level subsampling)
+    cache_version = "v3"  # bump when adding columns (v4: hasAnswer_response_time_interaction)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}_{cache_version}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}_{cache_version}.pkl")
@@ -380,6 +379,11 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
 
     # Response-time interaction
     full_df["log_response_time"] = np.log1p(full_df["t_answer"])
+    full_df["hasAnswer_response_time_interaction"] = np.where(
+        full_df["hasAnswer"] == 1,
+        full_df["log_response_time"],
+        0.0,
+    )
     full_df["treated_response_time_interaction"] = (
         full_df["is_treated_active"] * full_df["log_response_time"]
     )
@@ -411,6 +415,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
         "hasAnswer",
         "phase_post_question", "treated_post_question",
         "phase_post", "is_treated_active",
+        "hasAnswer_response_time_interaction",
         "treated_post_question_response_time_interaction",
         "treated_response_time_interaction",
         "tenure_bucket",
@@ -515,19 +520,9 @@ COVARIATES_MAIN = [
 ]
 
 COVARIATES_SPEED = COVARIATES_MAIN + [
+    "hasAnswer_response_time_interaction",
     "treated_response_time_interaction",
     "treated_post_question_response_time_interaction",
-]
-
-# For pooled >1 week non-linearity: treatment effect by response-time tertile
-COVARIATES_NONLINEAR = [
-    "hasAnswer",
-    "phase_post_question",
-    "treated_post_question",
-    "phase_post",
-    "is_treated_active",
-    "treated_bin2",
-    "treated_bin3",
 ]
 
 
@@ -624,8 +619,7 @@ def fit_all_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int =
     df_speed = pd.DataFrame(results_speed)
     df_main.to_csv(os.path.join(CACHE_DIR, "results_main.csv"), index=False)
     df_speed.to_csv(os.path.join(CACHE_DIR, "results_speed.csv"), index=False)
-    print(f"✓ Saved results_main.csv ({len(df_main)} buckets)")
-    print(f"✓ Saved results_speed.csv ({len(df_speed)} buckets)")
+    print(f"✓ Saved results_main.csv, results_speed.csv ({len(df_main)} tenure buckets) to {CACHE_DIR}/")
     return df_main, df_speed
 
 
@@ -639,11 +633,11 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
             subset = subset.drop(columns=[c])
     n_events = int(subset["event_occurred"].sum())
     if len(subset) < 100 or n_events < 10:
-        print("  ⚠ All-data: too few rows/events, skipping.")
+        print("  ⚠ All data: too few rows/events, skipping.")
         return None, None
 
     print("\n" + "=" * 60)
-    print("  ALL DATA (no tenure stratification)")
+    print("  All data (no tenure stratification)")
     print("=" * 60)
     res_a = fit_cox_cached(
         subset, "ModelA_AllData", COVARIATES_MAIN,
@@ -690,83 +684,8 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     os.makedirs(CACHE_DIR, exist_ok=True)
     df_main_all.to_csv(os.path.join(CACHE_DIR, "results_main_all.csv"), index=False)
     df_speed_all.to_csv(os.path.join(CACHE_DIR, "results_speed_all.csv"), index=False)
-    print(f"✓ Saved results_main_all.csv, results_speed_all.csv to {CACHE_DIR}/")
+    print(f"✓ Saved results_main_all.csv, results_speed_all.csv (All data) to {CACHE_DIR}/")
     return df_main_all, df_speed_all
-
-
-def plot_staggered_treatment_help_rate(model_df: pd.DataFrame, output_dir: str = FIGURE_DIR):
-    """
-    Descriptive visualization: help rate in control vs treatment phase (staggered treatment)
-    by response-time tertile (pooled tenure > 1 week). Shows why lift is higher when response time is greater.
-    """
-    if not _HAS_MATPLOTLIB:
-        print("  ⚠ matplotlib not available, skipping staggered-treatment figure.")
-        return
-    EXPERIENCED_BUCKETS = [b for b in BUCKET_ORDER if b != "< 1 Week"]
-    pooled = model_df[model_df["tenure_bucket"].isin(EXPERIENCED_BUCKETS)].copy()
-    if "response_time_bin" not in pooled.columns or "phase_post" not in pooled.columns:
-        print("  ⚠ Staggered plot: need response_time_bin and phase_post in data.")
-        return
-    # phase_post: 0 = control (before answer), 1 = treatment (after answer)
-    pooled["phase_label"] = pooled["phase_post"].map({0: "Control (pre-answer)", 1: "Treatment (post-answer)"})
-    pooled["exposure_hours"] = pooled["stop"] - pooled["start"]
-    agg = (
-        pooled.groupby(["response_time_bin", "phase_post"], as_index=False)
-        .agg(events=("event_occurred", "sum"), exposure_hours=("exposure_hours", "sum"))
-    )
-    agg["help_rate"] = agg["events"] / agg["exposure_hours"].replace(0, np.nan)
-    agg["phase_label"] = agg["phase_post"].map({0: "Control (pre-answer)", 1: "Treatment (post-answer)"})
-    # Control users (bin 0) only have phase 0; treated (bins 1,2,3) have both phases
-    agg = agg.sort_values(["response_time_bin", "phase_post"])
-    bin_labels = {0: "Control\n(no answer)", 1: "Fast\n(1st tertile)", 2: "Medium\n(2nd tertile)", 3: "Slow\n(3rd tertile)"}
-    agg["bin_label"] = agg["response_time_bin"].map(bin_labels)
-    os.makedirs(output_dir, exist_ok=True)
-    fig, ax = plt.subplots(figsize=(8, 5))
-    x = np.arange(4)  # 0, 1, 2, 3
-    width = 0.35
-    for i, phase in enumerate([0, 1]):
-        sub = agg[(agg["phase_post"] == phase) & (agg["response_time_bin"].isin([0, 1, 2, 3]))]
-        # For each bin, we may have 0 or 1 row (control users only have phase 0)
-        rates = []
-        for b in [0, 1, 2, 3]:
-            r = sub[sub["response_time_bin"] == b]["help_rate"].values
-            rates.append(r[0] if len(r) > 0 else np.nan)
-        offset = -width / 2 + (i * width)
-        label = "Control (pre-answer)" if phase == 0 else "Treatment (post-answer)"
-        ax.bar(x + offset, rates, width, label=label)
-    ax.set_xticks(x)
-    ax.set_xticklabels([bin_labels[b] for b in [0, 1, 2, 3]])
-    ax.set_ylabel("Help rate (events per person-hour)")
-    ax.set_xlabel("Response time group (pooled tenure > 1 week)")
-    ax.set_title("Staggered treatment: help rate before vs after receiving an answer")
-    ax.legend()
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    plt.tight_layout()
-    for ext in ["png", "pdf", "eps"]:
-        fig.savefig(os.path.join(output_dir, f"staggered_treatment_help_rate.{ext}"), dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print(f"✓ Saved staggered_treatment_help_rate.[png/pdf/eps]")
-
-    # Second figure: lift (treatment − control help rate) by response-time tertile
-    lift_df = agg[agg["response_time_bin"].isin([1, 2, 3])].pivot(
-        index="response_time_bin", columns="phase_post", values="help_rate"
-    ).reset_index()
-    if len(lift_df) > 0 and 0 in lift_df.columns and 1 in lift_df.columns:
-        lift_df["lift"] = lift_df[1] - lift_df[0]
-        fig2, ax2 = plt.subplots(figsize=(5, 4))
-        ax2.bar(lift_df["response_time_bin"].map({1: "Fast", 2: "Medium", 3: "Slow"}), lift_df["lift"], color="#2171b5")
-        ax2.axhline(0, color="gray", linestyle="--")
-        ax2.set_ylabel("Lift in help rate (treatment − control)")
-        ax2.set_xlabel("Response time tertile")
-        ax2.set_title("Why lift is higher when response time is greater")
-        ax2.spines["top"].set_visible(False)
-        ax2.spines["right"].set_visible(False)
-        plt.tight_layout()
-        for ext in ["png", "pdf", "eps"]:
-            fig2.savefig(os.path.join(output_dir, f"response_time_lift.{ext}"), dpi=300, bbox_inches="tight")
-        plt.close(fig2)
-        print(f"✓ Saved response_time_lift.[png/pdf/eps]")
 
 
 # =====================================================================
@@ -796,15 +715,15 @@ def main():
     # 1. One reciprocity model on all data (not stratified by seniority)
     df_main_all, df_speed_all = fit_all_data_models(model_df, use_cache=not args.no_cache)
     if df_main_all is not None:
-        print("\n=== All-Data Main Effect ===")
+        print("\n=== All data: Main effect ===")
         print(df_main_all.to_string(index=False))
     if df_speed_all is not None:
-        print("\n=== All-Data Speed Interaction ===")
+        print("\n=== All data: Speed interaction ===")
         print(df_speed_all.to_string(index=False))
 
-    print("\n=== Main Effect Results (by bucket) ===")
+    print("\n=== Main effect (by tenure bucket) ===")
     print(df_main.to_string(index=False))
-    print("\n=== Speed Interaction Results (by bucket) ===")
+    print("\n=== Speed interaction (by tenure bucket) ===")
     print(df_speed.to_string(index=False))
 
 
