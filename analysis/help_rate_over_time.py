@@ -240,11 +240,13 @@ def compute_binned_rates_adoption(
         rows.append({"bin_idx": bi, "control_hours": control_hours, "treated_hours": treated_hours})
     exposure_df = pd.DataFrame(rows)
 
-    # Build result: one row per (group, bin). Skip first bin (0 to bin_width): no one has help before t=0.
+    # Build result: one row per (group, bin).
+    # Control (no answer yet): include first bin (0 to bin_width). Treated (answer received): skip first bin (no one received before t=0).
     result = []
     for g in ["control", "treated"]:
         exp_col = "control_hours" if g == "control" else "treated_hours"
-        for bi in range(1, len(time_centers_h)):
+        bin_start = 0 if g == "control" else 1
+        for bi in range(bin_start, len(time_centers_h)):
             exp = exposure_df.loc[exposure_df["bin_idx"] == bi, exp_col].iloc[0]
             cnt = counts[(counts["group"] == g) & (counts["bin_idx"] == bi)]["event_count"]
             cnt = cnt.iloc[0] if len(cnt) else 0
@@ -260,6 +262,70 @@ def compute_binned_rates_adoption(
                 "rate_raw_se": rate_se,
             })
     return pd.DataFrame(result)
+
+
+def compute_binned_rates_stable_control(
+    timelines: pd.DataFrame,
+    events: pd.DataFrame,
+    bin_width_hours: float = 2.0,
+    time_max_hours: float = 24.0,
+    tenure_bucket: str = None,
+) -> pd.DataFrame:
+    """
+    Binned help rate for the stable control group (hasAnswer == 0, never receive an answer).
+    Same bin edges as adoption (0 to time_max_hours). For use as reference in adoption plot.
+
+    Returns DataFrame with columns:
+      time_center_hours, time_center_days, rate_raw, rate_raw_se, n_obs, event_count.
+    """
+    time_min_hours = 0.0
+    tl = timelines[timelines["hasAnswer"] == 0].copy()
+    if tenure_bucket is not None and "tenure_bucket" in tl.columns:
+        tl = tl[tl["tenure_bucket"] == tenure_bucket]
+    tl = tl[["match_id", "question_id"]]
+    if tl.empty:
+        bin_edges = np.arange(0, time_max_hours + bin_width_hours * 0.5, bin_width_hours)
+        time_centers_h = (bin_edges[:-1] + bin_edges[1:]) / 2
+        time_centers_d = time_centers_h / 24.0
+        return pd.DataFrame({
+            "time_center_hours": time_centers_h,
+            "time_center_days": time_centers_d,
+            "rate_raw": 0.0,
+            "rate_raw_se": 0.0,
+            "n_obs": 0.0,
+            "event_count": 0,
+        })
+
+    ev = events.merge(tl, on=["match_id", "question_id"], how="inner")
+    ev = ev[(ev["t_event"] >= time_min_hours) & (ev["t_event"] <= time_max_hours)]
+
+    bin_edges = np.arange(0, time_max_hours + bin_width_hours * 0.5, bin_width_hours)
+    time_centers_h = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_widths_h = np.diff(bin_edges)
+    time_centers_d = time_centers_h / 24.0
+    n_control = len(tl)
+
+    ev["bin_idx"] = np.searchsorted(bin_edges, ev["t_event"].values, side="right") - 1
+    ev["bin_idx"] = ev["bin_idx"].clip(0, len(bin_edges) - 2)
+    counts = ev.groupby("bin_idx").agg(event_count=("t_event", "count")).reset_index()
+
+    rows = []
+    for bi in range(len(time_centers_h)):
+        width = float(bin_widths_h[bi])
+        exposure = n_control * width
+        cnt = counts[counts["bin_idx"] == bi]["event_count"]
+        cnt = int(cnt.iloc[0]) if len(cnt) else 0
+        rate = cnt / exposure if exposure > 0 else 0.0
+        rate_se = np.sqrt(rate / exposure) if exposure > 0 else 0.0
+        rows.append({
+            "time_center_hours": time_centers_h[bi],
+            "time_center_days": time_centers_d[bi],
+            "rate_raw": rate,
+            "rate_raw_se": rate_se,
+            "n_obs": exposure,
+            "event_count": cnt,
+        })
+    return pd.DataFrame(rows)
 
 
 def normalize_to_baseline(df: pd.DataFrame) -> pd.DataFrame:
@@ -470,10 +536,25 @@ def _plot_adoption_one_panel(
     show_legend: bool = True,
     show_share_ylabel: bool = True,
     xlim_hours: tuple = (0, 24),
+    rates_control_stable: pd.DataFrame = None,
 ):
-    """Draw one adoption panel on ax: help rate (control/treated) + share with answer on twin axis."""
+    """Draw one adoption panel on ax: help rate (control/treated) + control group (no answer) + share with answer on twin axis."""
     colors = {"control": "#2166ac", "treated": "#b2182b"}
     labels = {"control": "No answer yet", "treated": "Answer received"}
+
+    # Control group (never received answer): reference line
+    if rates_control_stable is not None and not rates_control_stable.empty:
+        sub = rates_control_stable.sort_values("time_center_hours")
+        x = sub["time_center_hours"].values
+        y = sub["rate_raw"].values
+        yerr = (1.96 * sub["rate_raw_se"].values) if show_ci and "rate_raw_se" in sub.columns else None
+        ax.plot(
+            x, y,
+            color="#4d4d4d", linestyle="--", linewidth=1.5, marker="s", markersize=3,
+            label="Control (no answer)", zorder=2,
+        )
+        if yerr is not None:
+            ax.fill_between(x, y - yerr, y + yerr, color="#4d4d4d", alpha=0.15, zorder=1)
 
     for g in ["control", "treated"]:
         sub = rates_adoption[rates_adoption["group"] == g].sort_values("time_center_hours")
@@ -556,6 +637,12 @@ def plot_adoption_by_tenure(
             time_max_hours=time_max_hours,
             tenure_bucket=bucket,
         )
+        rates_control_b = compute_binned_rates_stable_control(
+            timelines, events,
+            bin_width_hours=bin_width_hours,
+            time_max_hours=time_max_hours,
+            tenure_bucket=bucket,
+        )
         show_share_ylabel = (i % n_cols == 1)
         _plot_adoption_one_panel(
             ax, rates_b, tl_b, show_ci,
@@ -563,20 +650,22 @@ def plot_adoption_by_tenure(
             show_legend=False,
             show_share_ylabel=show_share_ylabel,
             xlim_hours=(0, time_max_hours),
+            rates_control_stable=rates_control_b,
         )
     for j in range(n_buckets, len(axes.flat)):
         axes.flat[j].set_visible(False)
 
-    # Joint legend: use handles/labels from first panel (need to get them including twin)
-    # Re-get from first panel: iterate axes and get legend_handles from the one that has them
-    h, l = [], []
-    for idx in range(n_buckets):
-        h, l = axes.flat[idx].get_legend_handles_labels()
-        if h:
-            break
+    # Joint legend: proxy artists so all series are shown (panels have show_legend=False)
     from matplotlib.lines import Line2D
+    proxy_no_answer_yet = Line2D([0], [0], color="#2166ac", linestyle="-", linewidth=2, marker="o", markersize=4, label="No answer yet")
+    proxy_answer_received = Line2D([0], [0], color="#b2182b", linestyle="-", linewidth=2, marker="o", markersize=4, label="Answer received")
+    proxy_control_stable = Line2D([0], [0], color="#4d4d4d", linestyle="--", linewidth=1.5, marker="s", markersize=3, label="Control (no answer)")
     proxy_share = Line2D([0], [0], color="#2d7a3e", linestyle="--", linewidth=1.5, label="Share with answer")
-    fig.legend(h + [proxy_share], l + ["Share with answer"], loc="lower center", ncol=3, fontsize=10, bbox_to_anchor=(0.5, -0.02))
+    fig.legend(
+        [proxy_no_answer_yet, proxy_answer_received, proxy_control_stable, proxy_share],
+        ["No answer yet", "Answer received", "Control (no answer)", "Share with answer"],
+        loc="lower center", ncol=4, fontsize=10, bbox_to_anchor=(0.5, -0.02),
+    )
     plt.tight_layout(rect=[0, 0.06, 1, 1])  # leave space for legend below
     for ext in ["eps", "png", "pdf"]:
         fig.savefig(
@@ -637,7 +726,7 @@ def main():
             timelines, events,
             output_dir=args.output_dir,
             show_ci=show_ci,
-            bin_width_hours=0.25,
+            bin_width_hours=0.5,
             time_max_hours=12.0,
         )
 
