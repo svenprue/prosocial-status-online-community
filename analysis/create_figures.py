@@ -7,10 +7,12 @@ and figures for the paper's Results section.
 
 Outputs (written to output_tables/ and output_figures/):
   - desc_stats.tex              Descriptive statistics (Table 2)
+  - regression_all.tex          Pooled Cox regressions (Main, Main+Speed, Main+Speed+Quad.)
   - main_results.tex            Main effect by tenure bucket (Table 3)
   - speed_results.tex           Speed interaction by tenure bucket (Table 4)
   - strength_rec.*              Reciprocity HR by tenure bucket (Figure 2)
-  - speed_moderation.*          Speed interaction by tenure bucket (Figure 3)
+  - speed_moderation.*           Speed interaction by tenure bucket (Figure 3)
+  - interaction_effect.*        Predicted treatment effect by response time (pooled Model C/B)
 
 Usage:
     python create_figures.py
@@ -132,6 +134,138 @@ def generate_desc_stats_table(desc: dict) -> str:
 
 
 # =====================================================================
+# Table: Pooled regressions (regression_all.tex) — Main, Main+Speed, Main+Speed+Quadratic
+# =====================================================================
+
+def generate_regression_all_table(
+    df_main_all: pd.DataFrame,
+    df_speed_all: pd.DataFrame = None,
+    df_model_c_all: pd.DataFrame = None,
+) -> str:
+    """
+    Generate LaTeX table for pooled Cox regressions (all experience levels).
+    Columns: Main; Main + Speed (linear RT interaction); Main + Speed + Quadratic (Model C).
+    """
+    if df_main_all.empty or "treat_coef" not in df_main_all.columns:
+        return ""
+    r = df_main_all.iloc[0]
+    has_speed = (
+        df_speed_all is not None
+        and not df_speed_all.empty
+        and "speed_coef" in df_speed_all.columns
+    )
+    has_model_c = (
+        df_model_c_all is not None
+        and not df_model_c_all.empty
+        and "speed_coef" in df_model_c_all.columns
+    )
+    s = df_speed_all.iloc[0] if has_speed else None
+    c = df_model_c_all.iloc[0] if has_model_c else None
+
+    n_cols = 1 + int(has_speed) + int(has_model_c)
+    col_spec = "@{}l" + "c" * n_cols + "@{}"
+    header_cells = [r"\textbf{Main}"]
+    if has_speed:
+        header_cells.append(r"\textbf{Main + Speed}")
+    if has_model_c:
+        header_cells.append(r"\textbf{Main + Speed + Quad.}")
+    header = " & ".join(header_cells) + r" \\"
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Pooled Cox Regressions (All Experience Levels)}",
+        r"\label{tab:regression_all}",
+        r"\centering",
+        r"\footnotesize",
+        rf"\begin{{tabular}}{{{col_spec}}}",
+        r"\toprule",
+        " & " + header,
+        r"\midrule",
+        rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DID)}}}} \\",
+    ]
+    # Treatment coef row
+    row = rf"\hspace{{1em}} Received Answer $\times$ Post-Answer Received & {_fmt_coef(r['treat_coef'], r['treat_p'])}"
+    if has_speed:
+        row += rf" & {_fmt_coef(s['treat_coef'], s['treat_p'])}"
+    if has_model_c:
+        row += rf" & {_fmt_coef(c['treat_coef'], c['treat_p'])}"
+    lines.append(row + r" \\")
+    # SE row
+    row = rf" & {_fmt_se(r['treat_se'])}"
+    if has_speed:
+        row += rf" & {_fmt_se(s['treat_se'])}"
+    if has_model_c:
+        row += rf" & {_fmt_se(c['treat_se'])}"
+    lines.append(row + r" \\")
+    # HR [95% CI] row
+    row = rf"\hspace{{1em}} Hazard Ratio [95\% CI] & [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]"
+    if has_speed:
+        row += r" & —"
+    if has_model_c:
+        row += rf" & [{c['treat_ci_lo']:.2f}, {c['treat_ci_hi']:.2f}]"
+    lines.append(row + r" \\[4pt]")
+
+    lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Waiting Period}}}} \\")
+    gap_coef = r.get("gap_coef", np.nan)
+    gap_p = r.get("gap_p", np.nan)
+    waiting_cell = _fmt_coef(gap_coef, gap_p) if pd.notna(gap_coef) else "—"
+    row = rf"\hspace{{1em}} Received Answer $\times$ Post-Question & {waiting_cell}"
+    if has_speed:
+        row += r" & —"
+    if has_model_c:
+        row += r" & —"
+    lines.append(row + r" \\[4pt]")
+
+    if has_speed or has_model_c:
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Response Time Interaction}}}} \\")
+        row = r"\hspace{1em} Treatment $\times$ log(Response Time) & —"
+        if has_speed:
+            row += rf" & {_fmt_coef(s['speed_coef'], s['speed_p'])}"
+        else:
+            row += r" & —"
+        if has_model_c:
+            row += rf" & {_fmt_coef(c['speed_coef'], c['speed_p'])}"
+        lines.append(row + r" \\")
+        row = r" & —"
+        if has_speed:
+            row += rf" & {_fmt_se(s['speed_se'])}"
+        if has_model_c:
+            row += rf" & {_fmt_se(c['speed_se'])}"
+        lines.append(row + (r" \\[4pt]" if not (has_model_c and "speed_sq_coef" in c) else r" \\"))
+        if has_model_c and "speed_sq_coef" in c:
+            row = r"\hspace{1em} Treatment $\times$ [log(Response Time)]$^2$ & —"
+            if has_speed:
+                row += r" & —"
+            row += rf" & {_fmt_coef(c['speed_sq_coef'], c['speed_sq_p'])}"
+            lines.append(row + r" \\")
+            row = r" & —"
+            if has_speed:
+                row += r" & —"
+            row += rf" & {_fmt_se(c.get('speed_sq_se', np.nan))}"
+            lines.append(row + r" \\[4pt]")
+
+    n_rows = int(r["n_rows"])
+    n_events = int(r["n_events"])
+    lines.append(r"\midrule")
+    row = rf"Intervals & {n_rows:,}"
+    for _ in range(n_cols - 1):
+        row += rf" & {n_rows:,}"
+    lines.append(row + r" \\")
+    row = rf"Events & {n_events:,}"
+    for _ in range(n_cols - 1):
+        row += rf" & {n_events:,}"
+    lines.append(row + r" \\")
+
+    lines += [
+        r"\bottomrule",
+        rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\footnotesize $^{{***}}p<0.001$; $^{{**}}p<0.01$; $^{{*}}p<0.05$; $^{{\dagger}}p<0.1$}} \\",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+# =====================================================================
 # Table 3: Main effect (by tenure bucket)
 # =====================================================================
 
@@ -206,8 +340,8 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
     lines.append(rf" & " + " & ".join(cells_se) + r" \\")
     lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(cells_hr) + r" \\[4pt]")
 
-    # Waiting period (placebo)
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period (Placebo)}} \\")
+    # Waiting period
+    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period}} \\")
     gap_cells = []
     gap_se_cells = []
     for _, r in df.iterrows():
@@ -286,7 +420,7 @@ def generate_speed_table(df: pd.DataFrame) -> str:
     lines.append(rf"\hspace{{1em}}Treatment $\times$ log(Response Time) & " + " & ".join(speed_cells) + r" \\")
     lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[4pt]")
 
-    # Waiting period × speed (placebo for speed)
+    # Waiting period × speed
     lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period $\times$ Response Time}} \\")
     gs_cells = []
     for _, r in df.iterrows():
@@ -321,7 +455,9 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
     df = df.dropna(subset=["treat_hr"])
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("#fafafa")
 
     x = np.arange(len(df))
     hrs = df["treat_hr"].values
@@ -331,36 +467,53 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     err_lo = hrs - ci_lo
     err_hi = ci_hi - hrs
 
-    colors = plt.cm.Blues(np.linspace(0.4, 0.85, len(df)))
+    # Single-hue gradient: deep blue to teal for clarity and print-friendly contrast
+    n_bars = len(df)
+    colors = plt.cm.viridis(np.linspace(0.25, 0.85, n_bars))  # distinct from default Blues
 
+    bar_width = 0.62
     bars = ax.bar(
-        x, hrs, width=0.65, color=colors,
-        yerr=[err_lo, err_hi], capsize=4,
-        edgecolor="white", linewidth=0.5,
-        error_kw={"linewidth": 1.2, "color": "#333333"},
+        x, hrs, width=bar_width, color=colors,
+        yerr=[err_lo, err_hi], capsize=5, error_kw={"linewidth": 1.5, "color": "#2d2d2d", "capthick": 1.2},
+        edgecolor="white", linewidth=1.0,
     )
 
-    ax.axhline(y=1.0, color="#999999", linestyle="--", linewidth=0.8, label="No effect (HR=1)")
+    # Null effect line and subtle band for reference
+    y_min = min(0.92, ci_lo.min() - 0.02)
+    y_max = max(1.35, ci_hi.max() + 0.08)
+    ax.axhspan(0.98, 1.02, color="gray", alpha=0.12, zorder=0)
+    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)", zorder=1)
+    ax.set_ylim(y_min, y_max)
+
+    # Horizontal grid for easier reading
+    ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
+    ax.set_axisbelow(True)
+
     ax.set_xticks(x)
-    ax.set_xticklabels(BUCKET_SHORT, fontsize=9)
-    ax.set_xlabel("User Tenure at Time of Question", fontsize=10)
-    ax.set_ylabel("Hazard Ratio (Receiving Answer → Helping)", fontsize=10)
-    ax.set_title("Strength of Generalized Reciprocity\nAcross User Experience", fontsize=11, fontweight="bold")
-    ax.legend(fontsize=8, loc="upper right")
+    ax.set_xticklabels(BUCKET_SHORT, fontsize=10)
+    ax.set_xlabel("User tenure at time of question", fontsize=11)
+    ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
+    ax.set_title("Strength of generalized reciprocity across user experience", fontsize=12, fontweight="bold", pad=10)
+    ax.legend(fontsize=9, loc="upper right", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=9)
 
-    # Annotate significance
+    # Value labels on top of bars
+    for i, (hr, hi) in enumerate(zip(hrs, ci_hi)):
+        ax.text(i, hi + 0.015, f"{hr:.2f}", ha="center", va="bottom", fontsize=8, fontweight="500", color="#333333")
+
+    # Significance stars above value labels
     for i, (_, r) in enumerate(df.iterrows()):
         p = r["treat_p"]
         stars = _sig_stars(p).replace("\\textdagger", "†")
         if stars:
-            ax.text(i, ci_hi[i] + 0.01, stars, ha="center", va="bottom", fontsize=9)
+            ax.text(i, ci_hi[i] + 0.055, stars, ha="center", va="bottom", fontsize=10, fontweight="bold", color="#1a1a1a")
 
     plt.tight_layout()
 
     for ext in ["eps", "png", "pdf"]:
-        fig.savefig(os.path.join(FIGURE_DIR, f"strength_rec.{ext}"), dpi=300, bbox_inches="tight")
+        fig.savefig(os.path.join(FIGURE_DIR, f"strength_rec.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"✓ Saved strength_rec.[eps/png/pdf]")
 
@@ -499,6 +652,116 @@ def generate_combined_figure(df_main: pd.DataFrame, df_speed: pd.DataFrame):
 
 
 # =====================================================================
+# Figure: Interaction effect — treatment effect by response time bin (or parametric fallback)
+# =====================================================================
+
+def generate_interaction_effect_figure(
+    df_rt_bins: pd.DataFrame = None,
+    df_model_c_all: pd.DataFrame = None,
+    df_speed_all: pd.DataFrame = None,
+):
+    """
+    Plot treatment effect (hazard ratio) by response time.
+    If df_rt_bins is provided and non-empty, plot a bar chart by bin (non-parametric).
+    Otherwise plot the parametric curve from Model C or Model B.
+    """
+    if df_rt_bins is not None and not df_rt_bins.empty and "treat_hr" in df_rt_bins.columns:
+        _plot_interaction_effect_bins(df_rt_bins)
+        return
+    # Fallback: parametric curve
+    if df_model_c_all is not None and not df_model_c_all.empty and "speed_sq_coef" in df_model_c_all.columns:
+        row = df_model_c_all.iloc[0]
+        treat = row["treat_coef"]
+        speed = row["speed_coef"]
+        speed_sq = row["speed_sq_coef"]
+        use_quadratic = True
+        title_suffix = " (Model C: linear + quadratic)"
+    elif df_speed_all is not None and not df_speed_all.empty and "speed_coef" in df_speed_all.columns:
+        row = df_speed_all.iloc[0]
+        treat = row["treat_coef"]
+        speed = row["speed_coef"]
+        speed_sq = 0.0
+        use_quadratic = False
+        title_suffix = " (Model B: linear)"
+    else:
+        print("  ⚠ Skipping interaction_effect figure: no response-time bin results or Model C/B.")
+        return
+
+    rt_hours = np.linspace(0.5, 720, 400)
+    log_rt = np.log1p(rt_hours)
+    log_hr = treat + speed * log_rt + (speed_sq * (log_rt ** 2) if use_quadratic else 0.0)
+    hr = np.exp(log_hr)
+
+    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("#fafafa")
+    ax.plot(rt_hours, hr, color="#2e7d32", linewidth=2.5, label="Predicted hazard ratio")
+    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.0, label="No effect (HR = 1)")
+    ax.fill_between(rt_hours, 1.0, hr, where=(hr >= 1.0), alpha=0.15, color="#2e7d32")
+    ax.fill_between(rt_hours, hr, 1.0, where=(hr < 1.0), alpha=0.15, color="#c62828")
+    ax.set_xlabel("Response time (hours from question to answer)", fontsize=11)
+    ax.set_ylabel("Predicted hazard ratio\n(receiving answer → helping)", fontsize=11)
+    ax.set_title("Treatment effect by response time" + title_suffix, fontsize=12, fontweight="bold", pad=10)
+    ax.set_xlim(0, rt_hours.max())
+    ax.set_ylim(min(0.92, hr.min() - 0.02), max(1.25, hr.max() + 0.03))
+    ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=9, loc="best", framealpha=0.95)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    plt.tight_layout()
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(os.path.join(FIGURE_DIR, f"interaction_effect.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"✓ Saved interaction_effect.[eps/png/pdf]")
+
+
+def _plot_interaction_effect_bins(df: pd.DataFrame):
+    """Bar chart of treatment effect (HR) by response time bin."""
+    labels = df["bucket"].tolist()
+    hrs = df["treat_hr"].values
+    ci_lo = df["treat_ci_lo"].values
+    ci_hi = df["treat_ci_hi"].values
+    err_lo = hrs - ci_lo
+    err_hi = ci_hi - hrs
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("#fafafa")
+    x = np.arange(len(df))
+    colors = plt.cm.viridis(np.linspace(0.25, 0.85, len(df)))
+    ax.bar(
+        x, hrs, width=0.65, color=colors,
+        yerr=[err_lo, err_hi], capsize=4,
+        edgecolor="white", linewidth=1.0,
+        error_kw={"linewidth": 1.2, "color": "#2d2d2d"},
+    )
+    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9, rotation=25, ha="right")
+    ax.set_xlabel("Response time (question to answer)", fontsize=11)
+    ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
+    ax.set_title("Treatment effect by response time bin", fontsize=12, fontweight="bold", pad=10)
+    y_min = min(0.92, ci_lo.min() - 0.02)
+    y_max = max(1.2, ci_hi.max() + 0.05)
+    ax.set_ylim(y_min, y_max)
+    ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=9, loc="upper right", framealpha=0.95)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    for i, (_, r) in enumerate(df.iterrows()):
+        stars = _sig_stars(r["treat_p"]).replace("\\textdagger", "†")
+        if stars:
+            ax.text(i, ci_hi[i] + 0.01, stars, ha="center", va="bottom", fontsize=9)
+    plt.tight_layout()
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(os.path.join(FIGURE_DIR, f"interaction_effect.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    print(f"✓ Saved interaction_effect.[eps/png/pdf]")
+
+
+# =====================================================================
 # Main
 # =====================================================================
 
@@ -507,6 +770,10 @@ def main():
 
     # --- Load cached results (all result CSVs live in model_cache) ---
     main_path = os.path.join(CACHE_DIR, "results_main.csv")
+    main_all_path = os.path.join(CACHE_DIR, "results_main_all.csv")
+    speed_all_path = os.path.join(CACHE_DIR, "results_speed_all.csv")
+    model_c_all_path = os.path.join(CACHE_DIR, "results_model_c_all.csv")
+    rt_bins_path = os.path.join(CACHE_DIR, "results_response_time_bins.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
 
@@ -515,6 +782,10 @@ def main():
         return
 
     df_main = pd.read_csv(main_path)
+    df_main_all = pd.read_csv(main_all_path) if os.path.exists(main_all_path) else pd.DataFrame()
+    df_speed_all = pd.read_csv(speed_all_path) if os.path.exists(speed_all_path) else pd.DataFrame()
+    df_model_c_all = pd.read_csv(model_c_all_path) if os.path.exists(model_c_all_path) else pd.DataFrame()
+    df_rt_bins = pd.read_csv(rt_bins_path) if os.path.exists(rt_bins_path) else pd.DataFrame()
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
     descriptives = {}
     if os.path.exists(desc_path):
@@ -523,6 +794,14 @@ def main():
 
     # --- Generate Tables ---
     print("\n=== Generating LaTeX Tables ===")
+
+    # Pooled regressions table (Main, Main+Speed, Main+Speed+Quadratic)
+    if not df_main_all.empty:
+        tex = generate_regression_all_table(df_main_all, df_speed_all, df_model_c_all)
+        out = os.path.join(TABLE_DIR, "regression_all.tex")
+        with open(out, "w") as f:
+            f.write(tex)
+        print(f"✓ {out}")
 
     # Table 1: Descriptive Statistics
     tex = generate_desc_stats_table(descriptives)
@@ -554,6 +833,8 @@ def main():
     if not df_speed.empty:
         generate_speed_figure(df_speed)
         generate_combined_figure(df_main, df_speed)
+
+    generate_interaction_effect_figure(df_rt_bins, df_model_c_all, df_speed_all)
 
     print("\n=== All outputs generated ===")
     print(f"Tables: {TABLE_DIR}/")

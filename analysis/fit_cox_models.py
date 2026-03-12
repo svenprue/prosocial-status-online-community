@@ -8,8 +8,9 @@ Per tenure bucket:
   Model A – Main effect (no response-time interaction)
   Model B – With response-time × treatment interaction
 
-Additional analyses:
-  - All data: one reciprocity model on all data (no tenure stratification).
+Additional analyses (pooled all data only):
+  - All data: one reciprocity model (Model A), one with speed interaction (Model B).
+  - Model C: same as B plus quadratic log(response time) and all relevant interactions.
 
 Outputs: model_cache/*.csv (and *.pkl)
 
@@ -59,6 +60,9 @@ CONTINUOUS_COVARIATES = [
     "hasAnswer_response_time_interaction",
     "treated_response_time_interaction",
     "treated_post_question_response_time_interaction",
+    "hasAnswer_response_time_sq_interaction",
+    "treated_response_time_sq_interaction",
+    "treated_post_question_response_time_sq_interaction",
 ]
 # Max rows passed to Cox fitter; if exceeded, stratified subsample to avoid nan/inf in large risk sets
 MAX_FIT_ROWS = 8_000_000
@@ -276,7 +280,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     """Load parquet files, optionally subsample, build interval dataframe."""
 
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
-    cache_version = "v3"  # bump when adding columns (v4: hasAnswer_response_time_interaction)
+    cache_version = "v3"  # bump when adding columns (v4: quadratic log_response_time terms for Model C)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}_{cache_version}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}_{cache_version}.pkl")
@@ -390,6 +394,19 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     full_df["treated_post_question_response_time_interaction"] = (
         full_df["treated_post_question"] * full_df["log_response_time"]
     )
+    # Quadratic (log response time)² and interactions for Model C
+    full_df["log_response_time_sq"] = full_df["log_response_time"] ** 2
+    full_df["hasAnswer_response_time_sq_interaction"] = np.where(
+        full_df["hasAnswer"] == 1,
+        full_df["log_response_time_sq"],
+        0.0,
+    )
+    full_df["treated_response_time_sq_interaction"] = (
+        full_df["is_treated_active"] * full_df["log_response_time_sq"]
+    )
+    full_df["treated_post_question_response_time_sq_interaction"] = (
+        full_df["treated_post_question"] * full_df["log_response_time_sq"]
+    )
 
     # Response time (hours from question to answer) and tertile bin for non-linearity analysis
     full_df["response_time_hours"] = np.where(
@@ -418,6 +435,9 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
         "hasAnswer_response_time_interaction",
         "treated_post_question_response_time_interaction",
         "treated_response_time_interaction",
+        "hasAnswer_response_time_sq_interaction",
+        "treated_post_question_response_time_sq_interaction",
+        "treated_response_time_sq_interaction",
         "tenure_bucket",
         "response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3",
     ]
@@ -525,6 +545,105 @@ COVARIATES_SPEED = COVARIATES_MAIN + [
     "treated_post_question_response_time_interaction",
 ]
 
+# Model C: linear + quadratic log(response time) and all interactions (pooled all-data only)
+COVARIATES_QUADRATIC = COVARIATES_SPEED + [
+    "hasAnswer_response_time_sq_interaction",
+    "treated_response_time_sq_interaction",
+]
+
+# Response time bins (hours) for non-parametric moderation: [0, 0.25), [0.25, 0.5), ..., [8, 12)
+RT_BIN_EDGES_HOURS = [0, 0.25, 0.5, 1, 2, 4, 8, 12]
+RT_BIN_LABELS = [
+    "0-15 min", "15-30 min", "30-60 min", "1-2 hr", "2-4 hr", "4-8 hr", "8-12 hr",
+]
+
+
+def _fit_one_rt_bin(args):
+    """
+    Worker for parallel response-time bin fits.
+    args: (label, subset_df, cache_name, use_cache)
+    Returns: (label, result_dict or None)
+    """
+    label, subset, cache_name, use_cache = args
+    n_events = int(subset["event_occurred"].sum())
+    if len(subset) < 100 or n_events < 10:
+        return (label, None)
+    res = fit_cox_cached(
+        subset, cache_name, COVARIATES_MAIN,
+        use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+    )
+    if res is None:
+        return (label, None)
+    s = res.summary_df
+    row = {
+        "bucket": label,
+        "treat_coef": s.loc["is_treated_active", "coef"],
+        "treat_se": s.loc["is_treated_active", "se(coef)"],
+        "treat_p": s.loc["is_treated_active", "p"],
+        "treat_hr": np.exp(s.loc["is_treated_active", "coef"]),
+        "treat_ci_lo": np.exp(s.loc["is_treated_active", "coef lower 95%"]),
+        "treat_ci_hi": np.exp(s.loc["is_treated_active", "coef upper 95%"]),
+        "n_rows": res.meta.get("n_rows", len(subset)),
+        "n_events": res.meta.get("n_events", n_events),
+    }
+    return (label, row)
+
+
+def fit_response_time_bin_models(
+    model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None
+) -> pd.DataFrame:
+    """
+    Fit Model A (main effect) separately for each response-time bin (pooled over tenure).
+    Each bin: treated = hasAnswer==1 and response_time_hours in [lo, hi); control = hasAnswer==0.
+    Runs in parallel when n_jobs > 1.
+    Returns a DataFrame with columns: bucket, treat_coef, treat_se, treat_p, treat_hr, treat_ci_lo, treat_ci_hi, n_rows, n_events.
+    """
+    if "response_time_hours" not in model_df.columns:
+        print("  ⚠ response_time_hours not in model_df; skipping response-time bin models.")
+        return pd.DataFrame()
+    df_full = model_df.drop(columns=["tenure_bucket"], errors="ignore").copy()
+    drop_cols = [c for c in ["response_time_bin", "treated_bin2", "treated_bin3"] if c in df_full.columns]
+    n_bins = len(RT_BIN_EDGES_HOURS) - 1
+    n_workers = n_jobs if n_jobs is not None else min(cpu_count() or 4, n_bins)
+    tasks = []
+    for i in range(n_bins):
+        lo, hi = RT_BIN_EDGES_HOURS[i], RT_BIN_EDGES_HOURS[i + 1]
+        label = RT_BIN_LABELS[i]
+        mask = (
+            (df_full["hasAnswer"] == 0)
+            | (
+                (df_full["hasAnswer"] == 1)
+                & (df_full["response_time_hours"].notna())
+                & (df_full["response_time_hours"] >= lo)
+                & (df_full["response_time_hours"] < hi)
+            )
+        )
+        subset = df_full.loc[mask].copy()
+        for c in drop_cols:
+            if c in subset.columns:
+                subset = subset.drop(columns=[c])
+        subset = subset.drop(columns=["response_time_hours"], errors="ignore")
+        cache_name = f"ModelA_AllData_RTbin_{lo}_{hi}".replace(".", "_")
+        tasks.append((label, subset, cache_name, use_cache))
+    print("\n" + "=" * 60)
+    print("  Response time bin models (Model A per bin)")
+    print("=" * 60)
+    if n_workers <= 1:
+        results = [_fit_one_rt_bin(t) for t in tasks]
+    else:
+        print(f"  Fitting {n_bins} bins in parallel (n_jobs={n_workers}) …")
+        with Pool(n_workers) as pool:
+            results = pool.map(_fit_one_rt_bin, tasks)
+    results = [r[1] for r in results if r[1] is not None]
+    results.sort(key=lambda x: RT_BIN_LABELS.index(x["bucket"]) if x["bucket"] in RT_BIN_LABELS else 999)
+    if not results:
+        return pd.DataFrame()
+    df_bins = pd.DataFrame(results)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    df_bins.to_csv(os.path.join(CACHE_DIR, "results_response_time_bins.csv"), index=False)
+    print(f"✓ Saved results_response_time_bins.csv ({len(df_bins)} bins) to {CACHE_DIR}/")
+    return df_bins
+
 
 def _fit_one_tenure_bucket(args):
     """
@@ -627,14 +746,14 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     """Fit one reciprocity model on all data (not stratified by seniority)."""
     os.makedirs(CACHE_DIR, exist_ok=True)
     subset = model_df.drop(columns=["tenure_bucket"], errors="ignore").copy()
-    # Drop response_time_bin columns if present (not in COVARIATES_MAIN/SPEED)
+    # Drop response_time_bin columns if present (not in COVARIATES_MAIN/SPEED/QUADRATIC)
     for c in ["response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3"]:
         if c in subset.columns:
             subset = subset.drop(columns=[c])
     n_events = int(subset["event_occurred"].sum())
     if len(subset) < 100 or n_events < 10:
         print("  ⚠ All data: too few rows/events, skipping.")
-        return None, None
+        return None, None, None
 
     print("\n" + "=" * 60)
     print("  All data (no tenure stratification)")
@@ -649,7 +768,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         initial_point=None,  # cold start for speed model stability
     )
     if res_a is None or res_b is None:
-        return None, None
+        return None, None, None
 
     s_a = res_a.summary_df
     s_b = res_b.summary_df
@@ -684,8 +803,47 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     os.makedirs(CACHE_DIR, exist_ok=True)
     df_main_all.to_csv(os.path.join(CACHE_DIR, "results_main_all.csv"), index=False)
     df_speed_all.to_csv(os.path.join(CACHE_DIR, "results_speed_all.csv"), index=False)
-    print(f"✓ Saved results_main_all.csv, results_speed_all.csv (All data) to {CACHE_DIR}/")
-    return df_main_all, df_speed_all
+
+    # Model C: pooled all-data with quadratic log(response time) and all interactions
+    df_model_c_all = None
+    if all(c in subset.columns for c in COVARIATES_QUADRATIC):
+        res_c = fit_cox_cached(
+            subset, "ModelC_AllData", COVARIATES_QUADRATIC,
+            use_cache=use_cache, round_to_hours=ROUND_TO_HOURS,
+            initial_point=None,
+        )
+    else:
+        res_c = None
+    if res_c is not None:
+        s_c = res_c.summary_df
+        results_model_c_all = [{
+            "model": "AllData_ModelC",
+            "n_rows": res_c.meta.get("n_rows", len(subset)),
+            "n_events": res_c.meta.get("n_events", n_events),
+            "treat_coef": s_c.loc["is_treated_active", "coef"],
+            "treat_hr": np.exp(s_c.loc["is_treated_active", "coef"]),
+            "treat_se": s_c.loc["is_treated_active", "se(coef)"],
+            "treat_p": s_c.loc["is_treated_active", "p"],
+            "treat_ci_lo": np.exp(s_c.loc["is_treated_active", "coef lower 95%"]),
+            "treat_ci_hi": np.exp(s_c.loc["is_treated_active", "coef upper 95%"]),
+            "speed_coef": s_c.loc["treated_response_time_interaction", "coef"],
+            "speed_se": s_c.loc["treated_response_time_interaction", "se(coef)"],
+            "speed_p": s_c.loc["treated_response_time_interaction", "p"],
+            "speed_sq_coef": s_c.loc["treated_response_time_sq_interaction", "coef"],
+            "speed_sq_se": s_c.loc["treated_response_time_sq_interaction", "se(coef)"],
+            "speed_sq_p": s_c.loc["treated_response_time_sq_interaction", "p"],
+            "gap_coef": s_c.loc["treated_post_question", "coef"],
+            "gap_p": s_c.loc["treated_post_question", "p"],
+            "gap_speed_coef": s_c.loc["treated_post_question_response_time_interaction", "coef"],
+            "gap_speed_p": s_c.loc["treated_post_question_response_time_interaction", "p"],
+        }]
+        df_model_c_all = pd.DataFrame(results_model_c_all)
+        df_model_c_all.to_csv(os.path.join(CACHE_DIR, "results_model_c_all.csv"), index=False)
+        print(f"✓ Saved results_main_all.csv, results_speed_all.csv, results_model_c_all.csv (All data) to {CACHE_DIR}/")
+    else:
+        print(f"✓ Saved results_main_all.csv, results_speed_all.csv (All data) to {CACHE_DIR}/")
+
+    return df_main_all, df_speed_all, df_model_c_all
 
 
 # =====================================================================
@@ -712,14 +870,24 @@ def main():
 
     df_main, df_speed = fit_all_models(model_df, use_cache=not args.no_cache, n_jobs=args.n_jobs)
 
-    # 1. One reciprocity model on all data (not stratified by seniority)
-    df_main_all, df_speed_all = fit_all_data_models(model_df, use_cache=not args.no_cache)
+    # 1. One reciprocity model on all data (not stratified by seniority) + Model C (quadratic)
+    df_main_all, df_speed_all, df_model_c_all = fit_all_data_models(model_df, use_cache=not args.no_cache)
     if df_main_all is not None:
         print("\n=== All data: Main effect ===")
         print(df_main_all.to_string(index=False))
     if df_speed_all is not None:
         print("\n=== All data: Speed interaction ===")
         print(df_speed_all.to_string(index=False))
+    if df_model_c_all is not None:
+        print("\n=== All data: Model C (quadratic log response time) ===")
+        print(df_model_c_all.to_string(index=False))
+
+    df_rt_bins = fit_response_time_bin_models(
+        model_df, use_cache=not args.no_cache, n_jobs=args.n_jobs
+    )
+    if not df_rt_bins.empty:
+        print("\n=== Response time bin models ===")
+        print(df_rt_bins.to_string(index=False))
 
     print("\n=== Main effect (by tenure bucket) ===")
     print(df_main.to_string(index=False))
