@@ -281,9 +281,10 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
 
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
     cache_version = "v3"  # bump when adding columns (v4: quadratic log_response_time terms for Model C)
+    desc_cache_version = "v2"  # bump when adding descriptive stats (v2: response_time_by_tenure_bucket)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}_{cache_version}.parquet")
-    desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}_{cache_version}.pkl")
+    desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}_{cache_version}_{desc_cache_version}.pkl")
 
     if os.path.exists(interval_cache):
         print(f"✓ Loading cached intervals from {interval_cache}")
@@ -292,6 +293,25 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
         if os.path.exists(desc_cache):
             with open(desc_cache, "rb") as f:
                 descriptives = pickle.load(f)
+        else:
+            # Recompute descriptives only (e.g. after adding new stats like response_time_by_tenure_bucket)
+            print("Recomputing descriptives (cache version bump) …")
+            timelines = pd.read_parquet(f"{input_folder}/study_timelines.parquet")
+            events = pd.read_parquet(f"{input_folder}/study_events.parquet")
+            for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days"]:
+                if col in timelines.columns:
+                    timelines[col] = timelines[col].astype(float)
+            if "t_event" in events.columns:
+                events["t_event"] = events["t_event"].astype(float)
+            timelines = create_tenure_buckets(timelines)
+            if sample_size and sample_size < timelines["match_id"].nunique():
+                ids = np.random.choice(timelines["match_id"].unique(), sample_size, replace=False)
+                timelines = timelines[timelines["match_id"].isin(ids)].copy()
+                events = events[events["match_id"].isin(ids)].copy()
+            descriptives = _compute_descriptives(timelines, events)
+            with open(desc_cache, "wb") as f:
+                pickle.dump(descriptives, f)
+            print(f"✓ Saved {desc_cache}")
         return model_df, descriptives
 
     # --- Raw load ---
@@ -503,6 +523,26 @@ def _compute_descriptives(timelines: pd.DataFrame, events: pd.DataFrame) -> dict
     desc["tenure_bucket_counts"] = (
         timelines_bucketed["tenure_bucket"].value_counts().to_dict()
     )
+
+    # Response time by tenure bucket (treated only)
+    desc["response_time_by_tenure_bucket"] = {}
+    if "tenure_bucket" in treated.columns and "t_answer" in treated.columns and "t_question" in treated.columns:
+        treated_rt = treated.copy()
+        treated_rt["rt_hours"] = treated_rt["t_answer"] - treated_rt["t_question"]
+        treated_rt = treated_rt[treated_rt["rt_hours"] > 0]
+        for bucket in BUCKET_ORDER:
+            b = treated_rt[treated_rt["tenure_bucket"] == bucket]
+            if len(b) > 0:
+                desc["response_time_by_tenure_bucket"][bucket] = {
+                    "mean": float(b["rt_hours"].mean()),
+                    "std": float(b["rt_hours"].std()) if len(b) > 1 else np.nan,
+                    "median": float(b["rt_hours"].median()),
+                    "n": len(b),
+                }
+            else:
+                desc["response_time_by_tenure_bucket"][bucket] = {
+                    "mean": np.nan, "std": np.nan, "median": np.nan, "n": 0,
+                }
 
     # Balance-related columns (store whatever matching covariates exist)
     balance_candidates = [

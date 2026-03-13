@@ -97,6 +97,8 @@ def generate_desc_stats_table(desc: dict) -> str:
     rt_med = desc.get("response_time_median_hours", "—")
 
     def _f(v, d=2):
+        if isinstance(v, (float, np.floating)) and np.isnan(v):
+            return "—"
         if isinstance(v, (int, float, np.floating, np.integer)):
             if abs(v) > 100:
                 return f"{v:,.0f}"
@@ -121,6 +123,19 @@ def generate_desc_stats_table(desc: dict) -> str:
         rf"Response time (hours, treated) & {_f(rt_mean)} & {_f(rt_std)} & {_f(rt_med)} & \\",
         r"\midrule",
     ]
+
+    # Response time by tenure bucket
+    rt_by_bucket = desc.get("response_time_by_tenure_bucket", {})
+    if rt_by_bucket:
+        lines.append(r"\multicolumn{5}{@{}l}{\textit{Response time (hours, treated) by Tenure Bucket}} \\")
+        for b in BUCKET_ORDER:
+            stats = rt_by_bucket.get(b, {})
+            mean = stats.get("mean")
+            std = stats.get("std")
+            med = stats.get("median")
+            n = stats.get("n", 0)
+            lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & {_f(mean)} & {_f(std)} & {_f(med)} & {_f(n)} \\")
+        lines.append(r"\midrule")
 
     # Tenure bucket breakdown
     bucket_counts = desc.get("tenure_bucket_counts", {})
