@@ -71,6 +71,11 @@ def _fmt_se(val: float, decimals: int = 4) -> str:
     return f"({val:.{decimals}f})"
 
 
+def _latex_bucket(label: str) -> str:
+    """Escape < and > for LaTeX math mode in table labels."""
+    return label.replace("<", r"$<$").replace(">", r"$>$")
+
+
 # =====================================================================
 # Table 1: Descriptive Statistics
 # =====================================================================
@@ -123,7 +128,7 @@ def generate_desc_stats_table(desc: dict) -> str:
         lines.append(r"\multicolumn{5}{@{}l}{\textit{Observations by Tenure Bucket}} \\")
         for b in BUCKET_ORDER:
             ct = bucket_counts.get(b, 0)
-            lines.append(rf"\hspace{{1em}} {b} & & & & {_f(ct)} \\")
+            lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & & & & {_f(ct)} \\")
 
     lines += [
         r"\bottomrule",
@@ -244,9 +249,9 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
 
     n_buckets = len(df)
 
-    # Header
+    # Header (bucket labels with < and > in math mode for LaTeX)
     col_spec = "@{}l" + "c" * n_buckets + "@{}"
-    header_labels = " & ".join(df["bucket"].tolist())
+    header_labels = " & ".join(_latex_bucket(b) for b in df["bucket"].tolist())
 
     lines = [
         r"\begin{table}[H]",
@@ -350,7 +355,7 @@ def generate_speed_table(df: pd.DataFrame) -> str:
 
     n_buckets = len(df)
     col_spec = "@{}l" + "c" * n_buckets + "@{}"
-    header_labels = " & ".join(df["bucket"].tolist())
+    header_labels = " & ".join(_latex_bucket(b) for b in df["bucket"].tolist())
 
     lines = [
         r"\begin{table}[H]",
