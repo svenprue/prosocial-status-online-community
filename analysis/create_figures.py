@@ -10,8 +10,8 @@ Outputs (written to output_tables/ and output_figures/):
   - regression_all.tex          Pooled Cox regressions (Main, Main+Speed, Main+Speed+Quad.)
   - main_results.tex            Main effect by tenure bucket (Table 3)
   - speed_results.tex           Speed interaction by tenure bucket (Table 4)
-  - strength_rec.*              Reciprocity HR by tenure bucket (Figure 2)
-  - speed_moderation.*           Speed interaction by tenure bucket (Figure 3)
+  - strength_rec.*              Reciprocity HR by tenure bucket, connected dots (Figure 2)
+  - speed_moderation.*          Speed interaction by tenure bucket (Figure 3)
   - interaction_effect.*        Predicted treatment effect by response time (pooled Model C/B)
 
 Usage:
@@ -449,7 +449,7 @@ def generate_speed_table(df: pd.DataFrame) -> str:
 
 def generate_reciprocity_figure(df: pd.DataFrame):
     """
-    Bar chart of the hazard ratio for isTreatedActive by tenure bucket,
+    Connected-dots plot of the hazard ratio for isTreatedActive by tenure bucket,
     with 95% CI error bars.
     """
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
@@ -467,15 +467,20 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     err_lo = hrs - ci_lo
     err_hi = ci_hi - hrs
 
-    # Single-hue gradient: deep blue to teal for clarity and print-friendly contrast
-    n_bars = len(df)
-    colors = plt.cm.viridis(np.linspace(0.25, 0.85, n_bars))  # distinct from default Blues
-
-    bar_width = 0.62
-    bars = ax.bar(
-        x, hrs, width=bar_width, color=colors,
-        yerr=[err_lo, err_hi], capsize=5, error_kw={"linewidth": 1.5, "color": "#2d2d2d", "capthick": 1.2},
-        edgecolor="white", linewidth=1.0,
+    # Connected dots with 95% CI error bars
+    ax.errorbar(
+        x, hrs,
+        yerr=[err_lo, err_hi],
+        fmt="o-",
+        color="#2563eb",
+        linewidth=2,
+        markersize=9,
+        capsize=5,
+        capthick=1.2,
+        ecolor="#2d2d2d",
+        elinewidth=1.5,
+        markeredgecolor="white",
+        markeredgewidth=1.0,
     )
 
     # Null effect line and subtle band for reference
@@ -499,7 +504,7 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", labelsize=9)
 
-    # Value labels on top of bars
+    # Value labels above points
     for i, (hr, hi) in enumerate(zip(hrs, ci_hi)):
         ax.text(i, hi + 0.015, f"{hr:.2f}", ha="center", va="bottom", fontsize=8, fontweight="500", color="#333333")
 
@@ -524,131 +529,69 @@ def generate_reciprocity_figure(df: pd.DataFrame):
 
 def generate_speed_figure(df: pd.DataFrame):
     """
-    Bar chart of the speed interaction coefficient by tenure bucket,
-    with SE-based error bars.
+    Connected-dots plot of the speed interaction coefficient by tenure bucket,
+    with 95% CI error bars (1.96 * SE). Matches strength_rec style for consistency.
     """
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
     df = df.dropna(subset=["speed_coef"])
 
-    fig, ax = plt.subplots(figsize=(7, 4))
+    fig, ax = plt.subplots(figsize=(8, 5))
+    fig.patch.set_facecolor("white")
+    ax.set_facecolor("#fafafa")
 
     x = np.arange(len(df))
     coefs = df["speed_coef"].values
     ses = df["speed_se"].values
+    err = 1.96 * ses
 
-    # Color bars by sign
-    colors = ["#d9534f" if c < 0 else "#5cb85c" for c in coefs]
-    # Override: use a gradient for visual clarity
-    colors_pos = plt.cm.Greens(np.linspace(0.4, 0.8, len(df)))
-    colors_neg = plt.cm.Reds(np.linspace(0.4, 0.8, len(df)))
-    bar_colors = [colors_pos[i] if c >= 0 else colors_neg[i] for i, c in enumerate(coefs)]
-
-    bars = ax.bar(
-        x, coefs, width=0.65, color=bar_colors,
-        yerr=1.96 * ses, capsize=4,
-        edgecolor="white", linewidth=0.5,
-        error_kw={"linewidth": 1.2, "color": "#333333"},
+    ax.errorbar(
+        x, coefs,
+        yerr=err,
+        fmt="o-",
+        color="#059669",
+        linewidth=2,
+        markersize=9,
+        capsize=5,
+        capthick=1.2,
+        ecolor="#2d2d2d",
+        elinewidth=1.5,
+        markeredgecolor="white",
+        markeredgewidth=1.0,
     )
 
-    ax.axhline(y=0, color="#999999", linestyle="--", linewidth=0.8)
+    ax.axhline(y=0, color="#555555", linestyle="--", linewidth=1.2, label="No moderation (coef = 0)", zorder=0)
+    ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
+    ax.set_axisbelow(True)
+
     ax.set_xticks(x)
-    ax.set_xticklabels(BUCKET_SHORT, fontsize=9)
-    ax.set_xlabel("User Tenure at Time of Question", fontsize=10)
-    ax.set_ylabel("Coefficient: Treatment × log(Response Time)", fontsize=10)
-    ax.set_title("Response Time Moderation of Reciprocity\nAcross User Experience", fontsize=11, fontweight="bold")
+    ax.set_xticklabels(BUCKET_SHORT, fontsize=10)
+    ax.set_xlabel("User tenure at time of question", fontsize=11)
+    ax.set_ylabel("Coefficient: Treatment × log(Response Time)", fontsize=11)
+    ax.set_title("Response time moderation of reciprocity across user experience", fontsize=12, fontweight="bold", pad=10)
+    ax.legend(fontsize=9, loc="best", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=9)
 
-    # Annotate significance
+    # Y limits with headroom for labels
+    y_margin = max(0.015, err.max() + 0.01)
+    ax.set_ylim(coefs.min() - y_margin - err[np.argmin(coefs)], coefs.max() + y_margin + err[np.argmax(coefs)])
+
+    # Significance stars above/below error bars
     for i, (_, r) in enumerate(df.iterrows()):
         p = r["speed_p"]
         stars = _sig_stars(p).replace("\\textdagger", "†")
         if stars:
-            y_pos = coefs[i] + 1.96 * ses[i] + 0.002 if coefs[i] >= 0 else coefs[i] - 1.96 * ses[i] - 0.002
+            y_pos = coefs[i] + err[i] + 0.008 if coefs[i] >= 0 else coefs[i] - err[i] - 0.008
             va = "bottom" if coefs[i] >= 0 else "top"
-            ax.text(i, y_pos, stars, ha="center", va=va, fontsize=9)
-
-    # Add interpretive annotation
-    ax.annotate(
-        "Positive = longer wait\nincreases reciprocity",
-        xy=(0.98, 0.95), xycoords="axes fraction",
-        ha="right", va="top", fontsize=7, fontstyle="italic",
-        color="#555555",
-    )
+            ax.text(i, y_pos, stars, ha="center", va=va, fontsize=10, fontweight="bold", color="#1a1a1a")
 
     plt.tight_layout()
 
     for ext in ["eps", "png", "pdf"]:
-        fig.savefig(os.path.join(FIGURE_DIR, f"speed_moderation.{ext}"), dpi=300, bbox_inches="tight")
+        fig.savefig(os.path.join(FIGURE_DIR, f"speed_moderation.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"✓ Saved speed_moderation.[eps/png/pdf]")
-
-
-# =====================================================================
-# Combined Figure: Reciprocity + Speed side by side
-# =====================================================================
-
-def generate_combined_figure(df_main: pd.DataFrame, df_speed: pd.DataFrame):
-    """Side-by-side panels for the paper."""
-    df_m = df_main.set_index("bucket").reindex(BUCKET_ORDER).reset_index().dropna(subset=["treat_hr"])
-    df_s = df_speed.set_index("bucket").reindex(BUCKET_ORDER).reset_index().dropna(subset=["speed_coef"])
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4.5))
-
-    # --- Panel A: Reciprocity HR ---
-    x = np.arange(len(df_m))
-    hrs = df_m["treat_hr"].values
-    ci_lo = df_m["treat_ci_lo"].values
-    ci_hi = df_m["treat_ci_hi"].values
-
-    colors = plt.cm.Blues(np.linspace(0.4, 0.85, len(df_m)))
-    ax1.bar(x, hrs, width=0.65, color=colors,
-            yerr=[hrs - ci_lo, ci_hi - hrs], capsize=4,
-            edgecolor="white", linewidth=0.5,
-            error_kw={"linewidth": 1.2, "color": "#333333"})
-    ax1.axhline(y=1.0, color="#999999", linestyle="--", linewidth=0.8)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(BUCKET_SHORT, fontsize=8, rotation=30, ha="right")
-    ax1.set_ylabel("Hazard Ratio", fontsize=10)
-    ax1.set_title("(A) Reciprocity Effect", fontsize=11, fontweight="bold")
-    ax1.spines["top"].set_visible(False)
-    ax1.spines["right"].set_visible(False)
-
-    for i, (_, r) in enumerate(df_m.iterrows()):
-        stars = _sig_stars(r["treat_p"]).replace("\\textdagger", "†")
-        if stars:
-            ax1.text(i, ci_hi[i] + 0.005, stars, ha="center", va="bottom", fontsize=8)
-
-    # --- Panel B: Speed interaction ---
-    x2 = np.arange(len(df_s))
-    coefs = df_s["speed_coef"].values
-    ses = df_s["speed_se"].values
-    bar_colors = ["#5cb85c" if c >= 0 else "#d9534f" for c in coefs]
-
-    ax2.bar(x2, coefs, width=0.65, color=bar_colors,
-            yerr=1.96 * ses, capsize=4,
-            edgecolor="white", linewidth=0.5,
-            error_kw={"linewidth": 1.2, "color": "#333333"})
-    ax2.axhline(y=0, color="#999999", linestyle="--", linewidth=0.8)
-    ax2.set_xticks(x2)
-    ax2.set_xticklabels(BUCKET_SHORT, fontsize=8, rotation=30, ha="right")
-    ax2.set_ylabel("Interaction Coefficient", fontsize=10)
-    ax2.set_title("(B) Response Time Moderation", fontsize=11, fontweight="bold")
-    ax2.spines["top"].set_visible(False)
-    ax2.spines["right"].set_visible(False)
-
-    for i, (_, r) in enumerate(df_s.iterrows()):
-        stars = _sig_stars(r["speed_p"]).replace("\\textdagger", "†")
-        if stars:
-            y = coefs[i] + 1.96 * ses[i] + 0.001 if coefs[i] >= 0 else coefs[i] - 1.96 * ses[i] - 0.001
-            va = "bottom" if coefs[i] >= 0 else "top"
-            ax2.text(i, y, stars, ha="center", va=va, fontsize=8)
-
-    plt.tight_layout()
-    for ext in ["eps", "png", "pdf"]:
-        fig.savefig(os.path.join(FIGURE_DIR, f"combined_results.{ext}"), dpi=300, bbox_inches="tight")
-    plt.close(fig)
-    print(f"✓ Saved combined_results.[eps/png/pdf]")
 
 
 # =====================================================================
@@ -692,13 +635,13 @@ def generate_interaction_effect_figure(
     log_hr = treat + speed * log_rt + (speed_sq * (log_rt ** 2) if use_quadratic else 0.0)
     hr = np.exp(log_hr)
 
-    fig, ax = plt.subplots(figsize=(7, 4.5))
+    fig, ax = plt.subplots(figsize=(8, 5))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("#fafafa")
-    ax.plot(rt_hours, hr, color="#2e7d32", linewidth=2.5, label="Predicted hazard ratio")
-    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.0, label="No effect (HR = 1)")
-    ax.fill_between(rt_hours, 1.0, hr, where=(hr >= 1.0), alpha=0.15, color="#2e7d32")
-    ax.fill_between(rt_hours, hr, 1.0, where=(hr < 1.0), alpha=0.15, color="#c62828")
+    ax.plot(rt_hours, hr, color="#2563eb", linewidth=2.5, label="Predicted hazard ratio")
+    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)", zorder=1)
+    ax.fill_between(rt_hours, 1.0, hr, where=(hr >= 1.0), alpha=0.15, color="#2563eb", zorder=0)
+    ax.fill_between(rt_hours, hr, 1.0, where=(hr < 1.0), alpha=0.15, color="#c62828", zorder=0)
     ax.set_xlabel("Response time (hours from question to answer)", fontsize=11)
     ax.set_ylabel("Predicted hazard ratio\n(receiving answer → helping)", fontsize=11)
     ax.set_title("Treatment effect by response time" + title_suffix, fontsize=12, fontweight="bold", pad=10)
@@ -709,6 +652,7 @@ def generate_interaction_effect_figure(
     ax.legend(fontsize=9, loc="best", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=9)
     plt.tight_layout()
     for ext in ["eps", "png", "pdf"]:
         fig.savefig(os.path.join(FIGURE_DIR, f"interaction_effect.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
@@ -717,7 +661,7 @@ def generate_interaction_effect_figure(
 
 
 def _plot_interaction_effect_bins(df: pd.DataFrame):
-    """Points and line of treatment effect (HR) by response time bin."""
+    """Connected dots and line for treatment effect (HR) by response time bin."""
     labels = df["bucket"].tolist()
     hrs = df["treat_hr"].values
     ci_lo = df["treat_ci_lo"].values
@@ -733,32 +677,36 @@ def _plot_interaction_effect_bins(df: pd.DataFrame):
         x, hrs,
         yerr=[err_lo, err_hi],
         fmt="o-",
-        color="#2e7d32",
+        color="#2563eb",
         linewidth=2,
-        markersize=8,
-        capsize=4,
+        markersize=9,
+        capsize=5,
         capthick=1.2,
         ecolor="#2d2d2d",
-        elinewidth=1.2,
+        elinewidth=1.5,
+        markeredgecolor="white",
+        markeredgewidth=1.0,
     )
-    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)")
+    ax.axhspan(0.98, 1.02, color="gray", alpha=0.12, zorder=0)
+    ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)", zorder=1)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, fontsize=9, rotation=25, ha="right")
     ax.set_xlabel("Response time (question to answer)", fontsize=11)
     ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
     ax.set_title("Treatment effect by response time bin", fontsize=12, fontweight="bold", pad=10)
     y_min = min(0.92, ci_lo.min() - 0.02)
-    y_max = max(1.2, ci_hi.max() + 0.05)
+    y_max = max(1.2, ci_hi.max() + 0.06)
     ax.set_ylim(y_min, y_max)
     ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
     ax.set_axisbelow(True)
     ax.legend(fontsize=9, loc="upper right", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.tick_params(axis="both", labelsize=9)
     for i, (_, r) in enumerate(df.iterrows()):
         stars = _sig_stars(r["treat_p"]).replace("\\textdagger", "†")
         if stars:
-            ax.text(i, ci_hi[i] + 0.01, stars, ha="center", va="bottom", fontsize=9)
+            ax.text(i, ci_hi[i] + 0.015, stars, ha="center", va="bottom", fontsize=10, fontweight="bold", color="#1a1a1a")
     plt.tight_layout()
     for ext in ["eps", "png", "pdf"]:
         fig.savefig(os.path.join(FIGURE_DIR, f"interaction_effect.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
@@ -837,7 +785,6 @@ def main():
 
     if not df_speed.empty:
         generate_speed_figure(df_speed)
-        generate_combined_figure(df_main, df_speed)
 
     generate_interaction_effect_figure(df_rt_bins, df_model_c_all, df_speed_all)
 

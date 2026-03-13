@@ -431,13 +431,9 @@ Figure~\ref{fig:help_rate_2panel} plots the normalized help rate for treated and
 \subsection{Generalized Reciprocity Effect (H1)}
 %----------------------------------------------------------------------
 
-Table~\ref{tab:regression_all} presents three pooled Cox models estimated on the full matched sample. The primary coefficient of interest---\textit{Received Answer $\times$ Post-Answer Received}---captures the additional lift in helping hazard for treated users after receiving an answer, net of any difference during the waiting period and relative to matched controls.
+\input{../analysis/output_tables/regression_all.tex}
 
-\input{../analysis/output_tables/regression_all}
-
-In the baseline model (Column~1), this coefficient is 0.1102 (SE\,=\,0.0081, $p < .001$), corresponding to a hazard ratio of approximately 1.11 (95\% CI\,=\,[1.10, 1.13]): receiving an answer increases the instantaneous rate of helping by roughly 11\%. The waiting period coefficient (\textit{Received Answer $\times$ Post-Question}) is indistinguishable from zero, confirming that the boost in helping is attributable to the arrival of the answer rather than to the act of asking itself. These results support Hypothesis~1.
-
-Columns~2 and~3 augment the model with response time interactions. Adding a linear interaction between treatment and log response time (Column~2) reduces the base treatment coefficient to 0.0652 (SE\,=\,0.0064, $p < .001$), with a positive and significant linear interaction ($\gamma = 0.0115$, SE\,=\,0.0023, $p < .001$). Column~3 further adds a quadratic term, which is positive and highly significant ($\gamma^2 = 0.0240$, SE\,=\,0.0028, $p < .001$), while the linear term becomes negligible ($\gamma = -0.0034$, $p > .10$). The significant quadratic term indicates a nonlinear relationship between response time and the treatment effect that we examine in detail under Hypothesis~3.
+Table~\ref{tab:pooled_experienced} presents the pooled Cox model estimates for experienced users (tenure $>$ 1 week). The coefficient on \textit{Received Answer $\times$ Post-Answer Received}---which captures the additional lift in helping hazard for treated users after receiving an answer, relative to matched controls---is positive and highly statistically significant ($p < .001$). The estimated hazard ratio is 1.116, indicating an approximately 11.6\% increase in the instantaneous rate of helping after receiving an answer. The waiting period coefficients (\textit{Received Answer $\times$ Post-Question}) are effectively zero, confirming that the lift in helping is attributable specifically to the arrival of the answer rather than to the act of asking itself. These results provide strong support for Hypothesis~1: receiving help increases a user's propensity to help others on the platform.
 
 %----------------------------------------------------------------------
 \subsection{Experience Moderation of Reciprocity (H2)}
