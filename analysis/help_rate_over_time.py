@@ -12,11 +12,11 @@ Continuous treatment: one figure with 7 tenure panels, 0–12h, joint legend.
   - Vertical line at TQ (question time = 0); for treated, median answer time (TAT_A).
   - 95% CI error bars from Poisson SE: SE(rate) = sqrt(rate / exposure).
 
-Outputs:
-  - help_rate_pooled.eps/.png/.pdf   — Pooled help rate (all tenure buckets).
-  - help_rate_by_tenure.eps/.png/.pdf — Small multiples by tenure bucket (appendix).
-  - help_rate_adoption_pooled.eps/.png/.pdf — Adoption help rate pooled over all tenure (single panel, 0–12h).
-  - help_rate_adoption_by_tenure.eps/.png/.pdf — Continuous treatment adoption, 7 panels, 0–12h, joint legend.
+Outputs (file names match manuscript includegraphics paths):
+  - help_rate_pooled.*       — Help rate over ±2-day window, pooled (fig:help_rate_2panel).
+  - help_rate_by_tenure.*    — Help rate by tenure bucket, small multiples (fig:help_rate_by_tenure, appendix).
+  - help_rate_adoption_pooled.* — Help rate by answer-receipt status, pooled (fig:help_rate_adoption_pooled).
+  - help_rate_adoption_by_tenure.* — Help rate by adoption status, by tenure (fig:help_rate_adoption_by_tenure, appendix).
 
 Usage:
     python help_rate_over_time.py [--input ../data/event_history] [--sample 200000]
@@ -472,7 +472,7 @@ def plot_help_rate_pooled(
     fig, ax = plt.subplots(figsize=(8, 4.5))
     plot_help_rate_one_panel(
         ax, rates_df, timelines,
-        tenure_label="All tenure buckets (pooled)",
+        tenure_label="Help rate over the ±2-day observation window (pooled)",
         tenure_bucket_or_buckets=BUCKET_ORDER,
         use_normalized=use_normalized,
         median_ta_hours=median_ta,
@@ -634,7 +634,7 @@ def plot_adoption_pooled(
     fig, ax = plt.subplots(figsize=(8, 4.5))
     _plot_adoption_one_panel(
         ax, rates, timelines, show_ci,
-        title="All tenure buckets (pooled)",
+        title="Help rate in the post-question window by answer-receipt status (pooled)",
         show_legend=True,
         show_share_ylabel=True,
         xlim_hours=(0, time_max_hours),

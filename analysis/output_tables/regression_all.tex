@@ -1,27 +1,25 @@
 \begin{table}[H]
 \caption{Pooled Cox Regressions (All Experience Levels)}
-\label{tab:regression_all}
+\label{tab:pooled_experienced}
 \centering
 \footnotesize
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcc@{}}
 \toprule
- & \textbf{Main} & \textbf{Main + Speed} & \textbf{Main + Speed + Quad.} \\
+ & \textbf{Main} & \textbf{Main + Speed} \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Treatment Effect (DID)}} \\
-\hspace{1em} Received Answer $\times$ Post-Answer Received & 0.1102*** & 0.0652*** & 0.0689*** \\
- & (0.0081) & (0.0064) & (0.0065) \\
-\hspace{1em} Hazard Ratio [95\% CI] & [1.10, 1.13] & — & [1.06, 1.08] \\[4pt]
-\multicolumn{4}{@{}l}{\textit{Waiting Period}} \\
-\hspace{1em} Received Answer $\times$ Post-Question & -0.0000 & — & — \\[4pt]
-\multicolumn{4}{@{}l}{\textit{Response Time Interaction}} \\
-\hspace{1em} Treatment $\times$ log(Response Time) & — & 0.0115*** & -0.0034 \\
- & — & (0.0023) & (0.0028) \\
-\hspace{1em} Treatment $\times$ [log(Response Time)]$^2$ & — & — & 0.0240*** \\
- & — & — & (0.0028) \\[4pt]
+\multicolumn{3}{@{}l}{\textit{Treatment Effect (DID)}} \\
+\hspace{1em} Received Answer $\times$ Post-Answer Received & 0.1102*** & 0.0652*** \\
+ & (0.0081) & (0.0064) \\
+\hspace{1em} Hazard Ratio [95\% CI] & [1.10, 1.13] & — \\[4pt]
+\multicolumn{3}{@{}l}{\textit{Waiting Period}} \\
+\hspace{1em} Received Answer $\times$ Post-Question & -0.0000 & — \\[4pt]
+\multicolumn{3}{@{}l}{\textit{Response Time Interaction}} \\
+\hspace{1em} Treatment $\times$ log(Response Time) & — & 0.0115*** \\
+ & — & (0.0023) \\[4pt]
 \midrule
-Intervals & 8,001,064 & 8,001,064 & 8,001,064 \\
-Events & 263,855 & 263,855 & 263,855 \\
+Intervals & 8,001,064 & 8,001,064 \\
+Events & 263,855 & 263,855 \\
 \bottomrule
-\multicolumn{4}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\
+\multicolumn{3}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\
 \end{tabular}
 \end{table}

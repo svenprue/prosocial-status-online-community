@@ -441,7 +441,9 @@ Table~\ref{tab:pooled_experienced} presents the pooled Cox model estimates for e
 
 To test Hypothesis~2, we estimate the Cox model separately for each of seven tenure buckets. Table~\ref{tab:main_results} reports the estimates and Figure~\ref{fig:strength_rec} plots the corresponding hazard ratios.
 
+\begin{landscape}
 \input{../analysis/output_tables/main_results}
+\end{landscape}
 
 \begin{figure}[H]
 \centering
@@ -458,9 +460,11 @@ The reciprocity effect is statistically significant across all seven tenure buck
 
 Hypothesis~3 predicted that faster responses would strengthen the reciprocity effect. Table~\ref{tab:speed_results} reports the interaction between the treatment effect and log response time, estimated separately by tenure bucket. The results do not support this prediction. Instead, they reveal an unanticipated pattern that is heterogeneous across experience levels and nonlinear in the pooled data.
 
+\begin{landscape}
 \input{../analysis/output_tables/speed_results}
+\end{landscape}
 
-\paragraph{Pooled nonlinear pattern.} Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For questions answered within one hour---the fastest responses---the treatment effect is indistinguishable from zero across all three short bins (0--15 min, 15--30 min, 30--60 min; all HRs $\approx$ 1.00, $p > .10$). The effect rises sharply for questions answered in one to two hours (HR\,$\approx$\,1.11, $p < .001$) and remains elevated through the two-to-four-hour (HR\,$\approx$\,1.10, $p < .001$) and four-to-eight-hour bins (HR\,$\approx$\,1.10, $p < .001$), before attenuating for the longest delays (8--12 hours; HR\,$\approx$\,1.05, $p > .10$). This inverted-U shape in the pooled data is consistent with the significant quadratic term in Column~3 of Table~\ref{tab:regression_all}.
+\paragraph{Pooled nonlinear pattern.} Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For questions answered within one hour---the fastest responses---the treatment effect is indistinguishable from zero across all three short bins (0--15 min, 15--30 min, 30--60 min; all HRs $\approx$ 1.00, $p > .10$). The effect rises sharply for questions answered in one to two hours (HR\,$\approx$\,1.11, $p < .001$) and remains elevated through the two-to-four-hour (HR\,$\approx$\,1.10, $p < .001$) and four-to-eight-hour bins (HR\,$\approx$\,1.10, $p < .001$), before attenuating for the longest delays (8--12 hours; HR\,$\approx$\,1.05, $p > .10$). This inverted-U shape is evident in the pooled data in Figure~\ref{fig:interaction_effect}.
 
 \begin{figure}[H]
 \centering

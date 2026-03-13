@@ -6,13 +6,13 @@ Loads cached model results and descriptive statistics produced by fit_cox_models
 and figures for the paper's Results section.
 
 Outputs (written to output_tables/ and output_figures/):
-  - desc_stats.tex              Descriptive statistics (Table 2)
-  - regression_all.tex          Pooled Cox regressions (Main, Main+Speed, Main+Speed+Quad.)
-  - main_results.tex            Main effect by tenure bucket (Table 3)
-  - speed_results.tex           Speed interaction by tenure bucket (Table 4)
-  - strength_rec.*              Reciprocity HR by tenure bucket, connected dots (Figure 2)
-  - speed_moderation.*          Speed interaction by tenure bucket (Figure 3)
-  - interaction_effect.*        Predicted treatment effect by response time (pooled Model C/B)
+  - desc_stats.tex              Descriptive statistics (tab:desc_stats)
+  - regression_all.tex          Pooled Cox regressions for experienced users (tab:pooled_experienced)
+  - main_results.tex            Main effect by tenure bucket (tab:main_results)
+  - speed_results.tex           Response time moderation by tenure bucket (tab:speed_results)
+  - strength_rec.*              Strength of reciprocity across experience (fig:strength_rec)
+  - speed_moderation.*          Response time moderation by tenure (appendix)
+  - interaction_effect.*       Treatment effect by response time bin, pooled (fig:interaction_effect)
 
 Usage:
     python create_figures.py
@@ -134,17 +134,16 @@ def generate_desc_stats_table(desc: dict) -> str:
 
 
 # =====================================================================
-# Table: Pooled regressions (regression_all.tex) — Main, Main+Speed, Main+Speed+Quadratic
+# Table: Pooled regressions (regression_all.tex) — Main, Main+Speed
 # =====================================================================
 
 def generate_regression_all_table(
     df_main_all: pd.DataFrame,
     df_speed_all: pd.DataFrame = None,
-    df_model_c_all: pd.DataFrame = None,
 ) -> str:
     """
     Generate LaTeX table for pooled Cox regressions (all experience levels).
-    Columns: Main; Main + Speed (linear RT interaction); Main + Speed + Quadratic (Model C).
+    Columns: Main; Main + Speed (linear RT interaction).
     """
     if df_main_all.empty or "treat_coef" not in df_main_all.columns:
         return ""
@@ -154,27 +153,19 @@ def generate_regression_all_table(
         and not df_speed_all.empty
         and "speed_coef" in df_speed_all.columns
     )
-    has_model_c = (
-        df_model_c_all is not None
-        and not df_model_c_all.empty
-        and "speed_coef" in df_model_c_all.columns
-    )
     s = df_speed_all.iloc[0] if has_speed else None
-    c = df_model_c_all.iloc[0] if has_model_c else None
 
-    n_cols = 1 + int(has_speed) + int(has_model_c)
+    n_cols = 1 + int(has_speed)
     col_spec = "@{}l" + "c" * n_cols + "@{}"
     header_cells = [r"\textbf{Main}"]
     if has_speed:
         header_cells.append(r"\textbf{Main + Speed}")
-    if has_model_c:
-        header_cells.append(r"\textbf{Main + Speed + Quad.}")
     header = " & ".join(header_cells) + r" \\"
 
     lines = [
         r"\begin{table}[H]",
         r"\caption{Pooled Cox Regressions (All Experience Levels)}",
-        r"\label{tab:regression_all}",
+        r"\label{tab:pooled_experienced}",
         r"\centering",
         r"\footnotesize",
         rf"\begin{{tabular}}{{{col_spec}}}",
@@ -187,22 +178,16 @@ def generate_regression_all_table(
     row = rf"\hspace{{1em}} Received Answer $\times$ Post-Answer Received & {_fmt_coef(r['treat_coef'], r['treat_p'])}"
     if has_speed:
         row += rf" & {_fmt_coef(s['treat_coef'], s['treat_p'])}"
-    if has_model_c:
-        row += rf" & {_fmt_coef(c['treat_coef'], c['treat_p'])}"
     lines.append(row + r" \\")
     # SE row
     row = rf" & {_fmt_se(r['treat_se'])}"
     if has_speed:
         row += rf" & {_fmt_se(s['treat_se'])}"
-    if has_model_c:
-        row += rf" & {_fmt_se(c['treat_se'])}"
     lines.append(row + r" \\")
     # HR [95% CI] row
     row = rf"\hspace{{1em}} Hazard Ratio [95\% CI] & [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]"
     if has_speed:
         row += r" & —"
-    if has_model_c:
-        row += rf" & [{c['treat_ci_lo']:.2f}, {c['treat_ci_hi']:.2f}]"
     lines.append(row + r" \\[4pt]")
 
     lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Waiting Period}}}} \\")
@@ -212,37 +197,16 @@ def generate_regression_all_table(
     row = rf"\hspace{{1em}} Received Answer $\times$ Post-Question & {waiting_cell}"
     if has_speed:
         row += r" & —"
-    if has_model_c:
-        row += r" & —"
     lines.append(row + r" \\[4pt]")
 
-    if has_speed or has_model_c:
+    if has_speed:
         lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Response Time Interaction}}}} \\")
         row = r"\hspace{1em} Treatment $\times$ log(Response Time) & —"
-        if has_speed:
-            row += rf" & {_fmt_coef(s['speed_coef'], s['speed_p'])}"
-        else:
-            row += r" & —"
-        if has_model_c:
-            row += rf" & {_fmt_coef(c['speed_coef'], c['speed_p'])}"
+        row += rf" & {_fmt_coef(s['speed_coef'], s['speed_p'])}"
         lines.append(row + r" \\")
         row = r" & —"
-        if has_speed:
-            row += rf" & {_fmt_se(s['speed_se'])}"
-        if has_model_c:
-            row += rf" & {_fmt_se(c['speed_se'])}"
-        lines.append(row + (r" \\[4pt]" if not (has_model_c and "speed_sq_coef" in c) else r" \\"))
-        if has_model_c and "speed_sq_coef" in c:
-            row = r"\hspace{1em} Treatment $\times$ [log(Response Time)]$^2$ & —"
-            if has_speed:
-                row += r" & —"
-            row += rf" & {_fmt_coef(c['speed_sq_coef'], c['speed_sq_p'])}"
-            lines.append(row + r" \\")
-            row = r" & —"
-            if has_speed:
-                row += r" & —"
-            row += rf" & {_fmt_se(c.get('speed_sq_se', np.nan))}"
-            lines.append(row + r" \\[4pt]")
+        row += rf" & {_fmt_se(s['speed_se'])}"
+        lines.append(row + r" \\[4pt]")
 
     n_rows = int(r["n_rows"])
     n_events = int(r["n_events"])
@@ -498,7 +462,7 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     ax.set_xticklabels(BUCKET_SHORT, fontsize=10)
     ax.set_xlabel("User tenure at time of question", fontsize=11)
     ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
-    ax.set_title("Strength of generalized reciprocity across user experience", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Strength of the generalized reciprocity effect across user experience", fontsize=12, fontweight="bold", pad=10)
     ax.legend(fontsize=9, loc="upper right", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -567,7 +531,7 @@ def generate_speed_figure(df: pd.DataFrame):
     ax.set_xticklabels(BUCKET_SHORT, fontsize=10)
     ax.set_xlabel("User tenure at time of question", fontsize=11)
     ax.set_ylabel("Coefficient: Treatment × log(Response Time)", fontsize=11)
-    ax.set_title("Response time moderation of reciprocity across user experience", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Response time moderation of the reciprocity effect across user experience", fontsize=12, fontweight="bold", pad=10)
     ax.legend(fontsize=9, loc="best", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -644,7 +608,7 @@ def generate_interaction_effect_figure(
     ax.fill_between(rt_hours, hr, 1.0, where=(hr < 1.0), alpha=0.15, color="#c62828", zorder=0)
     ax.set_xlabel("Response time (hours from question to answer)", fontsize=11)
     ax.set_ylabel("Predicted hazard ratio\n(receiving answer → helping)", fontsize=11)
-    ax.set_title("Treatment effect by response time" + title_suffix, fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Treatment effect (hazard ratio) by response time, pooled" + title_suffix, fontsize=12, fontweight="bold", pad=10)
     ax.set_xlim(0, rt_hours.max())
     ax.set_ylim(min(0.92, hr.min() - 0.02), max(1.25, hr.max() + 0.03))
     ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
@@ -693,7 +657,7 @@ def _plot_interaction_effect_bins(df: pd.DataFrame):
     ax.set_xticklabels(labels, fontsize=9, rotation=25, ha="right")
     ax.set_xlabel("Response time (question to answer)", fontsize=11)
     ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
-    ax.set_title("Treatment effect by response time bin", fontsize=12, fontweight="bold", pad=10)
+    ax.set_title("Treatment effect (hazard ratio) by response time bin, pooled across tenure", fontsize=12, fontweight="bold", pad=10)
     y_min = min(0.92, ci_lo.min() - 0.02)
     y_max = max(1.2, ci_hi.max() + 0.06)
     ax.set_ylim(y_min, y_max)
@@ -748,9 +712,9 @@ def main():
     # --- Generate Tables ---
     print("\n=== Generating LaTeX Tables ===")
 
-    # Pooled regressions table (Main, Main+Speed, Main+Speed+Quadratic)
+    # Pooled regressions table (Main, Main+Speed)
     if not df_main_all.empty:
-        tex = generate_regression_all_table(df_main_all, df_speed_all, df_model_c_all)
+        tex = generate_regression_all_table(df_main_all, df_speed_all)
         out = os.path.join(TABLE_DIR, "regression_all.tex")
         with open(out, "w") as f:
             f.write(tex)
