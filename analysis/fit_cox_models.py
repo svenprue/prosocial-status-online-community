@@ -606,6 +606,7 @@ def _fit_one_rt_bin(args):
     """
     label, subset, cache_name, use_cache = args
     n_events = int(subset["event_occurred"].sum())
+    n_questions = int(subset["unique_id"].nunique())
     if len(subset) < 100 or n_events < 10:
         return (label, None)
     res = fit_cox_cached(
@@ -624,6 +625,7 @@ def _fit_one_rt_bin(args):
         "treat_ci_lo": np.exp(s.loc["is_treated_active", "coef lower 95%"]),
         "treat_ci_hi": np.exp(s.loc["is_treated_active", "coef upper 95%"]),
         "n_rows": res.meta.get("n_rows", len(subset)),
+        "n_questions": n_questions,
         "n_events": res.meta.get("n_events", n_events),
     }
     return (label, row)
@@ -636,7 +638,7 @@ def fit_response_time_bin_models(
     Fit Model A (main effect) separately for each response-time bin (pooled over tenure).
     Each bin: treated = hasAnswer==1 and response_time_hours in [lo, hi); control = hasAnswer==0.
     Runs in parallel when n_jobs > 1.
-    Returns a DataFrame with columns: bucket, treat_coef, treat_se, treat_p, treat_hr, treat_ci_lo, treat_ci_hi, n_rows, n_events.
+    Returns a DataFrame with columns: bucket, treat_coef, treat_se, treat_p, treat_hr, treat_ci_lo, treat_ci_hi, n_rows, n_questions, n_events.
     """
     if "response_time_hours" not in model_df.columns:
         print("  ⚠ response_time_hours not in model_df; skipping response-time bin models.")
@@ -696,6 +698,7 @@ def _fit_one_tenure_bucket(args):
     if "tenure_bucket" in subset.columns:
         subset = subset.drop(columns=["tenure_bucket"])
     n_events = int(subset["event_occurred"].sum())
+    n_questions = int(subset["unique_id"].nunique())
     if len(subset) < 100 or n_events < 10:
         return (bucket, None, None)
 
@@ -710,6 +713,7 @@ def _fit_one_tenure_bucket(args):
     main_row = {
         "bucket": bucket,
         "n_rows": res_a.meta.get("n_rows", len(subset)),
+        "n_questions": n_questions,
         "n_events": res_a.meta.get("n_events", n_events),
         "treat_coef": s_a.loc["is_treated_active", "coef"],
         "treat_hr": np.exp(s_a.loc["is_treated_active", "coef"]),
@@ -737,6 +741,7 @@ def _fit_one_tenure_bucket(args):
     speed_row = {
         "bucket": bucket,
         "n_rows": res_b.meta.get("n_rows", len(subset)),
+        "n_questions": n_questions,
         "n_events": res_b.meta.get("n_events", n_events),
         "treat_coef": s_b.loc["is_treated_active", "coef"],
         "treat_hr": np.exp(s_b.loc["is_treated_active", "coef"]),
@@ -791,6 +796,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         if c in subset.columns:
             subset = subset.drop(columns=[c])
     n_events = int(subset["event_occurred"].sum())
+    n_questions = int(subset["unique_id"].nunique())
     if len(subset) < 100 or n_events < 10:
         print("  ⚠ All data: too few rows/events, skipping.")
         return None, None, None
@@ -815,6 +821,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     results_main_all = [{
         "model": "AllData_Main",
         "n_rows": res_a.meta.get("n_rows", len(subset)),
+        "n_questions": n_questions,
         "n_events": res_a.meta.get("n_events", n_events),
         "treat_coef": s_a.loc["is_treated_active", "coef"],
         "treat_hr": np.exp(s_a.loc["is_treated_active", "coef"]),
@@ -829,11 +836,14 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
     results_speed_all = [{
         "model": "AllData_Speed",
         "n_rows": res_b.meta.get("n_rows", len(subset)),
+        "n_questions": n_questions,
         "n_events": res_b.meta.get("n_events", n_events),
         "treat_coef": s_b.loc["is_treated_active", "coef"],
         "treat_hr": np.exp(s_b.loc["is_treated_active", "coef"]),
         "treat_se": s_b.loc["is_treated_active", "se(coef)"],
         "treat_p": s_b.loc["is_treated_active", "p"],
+        "gap_coef": s_b.loc["treated_post_question", "coef"],
+        "gap_p": s_b.loc["treated_post_question", "p"],
         "speed_coef": s_b.loc["treated_response_time_interaction", "coef"],
         "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],
         "speed_p": s_b.loc["treated_response_time_interaction", "p"],
@@ -859,6 +869,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         results_model_c_all = [{
             "model": "AllData_ModelC",
             "n_rows": res_c.meta.get("n_rows", len(subset)),
+            "n_questions": n_questions,
             "n_events": res_c.meta.get("n_events", n_events),
             "treat_coef": s_c.loc["is_treated_active", "coef"],
             "treat_hr": np.exp(s_c.loc["is_treated_active", "coef"]),
