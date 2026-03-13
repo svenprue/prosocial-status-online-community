@@ -79,6 +79,8 @@ def _latex_bucket(label: str) -> str:
 # =====================================================================
 # Table 1: Descriptive Statistics
 # =====================================================================
+# N = number of unique questions (question_id) throughout all tables.
+# =====================================================================
 
 def generate_desc_stats_table(desc: dict) -> str:
     """Generate LaTeX for the descriptive statistics table."""
@@ -137,10 +139,10 @@ def generate_desc_stats_table(desc: dict) -> str:
             lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & {_f(mean)} & {_f(std)} & {_f(med)} & {_f(n)} \\")
         lines.append(r"\midrule")
 
-    # Tenure bucket breakdown
+    # Tenure bucket breakdown (N = unique questions per bucket)
     bucket_counts = desc.get("tenure_bucket_counts", {})
     if bucket_counts:
-        lines.append(r"\multicolumn{5}{@{}l}{\textit{Observations by Tenure Bucket}} \\")
+        lines.append(r"\multicolumn{5}{@{}l}{\textit{N (unique questions) by Tenure Bucket}} \\")
         for b in BUCKET_ORDER:
             ct = bucket_counts.get(b, 0)
             lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & & & & {_f(ct)} \\")
@@ -216,7 +218,10 @@ def generate_regression_all_table(
     waiting_cell = _fmt_coef(gap_coef, gap_p) if pd.notna(gap_coef) else "—"
     row = rf"\hspace{{1em}} Received Answer $\times$ Post-Question & {waiting_cell}"
     if has_speed:
-        row += r" & —"
+        gap_coef_b = s.get("gap_coef", np.nan)
+        gap_p_b = s.get("gap_p", np.nan)
+        waiting_cell_b = _fmt_coef(gap_coef_b, gap_p_b) if pd.notna(gap_coef_b) else "—"
+        row += rf" & {waiting_cell_b}"
     lines.append(row + r" \\[4pt]")
 
     if has_speed:
@@ -228,12 +233,12 @@ def generate_regression_all_table(
         row += rf" & {_fmt_se(s['speed_se'])}"
         lines.append(row + r" \\[4pt]")
 
-    n_rows = int(r["n_rows"])
+    n = int(r.get("n_questions", r["n_rows"]))
     n_events = int(r["n_events"])
     lines.append(r"\midrule")
-    row = rf"Intervals & {n_rows:,}"
+    row = rf"N & {n:,}"
     for _ in range(n_cols - 1):
-        row += rf" & {n_rows:,}"
+        row += rf" & {n:,}"
     lines.append(row + r" \\")
     row = rf"Events & {n_events:,}"
     for _ in range(n_cols - 1):
@@ -256,7 +261,7 @@ def generate_regression_all_table(
 def generate_main_results_table(df: pd.DataFrame) -> str:
     """
     Generate LaTeX table for the main effect (Model A) by tenure bucket.
-    Each column is one tenure bucket.
+    Each column is one tenure bucket. N = number of unique questions (question_id).
     """
     # Ensure correct order
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
@@ -341,11 +346,11 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
 
     lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Question & " + " & ".join(gap_cells) + r" \\[4pt]")
 
-    # Observations
+    # N = unique questions; Events = helping events
     lines.append(r"\midrule")
-    obs_cells = [f"{int(r['n_rows']):,}" for _, r in df.iterrows()]
+    n_cells = [f"{int(r.get('n_questions', r['n_rows'])):,}" for _, r in df.iterrows()]
     evt_cells = [f"{int(r['n_events']):,}" for _, r in df.iterrows()]
-    lines.append(rf"Intervals & " + " & ".join(obs_cells) + r" \\")
+    lines.append(rf"N & " + " & ".join(n_cells) + r" \\")
     lines.append(rf"Events & " + " & ".join(evt_cells) + r" \\")
 
     lines += [
@@ -411,11 +416,11 @@ def generate_speed_table(df: pd.DataFrame) -> str:
         gs_cells.append(_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]))
     lines.append(rf"\hspace{{1em}}Post-Question $\times$ log(Response Time) & " + " & ".join(gs_cells) + r" \\[4pt]")
 
-    # Observations
+    # N = unique questions; Events = helping events
     lines.append(r"\midrule")
-    obs_cells = [f"{int(r['n_rows']):,}" for _, r in df.iterrows()]
+    n_cells = [f"{int(r.get('n_questions', r['n_rows'])):,}" for _, r in df.iterrows()]
     evt_cells = [f"{int(r['n_events']):,}" for _, r in df.iterrows()]
-    lines.append(rf"Intervals & " + " & ".join(obs_cells) + r" \\")
+    lines.append(rf"N & " + " & ".join(n_cells) + r" \\")
     lines.append(rf"Events & " + " & ".join(evt_cells) + r" \\")
 
     lines += [
