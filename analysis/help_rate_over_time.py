@@ -15,6 +15,7 @@ Continuous treatment: one figure with 7 tenure panels, 0–12h, joint legend.
 Outputs:
   - help_rate_pooled.eps/.png/.pdf   — Pooled help rate (all tenure buckets).
   - help_rate_by_tenure.eps/.png/.pdf — Small multiples by tenure bucket (appendix).
+  - help_rate_adoption_pooled.eps/.png/.pdf — Adoption help rate pooled over all tenure (single panel, 0–12h).
   - help_rate_adoption_by_tenure.eps/.png/.pdf — Continuous treatment adoption, 7 panels, 0–12h, joint legend.
 
 Usage:
@@ -604,6 +605,51 @@ def _plot_adoption_one_panel(
     ax.tick_params(axis="both", labelsize=8)
 
 
+def plot_adoption_pooled(
+    timelines: pd.DataFrame,
+    events: pd.DataFrame,
+    output_dir: str = FIGURE_DIR,
+    show_ci: bool = True,
+    bin_width_hours: float = 0.5,
+    time_max_hours: float = 12.0,
+):
+    """
+    Single panel: adoption help rate pooled over all tenure buckets.
+    Includes No answer yet, Answer received, Control (no answer), Share with answer.
+    Saves help_rate_adoption_pooled.[eps/png/pdf].
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    rates = compute_binned_rates_adoption(
+        timelines, events,
+        bin_width_hours=bin_width_hours,
+        time_max_hours=time_max_hours,
+        tenure_bucket=None,
+    )
+    rates_control = compute_binned_rates_stable_control(
+        timelines, events,
+        bin_width_hours=bin_width_hours,
+        time_max_hours=time_max_hours,
+        tenure_bucket=None,
+    )
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    _plot_adoption_one_panel(
+        ax, rates, timelines, show_ci,
+        title="All tenure buckets (pooled)",
+        show_legend=True,
+        show_share_ylabel=True,
+        xlim_hours=(0, time_max_hours),
+        rates_control_stable=rates_control,
+    )
+    plt.tight_layout()
+    for ext in ["eps", "png", "pdf"]:
+        fig.savefig(
+            os.path.join(output_dir, "help_rate_adoption_pooled.{}".format(ext)),
+            dpi=300, bbox_inches="tight",
+        )
+    plt.close(fig)
+    print("✓ Saved help_rate_adoption_pooled.[eps/png/pdf]")
+
+
 def plot_adoption_by_tenure(
     timelines: pd.DataFrame,
     events: pd.DataFrame,
@@ -721,6 +767,14 @@ def main():
     plot_help_rate_by_tenure(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
 
     if not args.no_adoption:
+        print("Generating pooled adoption figure (0–12h, all groups)…")
+        plot_adoption_pooled(
+            timelines, events,
+            output_dir=args.output_dir,
+            show_ci=show_ci,
+            bin_width_hours=0.5,
+            time_max_hours=12.0,
+        )
         print("Generating adoption-by-tenure figure (0–12h, joint legend)…")
         plot_adoption_by_tenure(
             timelines, events,

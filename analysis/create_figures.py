@@ -717,7 +717,7 @@ def generate_interaction_effect_figure(
 
 
 def _plot_interaction_effect_bins(df: pd.DataFrame):
-    """Bar chart of treatment effect (HR) by response time bin."""
+    """Points and line of treatment effect (HR) by response time bin."""
     labels = df["bucket"].tolist()
     hrs = df["treat_hr"].values
     ci_lo = df["treat_ci_lo"].values
@@ -729,12 +729,17 @@ def _plot_interaction_effect_bins(df: pd.DataFrame):
     fig.patch.set_facecolor("white")
     ax.set_facecolor("#fafafa")
     x = np.arange(len(df))
-    colors = plt.cm.viridis(np.linspace(0.25, 0.85, len(df)))
-    ax.bar(
-        x, hrs, width=0.65, color=colors,
-        yerr=[err_lo, err_hi], capsize=4,
-        edgecolor="white", linewidth=1.0,
-        error_kw={"linewidth": 1.2, "color": "#2d2d2d"},
+    ax.errorbar(
+        x, hrs,
+        yerr=[err_lo, err_hi],
+        fmt="o-",
+        color="#2e7d32",
+        linewidth=2,
+        markersize=8,
+        capsize=4,
+        capthick=1.2,
+        ecolor="#2d2d2d",
+        elinewidth=1.2,
     )
     ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)")
     ax.set_xticks(x)
