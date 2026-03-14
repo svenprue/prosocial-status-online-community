@@ -28,11 +28,12 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 # =====================================================================
-# Configuration
+# Configuration (paths relative to this script so running from any cwd works)
 # =====================================================================
-CACHE_DIR = "model_cache"
-TABLE_DIR = "output_tables"
-FIGURE_DIR = "output_figures"
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+CACHE_DIR = os.path.join(_SCRIPT_DIR, "model_cache")
+TABLE_DIR = os.path.join(_SCRIPT_DIR, "output_tables")
+FIGURE_DIR = os.path.join(_SCRIPT_DIR, "output_figures")
 
 BUCKET_ORDER = [
     "< 1 Week", "1 Week - 1 Month", "1 - 6 Months",
@@ -82,10 +83,14 @@ def _latex_bucket(label: str) -> str:
 # N = number of unique questions (question_id) throughout all tables.
 # =====================================================================
 
-def generate_desc_stats_table(desc: dict) -> str:
-    """Generate LaTeX for the descriptive statistics table."""
-
-    n_q = desc.get("n_questions", "—")
+def generate_desc_stats_table(desc: dict, df_main: pd.DataFrame = None) -> str:
+    """Generate LaTeX for the descriptive statistics table.
+    If df_main is provided, N (total and by bucket) is taken from it (same source as main_results) so the two tables match.
+    """
+    if df_main is not None and not df_main.empty and "n_questions" in df_main.columns:
+        n_q = int(df_main["n_questions"].sum())
+    else:
+        n_q = desc.get("n_questions", "—")
     n_u = desc.get("n_unique_users", "—")
     pct_ans = desc.get("pct_has_answer", "—")
     he_mean = desc.get("help_events_mean", "—")
@@ -139,13 +144,21 @@ def generate_desc_stats_table(desc: dict) -> str:
             lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & {_f(mean)} & {_f(std)} & {_f(med)} & {_f(n)} \\")
         lines.append(r"\midrule")
 
-    # Tenure bucket breakdown (N = unique questions per bucket)
-    bucket_counts = desc.get("tenure_bucket_counts", {})
-    if bucket_counts:
+    # Tenure bucket breakdown (N = unique questions per bucket); use df_main so it matches main_results
+    if df_main is not None and not df_main.empty and "n_questions" in df_main.columns:
+        df_b = df_main.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
         lines.append(r"\multicolumn{5}{@{}l}{\textit{N (unique questions) by Tenure Bucket}} \\")
-        for b in BUCKET_ORDER:
-            ct = bucket_counts.get(b, 0)
+        for _, r in df_b.iterrows():
+            b = r["bucket"]
+            ct = int(r["n_questions"]) if pd.notna(r.get("n_questions")) else 0
             lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & & & & {_f(ct)} \\")
+    else:
+        bucket_counts = desc.get("tenure_bucket_counts", {})
+        if bucket_counts:
+            lines.append(r"\multicolumn{5}{@{}l}{\textit{N (unique questions) by Tenure Bucket}} \\")
+            for b in BUCKET_ORDER:
+                ct = bucket_counts.get(b, 0)
+                lines.append(rf"\hspace{{1em}} {_latex_bucket(b)} & & & & {_f(ct)} \\")
 
     lines += [
         r"\bottomrule",
@@ -355,6 +368,7 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
 
     lines += [
         r"\bottomrule",
+        r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
         r"\end{tabular}",
         r"\end{table}",
@@ -589,40 +603,29 @@ def generate_speed_figure(df: pd.DataFrame):
 
 def generate_interaction_effect_figure(
     df_rt_bins: pd.DataFrame = None,
-    df_model_c_all: pd.DataFrame = None,
     df_speed_all: pd.DataFrame = None,
 ):
     """
     Plot treatment effect (hazard ratio) by response time.
     If df_rt_bins is provided and non-empty, plot a bar chart by bin (non-parametric).
-    Otherwise plot the parametric curve from Model C or Model B.
+    Otherwise plot the parametric curve from Model B (speed interaction).
     """
     if df_rt_bins is not None and not df_rt_bins.empty and "treat_hr" in df_rt_bins.columns:
         _plot_interaction_effect_bins(df_rt_bins)
         return
-    # Fallback: parametric curve
-    if df_model_c_all is not None and not df_model_c_all.empty and "speed_sq_coef" in df_model_c_all.columns:
-        row = df_model_c_all.iloc[0]
-        treat = row["treat_coef"]
-        speed = row["speed_coef"]
-        speed_sq = row["speed_sq_coef"]
-        use_quadratic = True
-        title_suffix = " (Model C: linear + quadratic)"
-    elif df_speed_all is not None and not df_speed_all.empty and "speed_coef" in df_speed_all.columns:
+    # Fallback: parametric curve from Model B
+    if df_speed_all is not None and not df_speed_all.empty and "speed_coef" in df_speed_all.columns:
         row = df_speed_all.iloc[0]
         treat = row["treat_coef"]
         speed = row["speed_coef"]
-        speed_sq = 0.0
-        use_quadratic = False
+        rt_hours = np.linspace(0.5, 720, 400)
+        log_rt = np.log1p(rt_hours)
+        log_hr = treat + speed * log_rt
+        hr = np.exp(log_hr)
         title_suffix = " (Model B: linear)"
     else:
-        print("  ⚠ Skipping interaction_effect figure: no response-time bin results or Model C/B.")
+        print("  ⚠ Skipping interaction_effect figure: no response-time bin results or Model B.")
         return
-
-    rt_hours = np.linspace(0.5, 720, 400)
-    log_rt = np.log1p(rt_hours)
-    log_hr = treat + speed * log_rt + (speed_sq * (log_rt ** 2) if use_quadratic else 0.0)
-    hr = np.exp(log_hr)
 
     fig, ax = plt.subplots(figsize=(8, 5))
     fig.patch.set_facecolor("white")
@@ -714,7 +717,6 @@ def main():
     main_path = os.path.join(CACHE_DIR, "results_main.csv")
     main_all_path = os.path.join(CACHE_DIR, "results_main_all.csv")
     speed_all_path = os.path.join(CACHE_DIR, "results_speed_all.csv")
-    model_c_all_path = os.path.join(CACHE_DIR, "results_model_c_all.csv")
     rt_bins_path = os.path.join(CACHE_DIR, "results_response_time_bins.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
@@ -723,16 +725,19 @@ def main():
         print(f"ERROR: {main_path} not found. Run fit_cox_models.py first.")
         return
 
+    print(f"Reading cache from: {os.path.abspath(CACHE_DIR)}")
     df_main = pd.read_csv(main_path)
     df_main_all = pd.read_csv(main_all_path) if os.path.exists(main_all_path) else pd.DataFrame()
     df_speed_all = pd.read_csv(speed_all_path) if os.path.exists(speed_all_path) else pd.DataFrame()
-    df_model_c_all = pd.read_csv(model_c_all_path) if os.path.exists(model_c_all_path) else pd.DataFrame()
     df_rt_bins = pd.read_csv(rt_bins_path) if os.path.exists(rt_bins_path) else pd.DataFrame()
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
     descriptives = {}
     if os.path.exists(desc_path):
         with open(desc_path, "rb") as f:
             descriptives = pickle.load(f)
+        print(f"Loaded descriptives from: {os.path.abspath(desc_path)}")
+    else:
+        print(f"WARNING: {os.path.abspath(desc_path)} not found; desc_stats table will have missing values.")
 
     # --- Generate Tables ---
     print("\n=== Generating LaTeX Tables ===")
@@ -745,19 +750,19 @@ def main():
             f.write(tex)
         print(f"✓ {out}")
 
-    # Table 1: Descriptive Statistics
-    tex = generate_desc_stats_table(descriptives)
+    # Table 1: Descriptive Statistics (N by bucket from df_main so it matches main_results)
+    tex = generate_desc_stats_table(descriptives, df_main=df_main)
     out = os.path.join(TABLE_DIR, "desc_stats.tex")
     with open(out, "w") as f:
         f.write(tex)
-    print(f"✓ {out}")
+    print(f"✓ Wrote {os.path.abspath(out)}")
 
     # Table 3: Main effect (by tenure bucket)
     tex = generate_main_results_table(df_main)
     out = os.path.join(TABLE_DIR, "main_results.tex")
     with open(out, "w") as f:
         f.write(tex)
-    print(f"✓ {out}")
+    print(f"✓ Wrote {os.path.abspath(out)}")
 
     # Table 4: Speed interaction (by tenure bucket)
     if not df_speed.empty:
@@ -775,7 +780,7 @@ def main():
     if not df_speed.empty:
         generate_speed_figure(df_speed)
 
-    generate_interaction_effect_figure(df_rt_bins, df_model_c_all, df_speed_all)
+    generate_interaction_effect_figure(df_rt_bins, df_speed_all)
 
     print("\n=== All outputs generated ===")
     print(f"Tables: {TABLE_DIR}/")
