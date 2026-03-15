@@ -361,7 +361,7 @@ The dataset spans 24,537,194 question-level observations from 3,872,841 unique u
 \subsection{Descriptive Evidence: Help Rates and the Parallel Trends Assumption}
 %----------------------------------------------------------------------
 
-\begin{figure}
+\begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_pooled.pdf}
 \caption{Help rate over the $\pm$4-day observation window, pooled across all tenure buckets. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not).}
@@ -384,18 +384,18 @@ Table~\ref{tab:pooled_experienced} presents the pooled Cox model estimates acros
 
 To test Hypothesis~2, we estimate the Cox model separately for each of the seven tenure buckets. Table~\ref{tab:main_results} reports the estimates, and Figure~\ref{fig:strength_rec} plots the corresponding hazard ratios. The reciprocity effect is statistically significant in six of the seven tenure buckets, and its magnitude broadly declines with platform experience. The effect is largest among newcomers with less than one week of tenure (coefficient\,=\,0.0880, HR\,=\,1.09, 95\% CI\,=\,[1.08, 1.11], $p < .001$). The hazard ratio dips to 1.04 (95\% CI\,=\,[1.02, 1.06], $p < .001$) for users with one week to one month of tenure, before stabilizing through the intermediate experience strata (one to six months: HR\,=\,1.05, [1.04, 1.07]; six to twelve months: HR\,=\,1.05, [1.03, 1.06]; one to three years: HR\,=\,1.04, [1.02, 1.05]). The effect continues to decline for more established users (three to six years: HR\,=\,1.02, [1.00, 1.03], $p < .05$) and is statistically indistinguishable from zero among users with more than six years of tenure (coefficient\,=\,$-$0.0080, HR\,=\,0.99, [0.97, 1.01], $p > .10$). This gradient is visible in Figure~\ref{fig:strength_rec}. The waiting period coefficients remain near zero across all strata, ruling out pre-trend confounds. These results support Hypothesis~2: the reciprocity effect is strongest among newcomers, broadly attenuates with experience, and disappears entirely among the most experienced users.
 
-
-\clearpage
-\begin{landscape}
-\input{../analysis/output_tables/main_results}
-\end{landscape}
-
-\begin{figure}
+\begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/strength_rec.pdf}
 \caption{Strength of the generalized reciprocity effect across user experience. Bars show the hazard ratio for the treatment effect by tenure bucket. Error bars indicate 95\% confidence intervals.}
 \label{fig:strength_rec}
 \end{figure}
+
+\begin{landscape}
+\input{../analysis/output_tables/main_results}
+\end{landscape}
+
+
 
 
 %----------------------------------------------------------------------
@@ -406,14 +406,15 @@ Hypothesis~3 predicted that faster responses would strengthen the reciprocity ef
 
 Within the tenure-stratified Cox models, the speed interaction is negative across all groups with a significant base treatment effect, consistent with faster responses producing stronger reciprocity. The magnitude of this moderation varies with experience. Newcomers (tenure $<$\,1 week) show a moderate negative interaction ($\gamma = -0.0300$, SE\,=\,0.0024, $p < .001$). The interaction is largest in magnitude for users in the early-to-intermediate experience range: one week to one month ($\gamma = -0.0606$, SE\,=\,0.0029, $p < .001$) and one to six months ($\gamma = -0.0608$, SE\,=\,0.0020, $p < .001$). The interaction then attenuates with additional experience: six to twelve months ($\gamma = -0.0565$, SE\,=\,0.0020, $p < .001$), one to three years ($\gamma = -0.0383$, SE\,=\,0.0020, $p < .001$), and three to six years ($\gamma = -0.0189$, SE\,=\,0.0021, $p < .001$). Among users with more than six years of tenure, both the base treatment effect and the speed interaction are negligible and not statistically significant, consistent with the null result for this group in the main model.
 
-\clearpage
+Because we saw that the control group helped more than the treatment group right after the question time (Figure~\ref{fig:help_rate_pooled}), we suspect that users with very short response times will show no treatment effect, potentially because some of them exit the platform right after receiving an answer. To probe this mechanism, Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For the very fastest responses, the effect is indistinguishable from zero (0--15 min: HR\,$\approx$\,1.00; 15--30 min: HR\,$\approx$\,1.01; both $p > .10$). The effect peaks sharply for questions answered in 30--60 minutes (HR\,$\approx$\,1.18, $p < .001$) and declines thereafter: one to two hours (HR\,$\approx$\,1.06, $p < .001$), two to four hours (HR\,$\approx$\,1.02, $p > .10$), four to eight hours (HR\,$\approx$\,0.99, $p > .10$), and eight to twelve hours (HR\,$\approx$\,1.02, $p > .10$). This inverted-U, with its peak at 30--60 minutes rather than at the very fastest response bin, is visible in Figure~\ref{fig:interaction_effect}.
+
 \begin{landscape}
 \input{../analysis/output_tables/speed_results}
 \end{landscape}
 
-Because we saw that the control group helped more than the treatment group right after the question time (Figure~\ref{fig:help_rate_pooled}), we suspect that users with very short response times will show no treatment effect, potentially because some of them exit the platform right after receiving an answer. To probe this mechanism, Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For the very fastest responses, the effect is indistinguishable from zero (0--15 min: HR\,$\approx$\,1.00; 15--30 min: HR\,$\approx$\,1.01; both $p > .10$). The effect peaks sharply for questions answered in 30--60 minutes (HR\,$\approx$\,1.18, $p < .001$) and declines thereafter: one to two hours (HR\,$\approx$\,1.06, $p < .001$), two to four hours (HR\,$\approx$\,1.02, $p > .10$), four to eight hours (HR\,$\approx$\,0.99, $p > .10$), and eight to twelve hours (HR\,$\approx$\,1.02, $p > .10$). This inverted-U, with its peak at 30--60 minutes rather than at the very fastest response bin, is visible in Figure~\ref{fig:interaction_effect}.
 
-\begin{figure}
+
+\begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/interaction_effect.pdf}
 \caption{Treatment effect (hazard ratio) by response time bin, pooled across all tenure buckets. Each point shows the estimated hazard ratio for the treatment indicator within that response time bin, relative to the matched control. Error bars indicate 95\% confidence intervals.}
