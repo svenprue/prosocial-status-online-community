@@ -259,27 +259,6 @@ Table~\ref{tab:variables} provides an overview of the variables used in our anal
 
 \paragraph{User Experience.} To test Hypothesis 2, we stratify our analysis by user tenure, defined as the number of days between a user's first activity on the platform and the start of the observation window. We define seven tenure buckets using right-closed intervals: $[0, 7]$, $(7, 30]$, $(30, 180]$, $(180, 365]$, $(365, 1095]$, $(1095, 2190]$, and $(2190, \infty)$ days, corresponding to the labels less than one week, one week to one month, one to six months, six to twelve months, one to three years, three to six years, and more than six years, respectively. Running separate models by bucket enables us to examine how the reciprocity effect varies across the user trajectory without imposing a parametric functional form. Table~\ref{tab:tenure_counts} reports the number of matched observations and unique users in each bucket.
 
-\begin{table}[H]
-\caption{Sample Size by Tenure Bucket (Matched Dataset)}
-\label{tab:tenure_counts}
-\centering\small
-\begin{tabular}{lrrr}\toprule
-Tenure Bucket & Matched Obs.\ (Pairs) & Unique Users & \% of Total \\\midrule
-$<$ 1 week       & 1,044,218 & 522,109 & 21.7\% \\
-1 week -- 1 month  & 610,632  & 211,847 & 12.7\% \\
-1 -- 6 months      & 936,480  & 188,439 & 19.5\% \\
-6 -- 12 months     & 504,762  & 114,231 & 10.5\% \\
-1 -- 3 years       & 802,944  & 142,608 & 16.7\% \\
-3 -- 6 years       & 541,370  & 89,215  & 11.3\% \\
-$>$ 6 years        & 363,777  & 61,434  & 7.6\% \\\midrule
-\textbf{Total}     & \textbf{4,804,183} & \textbf{908,775} & \textbf{100\%} \\
-\bottomrule
-\end{tabular}
-
-\vspace{0.3em}
-\parbox{0.9\textwidth}{\footnotesize\textit{Note.} Matched observations counts are reported as pairs (treated + control). Unique users may appear across multiple tenure buckets if they posted questions at different stages of their platform career. All tenure buckets contain sufficient observations for stable estimation.}
-\end{table}
-
 %----------------------------------------------------------------------
 \subsection{Propensity Score Matching}
 \label{sec:matching}
@@ -300,7 +279,7 @@ Matching on the tag-level answer rate is particularly important for our response
 \midrule
 Exact matching & \\
 calendarYear & Calendar year exact matching indicating the year of the observation, controlling for secular trends in platform activity and answer rates. \\
-topLevelTag & First tag of the question indicating the topic and community that sees the question \\
+topLevelTag & First tag of the question indicating the main topic and community that sees the question \\
 
 \multicolumn{2}{l}{Propensity score matching }\\
 userTenure & Number of days since the user's first recorded activity on the platform, capturing cumulative experience. \\
