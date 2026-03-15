@@ -4,7 +4,7 @@ help_rate_over_time.py
 Plots empirical help rate over the study window (question-relative time),
 separately for treated and control, by tenure bucket.
 
-All plots use 15-minute bins (configurable via --bin-hours).
+Help rate over time uses 1-hour bins (configurable via --bin-hours); adoption plots use 30-minute bins.
 Stable groups: pooled figure (all tenure) + by-tenure small multiples for appendix.
 Continuous treatment: one figure with 7 tenure panels, 0–12h, joint legend.
   - X-axis: time relative to question (day 0 = question posted).
@@ -726,7 +726,7 @@ def main():
     parser = argparse.ArgumentParser(description="Plot empirical help rate over time by tenure")
     parser.add_argument("--input", default="../data/event_history", help="Folder with study_timelines.parquet, study_events.parquet")
     parser.add_argument("--sample", type=int, default=None, help="Subsample N matched pairs")
-    parser.add_argument("--bin-hours", type=float, default=0.25, help="Bin width in hours (default 0.25 = 15 min)")
+    parser.add_argument("--bin-hours", type=float, default=1.0, help="Bin width in hours (default 1.0 = 1 hr)")
     parser.add_argument("--no-normalize", action="store_true", help="Plot raw rate instead of normalized to pre-question baseline")
     parser.add_argument("--no-ci", action="store_true", help="Do not plot 95%% CI error bars")
     parser.add_argument("--min-errorbar-pct", type=float, default=2.0, metavar="PCT", help="Minimum error bar length as %% of y-range (for visibility when SE is tiny; 0 = true scale)")
