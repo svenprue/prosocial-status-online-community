@@ -1,11 +1,5 @@
 %======================================================================
 \section{Introduction}
-\todo[inline]
-{- Check consistent naming of covariates throughout the manuscript \\
-- Check for consistent 2D observation length \\
-- Sanity checks? \\
-- Clean up appendix \\
-}
 %======================================================================
 
 Whether receiving help on an online platform motivates subsequent helping behavior has been a persistent question in the study of online communities. Generalized reciprocity, the tendency to help others after being helped oneself \citep{nowak_upstream_2007, baker_paying_2014}, is among the mechanisms proposed to sustain cooperation on platforms like Stack Overflow and Wikipedia, where direct exchange between the same two individuals is rare. If receiving help reliably increases the probability of giving it, cooperation may sustain itself through cascading helping acts, even among strangers \citep{fowler_cooperative_2010}. The behavioral evidence, however, is inconsistent: some observational studies find substantial reciprocity effects \citep{baker_paying_2014, chen_why_2019}, while others find weak or null relationships \citep{wasko_why_2005, joyce_predicting_2006}. We argue that much of this inconsistency is methodological.
@@ -16,7 +10,7 @@ We address both problems by developing a matched difference-in-differences survi
 
 We develop two theoretical predictions alongside the basic reciprocity hypothesis. Drawing on theories of socialization and norm internalization, we predict that the reciprocity effect is stronger among newcomers than among experienced users (H2). Newcomers have not yet internalized community-specific norms or learned to value platform incentives such as reputation points; general moral obligations to reciprocate are therefore more likely to drive their behavior. As users accumulate experience, these general-purpose triggers may be displaced by community-specific motivations. We also predict that faster responses should amplify the reciprocity effect (H3), because gratitude is more intense when help arrives while the need is still salient \citep{mccullough_is_2001, tsang_gratitude_2006}.
 
-The results support H1, H2, and broadly H3. Receiving an answer increases the hazard of helping by roughly 6\% in the pooled sample (HR\,=\,1.06, 95\%~CI\,=\,[1.04, 1.07]). This effect declines from HR\,$\approx$\,1.09 among users with less than one week of tenure to a null effect among those with more than six years. Speed interactions are consistently negative across experience groups: faster responses produce stronger reciprocity, consistent with H3. One wrinkle: in the pooled discrete-bin analysis, the effect is near zero for responses arriving under 30 minutes, peaks at 30--60 minutes (HR\,$\approx$\,1.18), and attenuates at longer delays, reflecting platform session dynamics that we describe in the results.
+The results support H1, H2, and broadly H3. Receiving an answer increases the hazard of helping by roughly 6\% in the pooled sample (HR\,=\,1.06, 95\%~CI\,=\,[1.04, 1.07]). This effect declines from HR\,$\approx$\,1.09 among users with less than one week of tenure to a null effect among those with more than six years. Speed interactions are consistently negative across experience groups: faster responses produce stronger reciprocity, consistent with H3. One wrinkle: in the pooled discrete-bin analysis, the effect is near zero for responses arriving under 30 minutes, peaks at 30--60 minutes (HR\,$\approx$\,1.18), and attenuates at longer delays, reflecting a limited window where users can be re-engaged by receiving help that we describe in the results.
 
 Our study makes three contributions. First, we provide evidence that receiving help on Stack Overflow increases subsequent helping, using an identification strategy that addresses the endogeneity problems present in prior work. Second, we show that this effect is concentrated among newcomers and substantially attenuated among experienced users, consistent with the view that reciprocity functions primarily as a contributor-recruitment mechanism rather than a driver of sustained helping. Third, we identify a re-engagement window in which platform session dynamics moderate the reciprocity effect, qualifying the direct application of laboratory-based theories of emotional immediacy to task-driven field settings.
 
@@ -105,7 +99,7 @@ For our study, the key feature is the question-and-answer interaction between us
 \label{sec:methods}
 %======================================================================
 
-To test our predictions, we develop a matched staggered difference-in-differences survival analysis that leverages the temporal structure of help-seeking and help-giving on Stack Overflow. Our design compares changes in helping behavior (measured as the hazard of posting an answer) before and after an user receives an answer, between users who receive an answer and matched users who do not. This approach represents a novel integration of two methodological traditions: the staggered difference-in-differences framework of \citet{callaway_santanna_2021}, which accommodates variation in treatment timing and treatment effect heterogeneity, and the counting-process formulation of the Cox proportional hazards model \citep{andersen_gill_1982}, which allows treatment status and other covariates to vary continuously over the observation window.
+To test our predictions, we develop a matched staggered difference-in-differences (DiD) survival analysis that leverages the temporal structure of help-seeking and help-giving on Stack Overflow. Our design compares changes in helping behavior (measured as the hazard of posting an answer) before and after an user receives an answer, between users who receive an answer and matched users who do not. This approach represents a novel integration of two methodological traditions: the staggered difference-in-differences framework of \citet{callaway_santanna_2021}, which accommodates variation in treatment timing and treatment effect heterogeneity, and the counting-process formulation of the Cox proportional hazards model \citep{andersen_gill_1982}, which allows treatment status and other covariates to vary continuously over the observation window.
 
 %----------------------------------------------------------------------
 \subsection{Study Design}
@@ -131,89 +125,71 @@ The survival clock in our Cox models is centered on posting of the respective qu
 \caption{Study Design: Matched Difference-in-Differences Survival Analysis}
 \label{fig:study_design}
 \centering
-\begin{tikzpicture}[x=1.6cm, y=1cm, >=stealth, font=\small]
-
+\begin{tikzpicture}[x=1.2cm, y=1cm, >=stealth, font=\small]
 % --- Treated timeline ---
 \node[anchor=east, font=\bfseries] at (-0.3, 2) {Treated};
-
 % Main axis
 \draw[thick, ->] (0,2) -- (9.2,2);
-
 % Phase regions
 \fill[blue!10] (0,1.5) rectangle (3.5,2.5);
 \fill[orange!15] (3.5,1.5) rectangle (5.5,2.5);
 \fill[green!12] (5.5,1.5) rectangle (8.5,2.5);
-
 % Tick marks
 \draw[thick] (0,1.8) -- (0,2.2);
 \draw[thick] (3.5,1.8) -- (3.5,2.2);
 \draw[thick] (5.5,1.8) -- (5.5,2.2);
 \draw[thick] (8.5,1.8) -- (8.5,2.2);
-
 % Labels below axis
 \node[below, font=\footnotesize] at (0,1.8) {$T_Q - 2\text{D}$};
 \node[below, font=\footnotesize] at (3.5,1.75) {$T_Q$};
 \node[below, font=\footnotesize] at (5.5,1.75) {$T_A$};
 \node[below, font=\footnotesize] at (8.5,1.8) {$T_Q + 2\text{D}$};
-
 % Phase labels
 \node[font=\footnotesize] at (1.75, 2) {Pre-question};
 \node[font=\footnotesize] at (4.5, 2) {Waiting};
 \node[font=\footnotesize] at (7.0, 2) {Post-answer};
-
 % Response time brace
 \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (3.5, 1.3) -- (5.5, 1.3);
 \node[below, font=\footnotesize\itshape] at (4.5, 1.15) {Response time};
-
 % Question and answer markers
 \node[above, font=\footnotesize, text=blue!70!black] at (3.5, 2.55) {Question};
 \node[above, font=\footnotesize, text=green!50!black] at (5.5, 2.55) {Answer};
-
 % --- Control timeline ---
 \node[anchor=east, font=\bfseries] at (-0.3, -0.5) {Control};
-
 % Main axis
 \draw[thick, ->] (0,-0.5) -- (9.2,-0.5);
-
 % Phase regions
 \fill[blue!10] (0,-1) rectangle (3.5,0);
 \fill[orange!8] (3.5,-1) rectangle (5.5,0);
 \fill[gray!8] (5.5,-1) rectangle (8.5,0);
-
 % Tick marks
 \draw[thick] (0,-0.7) -- (0,-0.3);
 \draw[thick] (3.5,-0.7) -- (3.5,-0.3);
 \draw[thick, dashed] (5.5,-0.7) -- (5.5,-0.3);
 \draw[thick] (8.5,-0.7) -- (8.5,-0.3);
-
 % Labels below axis
 \node[below, font=\footnotesize] at (0,-0.7) {$T_Q - 2\text{D}$};
 \node[below, font=\footnotesize] at (3.5,-0.75) {$T_Q$};
 \node[below, font=\footnotesize, text=gray] at (5.5,-0.75) {Synthetic $T_A$};
 \node[below, font=\footnotesize] at (8.5,-0.7) {$T_Q + 2\text{D}$};
-
 % Phase labels
 \node[font=\footnotesize] at (1.75, -0.5) {Pre-question};
 \node[font=\footnotesize] at (4.5, -0.5) {Waiting};
 \node[font=\footnotesize, text=gray] at (7.0, -0.5) {Post (no answer)};
-
 % Question marker
 \node[above, font=\footnotesize, text=blue!70!black] at (3.5, 0.05) {Question};
 \node[above, font=\footnotesize, text=gray] at (5.5, 0.05) {No answer};
-
 % Alignment arrows
 \draw[dashed, gray, <->] (5.5, 1.2) -- (5.5, 0.15);
 \node[right, font=\scriptsize, text=gray] at (5.65, 0.65) {Aligned};
-
 % Help events (example)
 \draw[red, thick] (2.0, 2.5) -- (2.0, 2.7) node[above, font=\scriptsize, text=red] {Help};
 \draw[red, thick] (6.8, 2.5) -- (6.8, 2.7) node[above, font=\scriptsize, text=red] {Help};
 \draw[red, thick] (1.5, 0) -- (1.5, 0.2) node[above, font=\scriptsize, text=red] {Help};
-
 \end{tikzpicture}
 
 \vspace{0.5em}
-\parbox{\textwidth}{\footnotesize\textit{Note.} Each observation window spans 4 days centered on the focal question ($T_Q$). The treated timeline (top) shows three phases: the pre-question phase (baseline), the waiting period (question posted, no answer yet), and the post-answer phase (after the first qualifying answer $T_A$ arrives). The control timeline (bottom) is from a propensity-score-matched user whose question did not receive an answer. To ensure temporal alignment, the control's post-question period is split at a synthetic transition point matching the treated user's response time. Red markers indicate help events (answers posted by the focal user to other users' questions). The treatment effect is identified as the differential change in helping hazard between treated and control observations in the post-answer phase, relative to the pre-question baseline. The staggered timing of $T_A$ across observations motivates our use of matched difference-in-differences methods robust to treatment effect heterogeneity \citep{callaway_santanna_2021}.}
+\parbox{\textwidth}{\footnotesize\textit{Note.} Each observation window spans 4 days centered on the focal question ($T_Q$). The treated timeline (top) shows three phases: the pre-question phase (baseline), the waiting period (question posted, no answer yet), and the post-answer phase (after the first qualifying answer $T_A$ arrives). The control timeline (bottom) is from a propensity-score-matched user whose question did not receive an answer. To ensure temporal alignment, the control's post-question period is split at a synthetic transition point matching the treated user's response time. Red markers indicate help events (answers posted by the focal user to other users' questions). The treatment effect is the differential change in helping hazard between treated and control observations in the post-answer phase, relative to the pre-question baseline. The staggered timing of $T_A$ across observations motivates our use of matched DiD.}
 \end{figure}
 
 Within each timeline, we track all instances in which the user provides an answer to another user's question. These helping events constitute the outcome in our survival analysis. Conceptually, our design asks: Does the hazard of helping increase after a user receives an answer, relative to the change in hazard for a matched user who does not receive an answer? We present descriptive evidence on the raw help rates over this timeline in Section~\ref{sec:results} (Figure~\ref{fig:help_rate_2panel}), before turning to the formal Cox model estimates.
@@ -264,10 +240,10 @@ Table~\ref{tab:variables} provides an overview of the variables used in our anal
 \label{sec:matching}
 %----------------------------------------------------------------------
 
-Because the receipt of an answer (the treatment) is correlated with user characteristics (more experienced users, for instance, might tend to ask higher-quality questions that are more likely to receive answers), we employ propensity score matching \citep{rosenbaum_rubin_1983} to improve the comparability of the treatment and control groups. Importantly, matching is performed \textit{across different users}: each treated question (from a user who received an answer) is matched to a control question (from a different user whose question did not receive an answer) that has a similar propensity to receive an answer based on observable pre-treatment characteristics. This cross-user matching ensures that treated and control observations are independent conditional on the matched covariates, while the difference-in-differences structure within each pair absorbs residual differences.
+Because the receipt of an answer (the treatment) is correlated with user characteristics (more experienced users, for instance, might tend to ask higher-quality questions that are more likely to receive answers), we employ propensity score matching \citep{rosenbaum_rubin_1983} to improve the comparability of the treatment and control groups. Importantly, matching is performed \textit{across different users}: each treated question (from a user who received an answer) is matched to a control question (from a different user whose question did not receive an answer) that has a similar propensity to receive an answer based on observable pre-treatment characteristics. This cross-user matching ensures that treated and control observations are independent conditional on the matched covariates, while the DiD structure within each pair absorbs residual differences.
 
 We estimate the propensity score using the following pre-treatment covariates, which jointly capture user experience, recent activity, and question characteristics as depicted in Table \ref{tab:covariates}. It should be noted that \textit{tagAnswerRateAvg} is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low answer rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
-Matching on the tag-level answer rate is particularly important for our response time analysis, as it mitigates the concern that slower response times simply proxy for differently sized sub-communities with lower throughput. 
+Matching on the tag-level answer rate is particularly important for our response time analysis, as it mitigates the concern that slower response times simply proxy for differently sized sub-communities with lower throughput. We use nearest-neighbor matching with a caliper of 0.05 on the propensity score.
 
 \begin{table}[H]
 \caption{Definition of Matching Covariates}
@@ -311,9 +287,7 @@ tagAnswerRateAvg & Average share of questions that receive an answer within the 
 \end{itemize}
 \fi
 
-We use nearest-neighbor matching with a caliper of 0.05 on the propensity score.
-
-\paragraph{Balance Diagnostics.} Table~\ref{tab:balance} displays the covariate balance before and after matching. Before matching, several covariates showed a meaningful imbalance between the treated and control groups. For instance, treated users had asked more questions in the prior 30 days (SMD\,=\,0.197) and 7 days (SMD\,=\,0.174), reflecting that users who ask questions that attract answers tend to be more recently active. The largest imbalance was in the tag-level answer rate (SMD\,=\,0.695), confirming that question topic characteristics strongly predict answer receipt and underscoring the importance of matching on this variable. After nearest-neighbor propensity score matching, all standardized mean differences fell well below the conventional threshold of 0.1, with the largest residual imbalance at 0.029 (see Table~\ref{tab:balance}). This confirms adequate balance across all matching covariates, and the balance is also illustrated in the Love plot in Appendix~\ref{sec:balance_plot}.
+Table~\ref{tab:balance} displays the covariate balance before and after matching. Before matching, several covariates showed a meaningful imbalance between the treated and control groups. For instance, treated users had asked more questions in the prior 30 days (SMD\,=\,0.197) and 7 days (SMD\,=\,0.174), reflecting that users who ask questions that attract answers tend to be more recently active. The largest imbalance was in the tag-level answer rate (SMD\,=\,0.695), confirming that question topic characteristics strongly predict answer receipt and underscoring the importance of matching on this variable. After nearest-neighbor propensity score matching, all standardized mean differences fell well below the conventional threshold of 0.1, with the largest residual imbalance at 0.029 (see Table~\ref{tab:balance}). This confirms adequate balance across all matching covariates, and the balance is also illustrated in the Love plot in Appendix~\ref{sec:balance_plot}.
 
 \begin{table}[H]
 \caption{Covariate Balance Before and After Matching}
@@ -367,7 +341,7 @@ h(t \mid \mathbf{X}(t)) = h_0(t) \exp\Big(\boldsymbol{\beta}' \mathbf{X}(t) \\
 
 \paragraph{Stratification by Tenure.} To test Hypothesis 2, we fit separate models for each of the seven tenure buckets. This allows the baseline hazard and all coefficients to vary freely across levels of user experience, providing a nonparametric view of how reciprocity changes over the user trajectory.
 
-\paragraph{Identification.} Our identification strategy rests on the matched difference-in-differences logic embedded in the model. Propensity score matching \citep{rosenbaum_rubin_1983} ensures that treated and control observations come from users with comparable baseline characteristics, including tenure, activity levels, and question topic difficulty. This matching absorbs between-user differences that might otherwise confound the treatment effect. We do not include user fixed effects in the survival models. Because matching is performed across different users (not within-user), and because the Cox model already leverages within-observation temporal variation through the time-varying covariate structure \citep{andersen_gill_1982}, user fixed effects are not required for identification. The difference-in-differences structure, comparing within-observation changes before and after the answer across treatment groups, isolates the causal effect of receiving help from stable individual differences. The waiting period covariate (\textit{treatedPostQuestion}) absorbs the potential lift in helping behavior that treated users already show after merely asking a question but before receiving an answer. The treatment effect we estimate cannot be driven by this pre-treatment trend but must be driven by the answer itself.
+\paragraph{Identification.} Our identification strategy rests on the matched DiD logic embedded in the model. Propensity score matching \citep{rosenbaum_rubin_1983} ensures that treated and control observations come from users with comparable baseline characteristics, including tenure, activity levels, and question topic difficulty. This matching absorbs between-user differences that might otherwise confound the treatment effect. We do not include user fixed effects in the survival models. Because matching is performed across different users (not within-user), and because the Cox model already leverages within-observation temporal variation through the time-varying covariate structure \citep{andersen_gill_1982}, user fixed effects are not required for identification. The DiD structure, comparing within-observation changes before and after the answer across treatment groups, isolates the causal effect of receiving help from stable individual differences. The waiting period covariate (\textit{treatedPostQuestion}) absorbs the potential lift in helping behavior that treated users already show after merely asking a question but before receiving an answer. The treatment effect we estimate cannot be driven by this pre-treatment trend but must be driven by the answer itself.
 
 %======================================================================
 \section{Results}
@@ -394,7 +368,7 @@ The dataset spans 24,537,194 question-level observations from 3,872,841 unique u
 \label{fig:help_rate_pooled}
 \end{figure}
 
-Figure~\ref{fig:help_rate_pooled} plots the normalized help rate for treated and control users over the two days before and after question posting. Before the question ($t < T_Q$), treated and control help rates track each other closely and exhibit no systematic divergence, consistent with the parallel trends assumption underlying the difference-in-differences design. After the median answer arrival time, treated users' help rate rises above that of controls, providing descriptive evidence of a reciprocity effect. The pre-question overlap also reflects the effectiveness of propensity-score matching: treated and control users enter the observation window with comparable baseline helping propensities. Notably, the control group spikes right after the question post time, which we will explain later. 
+Figure~\ref{fig:help_rate_pooled} plots the normalized help rate for treated and control users over the two days before and after question posting. Before the question ($t < T_Q$), treated and control help rates track each other closely and exhibit no systematic divergence, consistent with the parallel trends assumption underlying the DiD design. After the median answer arrival time, treated users' help rate rises above that of controls, providing descriptive evidence of a reciprocity effect. The pre-question overlap also reflects the effectiveness of propensity-score matching: treated and control users enter the observation window with comparable baseline helping propensities. Notably, the control group spikes right after the question post time, which we will explain later. 
 
 %----------------------------------------------------------------------
 \subsection{Generalized Reciprocity Effect (H1)}
@@ -444,9 +418,9 @@ Because we saw that the control group helped more than the treatment group right
 \label{fig:interaction_effect}
 \end{figure}
 
-We interpret the non-linear pooled pattern through platform session dynamics. Posting a question creates a period of heightened engagement: users remain active, browsing, and encountering other questions. A very fast answer (under 30 minutes) resolves this pending state before the user has had meaningful time to browse; the reciprocity effect is suppressed, not because gratitude is absent, but because the structural window for acting on it has barely opened. In the 30--60-minute range, the answer arrives while the session is still active and the question is still salient. At longer delays, the session has likely ended, and the question has lost relevance to the user. These dynamics produce the inverted-U in Figure~\ref{fig:interaction_effect} and are consistent with the broadly negative continuous interactions, since many answers arrive after the 30-minute threshold, and the peak of the control group relative to the treatment group just after the question time, because some treated users end their session early. 
+We interpret the non-linear pooled pattern through platform session dynamics. When a user posts a question, they enter a state of active, engaged waiting: they remain on the platform, browsing other questions, during the interval before their answer arrives. A very fast answer (under 30 minutes) resolves this pending state and can end the session --- some users simply leave after receiving help. Only users who have already left the platform can be re-engaged by the arrival of an answer. In the 30--60-minute range, many users have ended their session, but the question is still salient enough to draw them back when the answer arrives, creating a new session in which helping others becomes possible. At longer delays, the question's salience has faded, and the answer is less likely to prompt re-engagement at all. These dynamics produce the inverted-U in Figure~\ref{fig:interaction_effect}: the suppressed effect at very short response times reflects premature session closure rather than absent gratitude, and the attenuation at long delays reflects a question that no longer motivates return. The pattern is also consistent with the broadly negative continuous interactions, since many answers arrive after the 30-minute threshold, and with the relative spike in the control group just after question posting, since some treated users end their session early after receiving help. 
 
-Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive support. The plot compares users who have received an answer (red) and users who will receive one but are still waiting (blue). The gap between users who received help and those who still wait is small initially, then widens and converges at later responses. Tenure-stratified versions of this figure are in Appendix Figure~\ref{fig:help_rate_adoption_by_tenure}.
+Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive support. The plot compares users who have received an answer (red) and users who will receive one but are still waiting (blue). The gap between users who received help and those who still wait is small initially, then widens and converges at later responses, consistent with re-engagement being most likely in the intermediate response-time range. Tenure-stratified versions of this figure are in Appendix Figure~\ref{fig:help_rate_adoption_by_tenure}.
 
 \begin{figure}[H]
 \centering
@@ -464,56 +438,19 @@ Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive support. The plo
 \subsection{Methodological Contribution}
 %----------------------------------------------------------------------
 
-A persistent difficulty in studying generalized reciprocity from platform data is that the same 
-user characteristics that predict seeking help also predict giving it. Active, engaged users are 
-more likely both to post questions and to post answers, so correlations between help received and 
-help given can reflect differences in user engagement rather than any causal response to receiving 
-help. Prior observational studies that report positive associations between help-seeking and 
-subsequent helping behavior without accounting for this selection \citep{baker_paying_2014, 
-chen_engaging_2018, joyce_predicting_2006} may have overstated the role of reciprocity. The 
-matched difference-in-differences survival design developed here addresses this confound by 
-comparing changes in helping behavior, before and after question posting, between users whose 
-questions received answers and propensity-score-matched users whose questions did not. The 
-waiting-period covariate further isolates the effect of answer receipt from the effect of 
-question-posting itself, ruling out the possibility that the lift in helping reflects engagement 
-created by the act of asking rather than by the act of receiving. Together, these features provide 
-a more credible basis for causal inference than prior designs, and the estimated effect is 
-substantially smaller than many earlier reports, consistent with the view that prior estimates 
-were partially confounded.
+A persistent difficulty in studying generalized reciprocity from platform data is that the same user characteristics that predict seeking help also predict giving it. Active, engaged users are more likely both to post questions and to post answers, so correlations between help received and help given can reflect differences in user engagement rather than any causal response to receiving help. Prior observational studies that report positive associations between help-seeking and subsequent helping behavior without accounting for this selection \citep{baker_paying_2014, chen_engaging_2018, joyce_predicting_2006} may have overstated the role of reciprocity. The matched DiD survival design developed here addresses this confound by comparing changes in helping behavior, before and after question posting, between users whose questions received answers and propensity-score-matched users whose questions did not. The waiting-period covariate further isolates the effect of answer receipt from the effect of question-posting itself, ruling out the possibility that the lift in helping reflects engagement created by the act of asking rather than by the act of receiving. Together, these features provide a more credible basis for causal inference than prior designs, and the estimated effect is substantially smaller than many earlier reports, consistent with the view that prior estimates were partially confounded.
 
 %----------------------------------------------------------------------
 \subsection{Reciprocity as a Contributor-Recruitment Mechanism}
 %----------------------------------------------------------------------
 
-The theoretical account developed in this paper treats generalized reciprocity not as a uniform 
-driver of community cooperation, but as a mechanism whose salience varies with a user's position 
-on the trajectory from newcomer to established contributor. The findings support this account. The 
-reciprocity effect is present and meaningful among users early in their platform tenure, and it 
-attenuates steadily across experience groups, becoming negligible among the most established users.
+The theoretical account developed in this paper treats generalized reciprocity not as a uniform driver of community cooperation, but as a mechanism whose salience varies with a user's position on the trajectory from newcomer to established contributor. The findings support this account. The reciprocity effect is present and meaningful among users early in their platform tenure, and it attenuates steadily across experience groups, becoming negligible among the most established users.
 
-This gradient has implications for how reciprocity's role in online communities should be 
-understood. If the effect were uniform across experience levels, reciprocity could plausibly be 
-treated as a general engine of cooperative behavior, sustaining helping throughout a community's 
-membership. The observed attenuation suggests a narrower role: reciprocity is most operative at 
-the point of entry, providing an early push into helping before community-specific motivations are 
-established. Newcomers lack the experience to value platform-specific incentives such as reputation 
-accumulation or norm identification. The general moral impulse to reciprocate, what 
-\citet{levine_logic_2020} terms the logic of universalization, is more prominent precisely because 
-these community-specific motivations have not yet taken hold.
+This gradient has implications for how reciprocity's role in online communities should be understood. If the effect were uniform across experience levels, reciprocity could plausibly be treated as a general engine of cooperative behavior, sustaining helping throughout a community's membership. The observed attenuation suggests a narrower role: reciprocity is most operative at the point of entry, providing an early push into helping before community-specific motivations are established. Newcomers lack the experience to value platform-specific incentives such as reputation accumulation or norm identification. The general moral impulse to reciprocate, what \citet{levine_logic_2020} terms the logic of universalization, is more prominent precisely because these community-specific motivations have not yet taken hold.
 
-As users accumulate experience, this account predicts that community-specific incentives gradually 
-displace the general reciprocal impulse. This is consistent with theories of norm displacement 
-\citep{benabou_incentives_2006}, which show how the introduction of external incentives can crowd 
-out moral motives. On Stack Overflow, reputation systems and status markers provide salient, 
-community-specific reasons to help that are not available to newcomers. The absence of a detectable 
-reciprocity effect among the most established users is consistent with this displacement account, 
-though we cannot directly observe the motivational shift that the theory posits.
+As users accumulate experience, this account predicts that community-specific incentives gradually displace the general reciprocal impulse. This is consistent with theories of norm displacement \citep{benabou_incentives_2006}, which show how the introduction of external incentives can crowd out moral motives. On Stack Overflow, reputation systems and status markers provide salient, community-specific reasons to help that are not available to newcomers. The absence of a detectable reciprocity effect among the most established users is consistent with this displacement account, though we cannot directly observe the motivational shift that the theory posits.
 
-This reframing also helps account for the inconsistency of findings in the prior literature. 
-Studies that draw primarily on samples of experienced users, or that aggregate across experience 
-levels dominated by experienced contributors, should find weaker reciprocity effects under this 
-account. Studies that capture behavior early in the user trajectory should find stronger ones. The 
-variation in prior findings may thus reflect not noise or methodological failure, but genuine 
+This reframing also helps account for the inconsistency of findings in the prior literature. Studies that draw primarily on samples of experienced users, or that aggregate across experience levels dominated by experienced contributors, should find weaker reciprocity effects under this account. Studies that capture behavior early in the user trajectory should find stronger ones. The variation in prior findings may thus reflect not noise or methodological failure, but genuine 
 heterogeneity in the effect across the user population.
 
 %----------------------------------------------------------------------
@@ -554,17 +491,16 @@ Several limitations constrain the conclusions that can be drawn from this analys
 
 The design identifies a behavioral response to answer receipt, but cannot identify the psychological mechanism producing it. Gratitude, moral obligation, and the re-engagement dynamics of platform sessions are all consistent with the observed patterns, and the data do not allow us to distinguish among them. Future work combining behavioral records with experience-sampling measures of emotional state or moral reasoning during platform use could help disentangle these pathways.
 
-The identification strategy rests on the assumption that, conditional on the matched covariates and the difference-in-differences structure, answer receipt is approximately independent of the potential outcomes for helping behavior. The propensity score matching substantially improves the comparability of treated and control observations, as confirmed by post-matching balance diagnostics. Unobserved time-varying factors, including changes in workload, access to alternative information sources, or exogenous variation in a user's availability, could nonetheless bias the estimates in ways that the design cannot rule out.
+The identification strategy rests on the assumption that, conditional on the matched covariates and the DiD structure, answer receipt is approximately independent of the potential outcomes for helping behavior. The propensity score matching substantially improves the comparability of treated and control observations, as confirmed by post-matching balance diagnostics. Unobserved time-varying factors, including changes in workload, access to alternative information sources, or exogenous variation in a user's availability, could nonetheless bias the estimates in ways that the design cannot rule out.
 
-Response time may partially proxy for question characteristics not fully captured by the tag-level answer rate, since questions that attract fast responses may differ systematically from those that wait. Future work with finer-grained measures of question difficulty, such as text-based complexity or specificity scores, could provide a cleaner test of the response time mechanism.
+Response time may partially proxy for question characteristics not fully captured by the tag-level answer rate, since questions that attract fast responses may differ systematically from those that wait. Future work with random treatment or finer-grained measures of question difficulty, such as text-based complexity or specificity scores, could provide a cleaner test of the response time mechanism.
 
 The re-engagement window interpretation rests on indirect evidence: the non-linearity in the discrete-bin analysis, the broadly negative continuous speed interactions, and descriptive patterns in the help-rate figures. Direct tests would require session-level data, including login and logout timestamps or inactivity-based session boundaries, to confirm that the peak effect occurs among users who left and were drawn back by the answer notification, and that very fast answers disproportionately end active sessions. This remains an important direction for future work.
 
 Stack Overflow is a large, relatively anonymous platform built around technical question-answering. The mechanisms identified here are likely to operate in other knowledge-sharing communities, but the specific patterns, including the tenure gradient, the shape of the re-engagement window, and the attenuation at high experience levels, may differ in smaller or more intimate settings, in intra-organizational platforms where social ties moderate motivation, or on platforms with different incentive structures.
 
-Finally, the analysis establishes that reciprocity declines with experience but does not characterize what replaces it. The theoretical argument implicates community-specific norms and status motives, but testing this account would require integrating behavioral analysis with direct measures of those alternative mechanisms, for instance, through surveys or experimental manipulations of reputation visibility.
-
+Finally, the analysis establishes that reciprocity declines with experience but does not characterize what replaces it. The theoretical argument implicates com\-munity-spe\-cific norms and status motives, but testing this account would require integrating behavioral analysis with direct measures of those alternative mechanisms, for instance, through surveys or experimental manipulations of reputation visibility.
 
 %=============================================================
 \section{Conclusion} \label{sec:conclusion} %=============================================================
-Generalized reciprocity is widely theorized as a mechanism sustaining cooperation on knowledge-sharing platforms, but observational evidence is limited by a persistent confound: active users are more likely both to seek help and to give it, regardless of whether their questions are resolved. Our matched difference-in-differences design addresses this confound. The effect is positive but more modest than prior reports suggest. Reciprocity is strongest among newcomers and disappears among the most established contributors, supporting a respecification of its role: not a general engine of community cooperation, but a recruitment mechanism that operates before platform-specific incentives displace the general moral impulse to reciprocate. The response time findings add a structural qualification: reciprocity peaks within a re-engagement window in which an answer arrives after a user has left the platform but while the question is still salient enough to draw them back. Answers arriving too quickly close an active session before re-engagement is possible; answers arriving too late find a user for whom the question no longer matters. Gratitude may be present in both cases, but whether it produces helping depends on the structural conditions of platform re-engagement --- a mechanism absent from laboratory settings that field theories of reciprocity need to incorporate. Platforms can leverage reciprocity at the point of entry, but not to sustain established contributors. They should prioritize ensuring newcomers receive answers, and attend to the conditions that make re-engagement possible when those answers arrive.
+Generalized reciprocity is widely theorized as a mechanism sustaining cooperation on knowledge-sharing platforms, but observational evidence is limited by a persistent confound: active users are more likely both to seek help and to give it, regardless of whether their questions are resolved. Our matched DiD design addresses this confound. The effect is positive but more modest than prior reports suggest. Reciprocity is strongest among newcomers and disappears among the most established contributors, supporting a respecification of its role: not a general engine of community cooperation, but a recruitment mechanism that operates before platform-specific incentives displace the general moral impulse to reciprocate. The response time findings add a structural qualification: reciprocity peaks within a re-engagement window in which an answer arrives after a user has left the platform but while the question is still salient enough to draw them back. Answers arriving too quickly close an active session before re-engagement is possible; answers arriving too late find a user for whom the question no longer matters. Gratitude may be present in both cases, but whether it produces helping depends on the structural conditions of platform re-engagement --- a mechanism absent from laboratory settings that field theories of reciprocity need to incorporate. Platforms can leverage reciprocity at the point of entry, but not to sustain established contributors. They should prioritize ensuring newcomers receive answers, and attend to the conditions that make re-engagement possible when those answers arrive.

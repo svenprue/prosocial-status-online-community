@@ -19,6 +19,9 @@
 %\placeholder{Include complete regression output for all models across all tenure buckets, including all covariates, standard errors, and model diagnostics.}
 \end{comment}
 
+\section{Code for the paper}
+Code for the paper can be found in the GitHub repo: \href{https://github.com/svenprue/prosocial-status-online-community}{svenprue/prosocial-status-online-community}
+
 \section{Matching Diagnostics}
 \label{sec:balance_plot}
 Figure \ref{fig:common_support} shows that there is sufficient common support between the treatment and the control group. The propensity score distribution between the original treated and control groups is similar. The distribution of the matched control is nearly identical to the treated group. 
@@ -26,7 +29,7 @@ Figure \ref{fig:common_support} shows that there is sufficient common support be
 \begin{figure}[!htbp]
     \centering
     \includegraphics[width=\textwidth]{../matching/common\_support.pdf}
-    \caption{Relationship between user experience and strength of status pursuit}
+    \caption{Distribution of propensity scores of treatment group, control group, and matched control group}
     \label{fig:common_support}
 \end{figure}
 
@@ -64,8 +67,8 @@ Figure \ref{fig:help_rate_by_tenure} shows that the post-question lift in treate
 
 Figure \ref{fig:help_rate_adoption_by_tenure} shows that for experienced users (all panels beyond $<$\,1 Week), the help rate of users still waiting (blue) exceeds that of users who have already received an answer (red), and both exceed the control baseline (grey dashed), up to approximately 1--2 hours post-question. This is consistent with the re-engagement window account: the pending-question state elevates engagement, and answer receipt collapses it back toward control levels. The newcomer panel ($<$\,1 Week) shows the reverse ordering, consistent with the gratitude-and-obligation mechanism dominating for users who do not promptly exit after receiving help.
 
-\section{Analysis of Life-Time Contributions \label{sec:lt-contributions}}
-What remains unclear is whether users who become contributors through generalized reciprocity continue to contribute consistently and become valuable community members. To explore this, I compare the contributions of reciprocity-activated users with those of all contributors selected for Study 1. Specifically, I examine the number of times users from each group provided and received help up to July 14, 2024. The results are presented in Table \ref{tab:quartile_statistics}. Across all quartiles and at the median, reciprocity-activated users ask and provide more help than their counterparts.
+section{Analysis of Life-Time Contributions \label{sec:lt-contributions}}
+What remains unclear is whether users who become contributors through generalized reciprocity continue to contribute consistently and become valuable community members. To explore this, we compare the contributions of reciprocity-activated users with those of all contributors selected for Study 1. Specifically, we examine the number of times users from each group provided and received help up to July 14, 2024. The results are presented in Table \ref{tab:quartile_statistics}. Across all quartiles and at the median, reciprocity-activated users ask and provide more help than their counterparts.
 For example, at the median, reciprocity-activated users provide eight answers and ask 13 questions, compared to six answers and 11 questions among all contributors. Similarly, the 75th percentile of reciprocity-activated users provides 23 answers and asks 29 questions, compared to 19 answers and 22 questions for all contributors.
 These findings suggest that users who begin contributing after receiving help become equally, if not more, engaged in the community's helping dynamics compared to all contributors. Furthermore, this analysis demonstrates that once users start contributing, the act of giving and receiving help becomes (at least temporarily) decoupled.
 
