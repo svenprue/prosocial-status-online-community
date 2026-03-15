@@ -121,7 +121,7 @@ For control users (those whose questions did not receive an answer), there is no
 
 The survival clock in our Cox models is centered on posting of the respective question: time zero corresponds to the start of the observation window ($T_{\text{question}} - 2\text{D}$), so that the question itself is posted at day~2 of the timeline and the observation window closes at day~4. All help events (answers posted by the focal user) are recorded with their exact timestamps and converted to elapsed time on this clock.
 
-\begin{figure}[H]
+\begin{figure}
 \caption{Study Design: Matched Difference-in-Differences Survival Analysis}
 \label{fig:study_design}
 \centering
@@ -206,7 +206,7 @@ We utilized the full sample of non-deleted questions from Stack Overflow's incep
 
 Table~\ref{tab:variables} provides an overview of the variables used in our analysis. The phase terminology is consistent with Figure~\ref{fig:study_design}: the pre-question phase captures baseline behavior, the waiting period spans the interval from question to answer, and the post-answer phase captures the period after the answer arrives. We use ``post-question'' to refer to the combined waiting period and post-answer phase whenever distinguishing between these two sub-periods is not necessary.
 
-\begin{table}[H]
+\begin{table}
 \caption{Overview of Variables}
 \label{tab:variables}
 \centering
@@ -245,7 +245,7 @@ Because the receipt of an answer (the treatment) is correlated with user charact
 We estimate the propensity score using the following pre-treatment covariates, which jointly capture user experience, recent activity, and question characteristics as depicted in Table \ref{tab:covariates}. It should be noted that \textit{tagAnswerRateAvg} is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low answer rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
 Matching on the tag-level answer rate is particularly important for our response time analysis, as it mitigates the concern that slower response times simply proxy for differently sized sub-communities with lower throughput. We use nearest-neighbor matching with a caliper of 0.05 on the propensity score.
 
-\begin{table}[H]
+\begin{table}
 \caption{Definition of Matching Covariates}
 \label{tab:covariates}
 \centering\small
@@ -289,7 +289,7 @@ tagAnswerRateAvg & Average share of questions that receive an answer within the 
 
 Table~\ref{tab:balance} displays the covariate balance before and after matching. Before matching, several covariates showed a meaningful imbalance between the treated and control groups. For instance, treated users had asked more questions in the prior 30 days (SMD\,=\,0.197) and 7 days (SMD\,=\,0.174), reflecting that users who ask questions that attract answers tend to be more recently active. The largest imbalance was in the tag-level answer rate (SMD\,=\,0.695), confirming that question topic characteristics strongly predict answer receipt and underscoring the importance of matching on this variable. After nearest-neighbor propensity score matching, all standardized mean differences fell well below the conventional threshold of 0.1, with the largest residual imbalance at 0.029 (see Table~\ref{tab:balance}). This confirms adequate balance across all matching covariates, and the balance is also illustrated in the Love plot in Appendix~\ref{sec:balance_plot}.
 
-\begin{table}[H]
+\begin{table}
 \caption{Covariate Balance Before and After Matching}
 \label{tab:balance}
 \centering\small
@@ -361,7 +361,7 @@ The dataset spans 24,537,194 question-level observations from 3,872,841 unique u
 \subsection{Descriptive Evidence: Help Rates and the Parallel Trends Assumption}
 %----------------------------------------------------------------------
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_pooled.pdf}
 \caption{Help rate over the $\pm$4-day observation window, pooled across all tenure buckets. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not).}
@@ -382,20 +382,20 @@ Table~\ref{tab:pooled_experienced} presents the pooled Cox model estimates acros
 \subsection{Experience Moderation of Reciprocity (H2)}
 %----------------------------------------------------------------------
 
-To test Hypothesis~2, we estimate the Cox model separately for each of the seven tenure buckets. Table~\ref{tab:main_results} reports the estimates, and Figure~\ref{fig:strength_rec} plots the corresponding hazard ratios.
+To test Hypothesis~2, we estimate the Cox model separately for each of the seven tenure buckets. Table~\ref{tab:main_results} reports the estimates, and Figure~\ref{fig:strength_rec} plots the corresponding hazard ratios. The reciprocity effect is statistically significant in six of the seven tenure buckets, and its magnitude broadly declines with platform experience. The effect is largest among newcomers with less than one week of tenure (coefficient\,=\,0.0880, HR\,=\,1.09, 95\% CI\,=\,[1.08, 1.11], $p < .001$). The hazard ratio dips to 1.04 (95\% CI\,=\,[1.02, 1.06], $p < .001$) for users with one week to one month of tenure, before stabilizing through the intermediate experience strata (one to six months: HR\,=\,1.05, [1.04, 1.07]; six to twelve months: HR\,=\,1.05, [1.03, 1.06]; one to three years: HR\,=\,1.04, [1.02, 1.05]). The effect continues to decline for more established users (three to six years: HR\,=\,1.02, [1.00, 1.03], $p < .05$) and is statistically indistinguishable from zero among users with more than six years of tenure (coefficient\,=\,$-$0.0080, HR\,=\,0.99, [0.97, 1.01], $p > .10$). This gradient is visible in Figure~\ref{fig:strength_rec}. The waiting period coefficients remain near zero across all strata, ruling out pre-trend confounds. These results support Hypothesis~2: the reciprocity effect is strongest among newcomers, broadly attenuates with experience, and disappears entirely among the most experienced users.
+
 
 \begin{landscape}
 \input{../analysis/output_tables/main_results}
 \end{landscape}
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/strength_rec.pdf}
 \caption{Strength of the generalized reciprocity effect across user experience. Bars show the hazard ratio for the treatment effect by tenure bucket. Error bars indicate 95\% confidence intervals.}
 \label{fig:strength_rec}
 \end{figure}
 
-The reciprocity effect is statistically significant in six of the seven tenure buckets, and its magnitude broadly declines with platform experience. The effect is largest among newcomers with less than one week of tenure (coefficient\,=\,0.0880, HR\,=\,1.09, 95\% CI\,=\,[1.08, 1.11], $p < .001$). The hazard ratio dips to 1.04 (95\% CI\,=\,[1.02, 1.06], $p < .001$) for users with one week to one month of tenure, before stabilizing through the intermediate experience strata (one to six months: HR\,=\,1.05, [1.04, 1.07]; six to twelve months: HR\,=\,1.05, [1.03, 1.06]; one to three years: HR\,=\,1.04, [1.02, 1.05]). The effect continues to decline for more established users (three to six years: HR\,=\,1.02, [1.00, 1.03], $p < .05$) and is statistically indistinguishable from zero among users with more than six years of tenure (coefficient\,=\,$-$0.0080, HR\,=\,0.99, [0.97, 1.01], $p > .10$). This gradient is visible in Figure~\ref{fig:strength_rec}. The waiting period coefficients remain near zero across all strata, ruling out pre-trend confounds. These results support Hypothesis~2: the reciprocity effect is strongest among newcomers, broadly attenuates with experience, and disappears entirely among the most experienced users.
 
 %----------------------------------------------------------------------
 \subsection{Response Time Moderation (H3)}
@@ -411,7 +411,7 @@ Within the tenure-stratified Cox models, the speed interaction is negative acros
 
 Because we saw that the control group helped more than the treatment group right after the question time (Figure~\ref{fig:help_rate_pooled}), we suspect that users with very short response times will show no treatment effect, potentially because some of them exit the platform right after receiving an answer. To probe this mechanism, Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For the very fastest responses, the effect is indistinguishable from zero (0--15 min: HR\,$\approx$\,1.00; 15--30 min: HR\,$\approx$\,1.01; both $p > .10$). The effect peaks sharply for questions answered in 30--60 minutes (HR\,$\approx$\,1.18, $p < .001$) and declines thereafter: one to two hours (HR\,$\approx$\,1.06, $p < .001$), two to four hours (HR\,$\approx$\,1.02, $p > .10$), four to eight hours (HR\,$\approx$\,0.99, $p > .10$), and eight to twelve hours (HR\,$\approx$\,1.02, $p > .10$). This inverted-U, with its peak at 30--60 minutes rather than at the very fastest response bin, is visible in Figure~\ref{fig:interaction_effect}.
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/interaction_effect.pdf}
 \caption{Treatment effect (hazard ratio) by response time bin, pooled across all tenure buckets. Each point shows the estimated hazard ratio for the treatment indicator within that response time bin, relative to the matched control. Error bars indicate 95\% confidence intervals.}
@@ -422,7 +422,7 @@ We interpret the non-linear pooled pattern through platform session dynamics. Wh
 
 Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive support. The plot compares users who have received an answer (red) and users who will receive one but are still waiting (blue). The gap between users who received help and those who still wait is small initially, then widens and converges at later responses, consistent with re-engagement being most likely in the intermediate response-time range. Tenure-stratified versions of this figure are in Appendix Figure~\ref{fig:help_rate_adoption_by_tenure}.
 
-\begin{figure}[H]
+\begin{figure}
 \centering
 \includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_adoption_pooled.pdf}
 \caption{Help rate in the post-question window by answer-receipt status, pooled across all tenure buckets. Grey dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (No answer yet). Red: treated users who have already received an answer (Answer received). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour.}
