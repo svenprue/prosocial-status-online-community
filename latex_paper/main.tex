@@ -1,136 +1,108 @@
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Template for a conference paper, prepared for the
-%% Food and Resource Economics Department - IFAS
-%% UNIVERSITY OF FLORIDA
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Version 1.0 // November 2019
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Ariel Soto-Caro
-%%  - asotocaro@students.uu.nl
-%%  - arielsotocaro@gmail.com
-%% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% =========================================================
+%% arXiv preprint
+%% =========================================================
 \documentclass[12pt]{article}
-\usepackage{UF_FRED_paper_style}
 
-% inline comments
-\usepackage[colorinlistoftodos]{todonotes}
+%% ----- Encoding & Language --------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[american]{babel}
 
-\usepackage{lipsum}  %% Package to create dummy text (comment or erase before start)
-\usepackage{verbatim}
+%% ----- Fonts & Spacing -----------------------------------
+\usepackage{palatino}
+\fontfamily{ppl}\selectfont
+\usepackage{setspace}
+\onehalfspacing                  % arXiv standard (double-space for journal submission)
+
+%% ----- Page Layout ---------------------------------------
+\usepackage[letterpaper, margin=1in]{geometry}
+
+%% ----- Math ----------------------------------------------
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{dcolumn}
+
+%% ----- Graphics & Figures --------------------------------
+\usepackage{graphicx}
 \usepackage{float}
-\usepackage{import}
-
-
-% Graphics rendering using TikZ
-% See: https://en.wikibooks.org/wiki/LaTeX/PGF/TikZ
+\usepackage{subcaption}
 \usepackage{tikz}
-% Include required TikZ libraries here, some exemplary libraries are pre-included
-\usetikzlibrary{calc}
-\usetikzlibrary{matrix}
-\usetikzlibrary{positioning}
-\usetikzlibrary{shapes.geometric}
-\usetikzlibrary{decorations.pathreplacing}
-\usepackage{pdflscape} 
+\usetikzlibrary{calc,matrix,positioning,shapes.geometric,decorations.pathreplacing}
+\usepackage{pdflscape}
+\usepackage{lscape}
+\usepackage{placeins}
 
-
-% self added
+%% ----- Tables --------------------------------------------
+\usepackage{booktabs}
+\usepackage{multirow}
 \usepackage{multicol}
 \usepackage{threeparttable}
-\usepackage{lscape}
 \usepackage{longtable}
-\usepackage{verbatim}
-\usepackage{graphics}
-\usepackage{placeins}
+\usepackage{tabularx}
+\usepackage{adjustbox}
+
+%% ----- References & Links --------------------------------
+\usepackage{natbib}
+\bibliographystyle{apa-good.bst}
 \usepackage{hyperref}
-\usepackage{booktabs}
-\usepackage{amsmath}
-\usepackage{dcolumn}
-%\usepackage[margin=1in]{geometry} % Adjust page margins
-\usepackage{float}               % For [H] float specifier
-\usepackage{tabularx}            % For flexible table widths
-\usepackage{booktabs}            % For professional table formatting
-\usepackage{adjustbox}           % For scaling wide tables to fit text width
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=blue,
+    urlcolor=blue
+}
 
-% --- Placeholder command ---
+%% ----- Misc ----------------------------------------------
+\usepackage[colorinlistoftodos]{todonotes}
+\usepackage{verbatim}
+\usepackage{import}
+\usepackage{titling}
+
+%% ----- Custom Commands -----------------------------------
 \newcommand{\placeholder}[1]{\textcolor{red}{[#1]}}
-
-% --- Hyperlink targets for hypotheses ---
 \newcommand{\hypmark}[1]{\hypertarget{#1}{}}
 
-%% ===============================================
-%% Setting the line spacing (3 options: only pick one)
- \doublespacing
-%  \singlespacing
-%  \onehalfspacing
-%% ===============================================
-
-\setlength{\droptitle}{-5em} %% Don't touch
-
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% SET THE TITLE
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% TITLE:
+%% =========================================================
+%% Title / Authors
+%% =========================================================
 \title{Help Converts Newcomers, Not Veterans: Generalized Reciprocity and Platform Engagement on Stack Overflow}
 
-% AUTHORS:
-%\author{}
-% DATE:
+\author{}
+
 \date{\today}
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% =========================================================
 \begin{document}
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% ABSTRACT
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-{\setstretch{.8}
+%% =========================================================
+
 \maketitle
+\thispagestyle{empty}
 
-% %%%%%%%%%%%%%%%%%%
-
+%% ----- Abstract ------------------------------------------
 \begin{abstract}
 \noindent Generalized reciprocity — the tendency to help others after receiving help oneself — is widely theorized as a mechanism sustaining cooperation on online knowledge-sharing platforms. Yet robust empirical evidence from field settings remains surprisingly scarce. Prior studies relying on survey self-reports struggle to distinguish reciprocity from other prosocial motives, while observational designs confound reciprocity with baseline user activity, producing upward-biased estimates. We address these empirical challenges by developing a matched difference-in-differences survival analysis that leverages the temporal structure of help-seeking and help-giving on Stack Overflow. Using Cox proportional hazards models on over 21 million questions, we find that receiving an answer significantly increases a user's propensity to help others, but this effect is concentrated among newcomers and declines with platform experience. This pattern suggests that reciprocity functions primarily as a contributor-recruitment mechanism, operating before platform-specific incentives such as reputation and status displace the general moral impulse to reciprocate. Response time moderates the effect, but non-linearly: reciprocity peaks for answers arriving within a re-engagement window of roughly thirty to sixty minutes. These findings contribute to the theory of generalized reciprocity and have implications for platform design.
 
-
-% END CONTENT ABS------------------------------------------
-\noindent
-%\textit{\textbf{Keywords: }%
-%Labour Force Participation; Mothers; Economic Motive; Cultural Motive; In-cash policies; In-child policies.} \\ %% <-- Keywords HERE!
-%\noindent
-%\textit{\textbf{JEL Classification: }%
-%Q12; C22; D81.} %% <-- JEL code HERE!
-\textbf{Keywords:} generalized reciprocity, online communities, knowledge sharing, survival analysis, platform design, Stack Overflow
-
+\bigskip
+\noindent\textbf{Keywords:} generalized reciprocity, online communities, knowledge sharing, survival analysis, platform design, Stack Overflow
 \end{abstract}
+
 \newpage
-}
 
-%\todo[inline]{Diff-in-Diff Analyse: Community Volume and Complexity; \\ Reciprocity-activated: lifetime comments, answers, accepted answers}
-
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% BODY OF THE DOCUMENT
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
+%% =========================================================
+%% Body
+%% =========================================================
 \input{body}
 
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% REFERENCES SECTION
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% =========================================================
+%% References
+%% =========================================================
 \medskip
+\bibliography{references.bib, references-2}
 
-\bibliography{references.bib, references-2} 
-
-
+%% =========================================================
+%% Appendix
+%% =========================================================
 \newpage
 \appendix
 \input{appendix}
 
 \end{document}
-
