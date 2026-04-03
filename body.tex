@@ -192,7 +192,7 @@ The survival clock in our Cox models is centered on posting of the respective qu
 \parbox{\textwidth}{\footnotesize\textit{Note.} Each observation window spans 4 days centered on the focal question ($T_Q$). The treated timeline (top) shows three phases: the pre-question phase (baseline), the waiting period (question posted, no answer yet), and the post-answer phase (after the first qualifying answer $T_A$ arrives). The control timeline (bottom) is from a propensity-score-matched user whose question did not receive an answer. To ensure temporal alignment, the control's post-question period is split at a synthetic transition point matching the treated user's response time. Red markers indicate help events (answers posted by the focal user to other users' questions). The treatment effect is the differential change in helping hazard between treated and control observations in the post-answer phase, relative to the pre-question baseline. The staggered timing of $T_A$ across observations motivates our use of matched DiD.}
 \end{figure}
 
-Within each timeline, we track all instances in which the user provides an answer to another user's question. These helping events constitute the outcome in our survival analysis. Conceptually, our design asks: Does the hazard of helping increase after a user receives an answer, relative to the change in hazard for a matched user who does not receive an answer? We present descriptive evidence on the raw help rates over this timeline in Section~\ref{sec:results} (Figure~\ref{fig:help_rate_2panel}), before turning to the formal Cox model estimates.
+Within each timeline, we track all instances in which the user provides an answer to another user's question. These helping events constitute the outcome in our survival analysis. Conceptually, our design asks: Does the hazard of helping increase after a user receives an answer, relative to the change in hazard for a matched user who does not receive an answer? We present descriptive evidence on the raw help rates over this timeline in Section~\ref{sec:results} (Figure~\ref{fig:help_rate_pooled}), before turning to the formal Cox model estimates.
 
 %----------------------------------------------------------------------
 \subsection{Data}
@@ -271,7 +271,7 @@ numQuestionsAsked7D & Number of questions asked in the 7 days preceding the obse
 
 numHelpProvided7D & Number of answers provided in the 7 days preceding the observation window. \\
 
-tagAnswerRateAvg & Average share of questions that receive an answer within the question's tags, capturing topic-specific difficulty.
+tagAnswerRateAvg & Average share of questions that receive an answer within the question's tags, capturing topic-specific difficulty. \\
 \bottomrule
 \end{tabular}
 \end{table}
