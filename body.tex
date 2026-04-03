@@ -354,7 +354,7 @@ h(t \mid \mathbf{X}(t)) = h_0(t) \exp\Big(\boldsymbol{\beta}' \mathbf{X}(t) \\
 
 The dataset spans 24,537,194 question-level observations from 3,872,841 unique users on Stack Overflow, with 50\% of questions receiving at least one answer. The matched analytic sample retains one treated and one matched control user per question, yielding a 50\% treatment rate by construction. Help-event counts are right-skewed: the mean is 0.18 events per observation window (SD\,=\,1.26), consistent with helping being a relatively rare behavior for any individual user in any given window. Among treated users, the median response time from question to first answer is 0.34 hours, though the distribution is heavily right-skewed (mean 5.09 hours, SD\,=\,17.09), reflecting a minority of questions that wait many hours or days for a response. The sample spans all levels of platform experience, with the largest strata being early-experienced users (1--6 months: $n=4{,}078{,}207$) and established users (1--3 years: $n=6{,}473{,}619$).
 
-\input{../analysis/output_tables/desc_stats}
+\input{analysis/output_tables/desc_stats}
 
 
 %----------------------------------------------------------------------
@@ -363,7 +363,7 @@ The dataset spans 24,537,194 question-level observations from 3,872,841 unique u
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_pooled.pdf}
+\includegraphics[width=\textwidth]{analysis/output_figures/help_rate_pooled.pdf}
 \caption{Help rate over the $\pm$4-day observation window, pooled across all tenure buckets. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not).}
 \label{fig:help_rate_pooled}
 \end{figure}
@@ -377,7 +377,7 @@ Figure~\ref{fig:help_rate_pooled} plots the normalized help rate for treated and
 
 Table~\ref{tab:pooled_experienced} presents the pooled Cox model estimates across all experience levels. The coefficient on \textit{Received Answer $\times$ Post-Answer Received}, which captures the additional lift in helping hazard for treated users after receiving an answer relative to matched controls, is positive and highly statistically significant ($p < .001$). The estimated hazard ratio is 1.058 (95\%~CI\,=\,[1.04, 1.07]), indicating an approximately 5.8\% increase in the instantaneous rate of helping after receiving an answer. The waiting period coefficient (\textit{Received Answer $\times$ Post-Question}) is effectively zero ($-$0.005, $p > .10$), confirming that the lift in helping is attributable specifically to the arrival of the answer rather than to the act of asking itself. These results provide support for Hypothesis~1: receiving help increases a user's propensity to help others on the platform.
 
-\input{../analysis/output_tables/regression_all.tex}
+\input{analysis/output_tables/regression_all.tex}
 
 
 %----------------------------------------------------------------------
@@ -388,13 +388,13 @@ To test Hypothesis~2, we estimate the Cox model separately for each of the seven
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{../analysis/output_figures/strength_rec.pdf}
+\includegraphics[width=\textwidth]{analysis/output_figures/strength_rec.pdf}
 \caption{Strength of the generalized reciprocity effect across user experience. Bars show the hazard ratio for the treatment effect by tenure bucket. Error bars indicate 95\% confidence intervals.}
 \label{fig:strength_rec}
 \end{figure}
 
 \begin{landscape}
-\input{../analysis/output_tables/main_results}
+\input{analysis/output_tables/main_results}
 \end{landscape}
 
 
@@ -411,14 +411,14 @@ Within the tenure-stratified Cox models, the speed interaction is negative acros
 Because we observed that the control group helped more than the treatment group immediately after the question time (Figure~\ref{fig:help_rate_pooled}), we suspect that users with very short response times will exhibit no treatment effect, potentially because some of them exit the platform immediately after receiving an answer. To probe this mechanism, Figure~\ref{fig:interaction_effect} plots the treatment effect (expressed as a hazard ratio) by discrete response time bins, pooled across all tenure groups. For the very fastest responses, the effect is indistinguishable from zero (0--15 min: HR\,$\approx$\,1.00; 15--30 min: HR\,$\approx$\,1.01; both $p > .10$). The effect peaks sharply for questions answered in 30--60 minutes (HR\,$\approx$\,1.18, $p < .001$) and declines thereafter: one to two hours (HR\,$\approx$\,1.06, $p < .001$), two to four hours (HR\,$\approx$\,1.02, $p > .10$), four to eight hours (HR\,$\approx$\,0.99, $p > .10$), and eight to twelve hours (HR\,$\approx$\,1.02, $p > .10$). This inverted-U, with its peak at 30--60 minutes rather than at the very fastest response bin, is visible in Figure~\ref{fig:interaction_effect}.
 
 \begin{landscape}
-\input{../analysis/output_tables/speed_results}
+\input{analysis/output_tables/speed_results}
 \end{landscape}
 
 
 
 \begin{figure}[h]
 \centering
-\includegraphics[width=\textwidth]{../analysis/output_figures/interaction_effect.pdf}
+\includegraphics[width=\textwidth]{analysis/output_figures/interaction_effect.pdf}
 \caption{Treatment effect (hazard ratio) by response time bin, pooled across all tenure buckets. Each point represents the estimated hazard ratio of the treatment indicator within that response-time bin, relative to the matched control. Error bars indicate 95\% confidence intervals.}
 \label{fig:interaction_effect}
 \end{figure}
@@ -429,7 +429,7 @@ Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive support. The plo
 
 \begin{figure}
 \centering
-\includegraphics[width=\textwidth]{../analysis/output_figures/help_rate_adoption_pooled.pdf}
+\includegraphics[width=\textwidth]{analysis/output_figures/help_rate_adoption_pooled.pdf}
 \caption{Help rate in the post-question window by answer-receipt status, pooled across all tenure buckets. Grey dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (No answer yet). Red: treated users who have already received an answer (Answer received). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour.}
 \label{fig:help_rate_adoption_pooled}
 \end{figure}
