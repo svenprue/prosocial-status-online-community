@@ -1,0 +1,275 @@
+\begin{thebibliography}{31}
+\expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
+\providecommand{\url}[1]{\texttt{#1}}
+\providecommand{\href}[2]{#2}
+\providecommand{\path}[1]{#1}
+\providecommand{\DOIprefix}{doi:}
+\providecommand{\ArXivprefix}{arXiv:}
+\providecommand{\URLprefix}{URL: }
+\providecommand{\Pubmedprefix}{pmid:}
+\providecommand{\doi}[1]{\href{http://dx.doi.org/#1}{\path{#1}}}
+\providecommand{\Pubmed}[1]{\href{pmid:#1}{\path{#1}}}
+\providecommand{\bibinfo}[2]{#2}
+\ifx\xfnm\relax \def\xfnm[#1]{\unskip,\space#1}\fi
+%Type = Article
+\bibitem[{Andersen and Gill(1982)}]{andersen_gill_1982}
+\bibinfo{author}{Andersen, P.K.}, \bibinfo{author}{Gill, R.D.},
+  \bibinfo{year}{1982}.
+\newblock \bibinfo{title}{Cox's regression model for counting processes: A
+  large sample study}.
+\newblock \bibinfo{journal}{The Annals of Statistics} \bibinfo{volume}{10},
+  \bibinfo{pages}{1100--1120}.
+\newblock \DOIprefix\doi{10.1214/aos/1176345976}.
+%Type = Article
+\bibitem[{Baker and Bulkley(2014)}]{baker_paying_2014}
+\bibinfo{author}{Baker, W.E.}, \bibinfo{author}{Bulkley, N.},
+  \bibinfo{year}{2014}.
+\newblock \bibinfo{title}{Paying {It} {Forward} vs. {Rewarding} {Reputation}:
+  {Mechanisms} of {Generalized} {Reciprocity}}.
+\newblock \bibinfo{journal}{Organization Science} \bibinfo{volume}{25},
+  \bibinfo{pages}{1493--1510}.
+%Type = Article
+\bibitem[{Bartlett and DeSteno(2006)}]{bartlett_gratitude_2006}
+\bibinfo{author}{Bartlett, M.Y.}, \bibinfo{author}{DeSteno, D.},
+  \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Gratitude and {Prosocial} {Behavior}: {Helping}
+  {When} {It} {Costs} {You}}.
+\newblock \bibinfo{journal}{Psychological Science} \bibinfo{volume}{17},
+  \bibinfo{pages}{319--325}.
+%Type = Book
+\bibitem[{Batson(1991)}]{batson1991altruism}
+\bibinfo{author}{Batson, C.D.}, \bibinfo{year}{1991}.
+\newblock \bibinfo{title}{The {Altruism} {Question}: {Toward} a
+  {Social}-{Psychological} {Answer}}.
+\newblock \bibinfo{publisher}{Lawrence Erlbaum Associates},
+  \bibinfo{address}{Hillsdale, NJ}.
+%Type = Article
+\bibitem[{Boyd and Richerson(1989)}]{boyd_evolution_1989}
+\bibinfo{author}{Boyd, R.}, \bibinfo{author}{Richerson, P.J.},
+  \bibinfo{year}{1989}.
+\newblock \bibinfo{title}{The evolution of indirect reciprocity}.
+\newblock \bibinfo{journal}{Social Networks} \bibinfo{volume}{11},
+  \bibinfo{pages}{213--236}.
+\newblock \DOIprefix\doi{https://doi.org/10.1016/0378-8733(89)90003-8}.
+%Type = Article
+\bibitem[{Bénabou and Tirole(2006)}]{benabou_incentives_2006}
+\bibinfo{author}{Bénabou, R.}, \bibinfo{author}{Tirole, J.},
+  \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Incentives and {Prosocial} {Behavior}}.
+\newblock \bibinfo{journal}{American Economic Review} \bibinfo{volume}{96},
+  \bibinfo{pages}{1652--1678}.
+\newblock \DOIprefix\doi{10.1257/aer.96.5.1652}.
+%Type = Article
+\bibitem[{Callaway and Sant'Anna(2021)}]{callaway_santanna_2021}
+\bibinfo{author}{Callaway, B.}, \bibinfo{author}{Sant'Anna, P.H.C.},
+  \bibinfo{year}{2021}.
+\newblock \bibinfo{title}{Difference-in-differences with multiple time
+  periods}.
+\newblock \bibinfo{journal}{Journal of Econometrics} \bibinfo{volume}{225},
+  \bibinfo{pages}{200--230}.
+\newblock \DOIprefix\doi{10.1016/j.jeconom.2020.12.001}.
+%Type = Article
+\bibitem[{Chen et~al.(2019)Chen, Baird and Straub}]{chen_why_2019}
+\bibinfo{author}{Chen, L.}, \bibinfo{author}{Baird, A.},
+  \bibinfo{author}{Straub, D.}, \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Why do participants continue to contribute?
+  {Evaluation} of usefulness voting and commenting motivational affordances
+  within an online knowledge community}.
+\newblock \bibinfo{journal}{Decision Support Systems} \bibinfo{volume}{118},
+  \bibinfo{pages}{21--32}.
+\newblock \DOIprefix\doi{https://doi.org/10.1016/j.dss.2018.12.008}.
+%Type = Article
+\bibitem[{Chen et~al.(2018)Chen, Wei and Zhu}]{chen_engaging_2018}
+\bibinfo{author}{Chen, W.}, \bibinfo{author}{Wei, X.}, \bibinfo{author}{Zhu,
+  K.X.}, \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Engaging {Voluntary} {Contributions} in {Online}
+  {Communities}: {A} {Hidden} {Markov} {Model}}.
+\newblock \bibinfo{journal}{MIS Quarterly} \bibinfo{volume}{42},
+  \bibinfo{pages}{83--100}.
+%Type = Article
+\bibitem[{Cox(1972)}]{cox_regression_1972}
+\bibinfo{author}{Cox, D.R.}, \bibinfo{year}{1972}.
+\newblock \bibinfo{title}{Regression {Models} and {Life}-{Tables}}.
+\newblock \bibinfo{journal}{Journal of the Royal Statistical Society: Series B
+  (Methodological)} \bibinfo{volume}{34}, \bibinfo{pages}{187--202}.
+\newblock \URLprefix
+  \url{https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/j.2517-6161.1972.tb00899.x},
+  \DOIprefix\doi{https://doi.org/10.1111/j.2517-6161.1972.tb00899.x}.
+%Type = Article
+\bibitem[{Curry et~al.(2019)Curry, Mullins and Whitehouse}]{curry_is_2019}
+\bibinfo{author}{Curry, O.S.}, \bibinfo{author}{Mullins, D.A.},
+  \bibinfo{author}{Whitehouse, H.}, \bibinfo{year}{2019}.
+\newblock \bibinfo{title}{Is {It} {Good} to {Cooperate}? {Testing} the {Theory}
+  of {Morality}-as-{Cooperation} in 60 {Societies}}.
+\newblock \bibinfo{journal}{Current Anthropology} \bibinfo{volume}{60},
+  \bibinfo{pages}{47--69}.
+\newblock \DOIprefix\doi{10.1086/701478}.
+%Type = Incollection
+\bibitem[{Elster(2009)}]{elster_norms_2009}
+\bibinfo{author}{Elster, J.}, \bibinfo{year}{2009}.
+\newblock \bibinfo{title}{Norms}, in: \bibinfo{booktitle}{The {Oxford}
+  {Handbook} of {Analytical} {Sociology}}. \bibinfo{publisher}{Oxford
+  University Press}, \bibinfo{address}{Oxford}. Research {Handbook} on
+  {Analytical} {Sociology}, pp. \bibinfo{pages}{195--217}.
+%Type = Article
+\bibitem[{Fowler and Christakis(2010)}]{fowler_cooperative_2010}
+\bibinfo{author}{Fowler, J.H.}, \bibinfo{author}{Christakis, N.A.},
+  \bibinfo{year}{2010}.
+\newblock \bibinfo{title}{Cooperative behavior cascades in human social
+  networks}.
+\newblock \bibinfo{journal}{Proceedings of the National Academy of Sciences}
+  \bibinfo{volume}{107}, \bibinfo{pages}{5334--5338}.
+\newblock \DOIprefix\doi{10.1073/pnas.0913149107}.
+%Type = Article
+\bibitem[{Greiner and Levati(2005)}]{greiner_indirect_2005}
+\bibinfo{author}{Greiner, B.}, \bibinfo{author}{Levati, M.V.},
+  \bibinfo{year}{2005}.
+\newblock \bibinfo{title}{Indirect reciprocity in cyclical networks: {An}
+  experimental study}.
+\newblock \bibinfo{journal}{Journal of Economic Psychology}
+  \bibinfo{volume}{26}, \bibinfo{pages}{711--731}.
+\newblock \DOIprefix\doi{https://doi.org/10.1016/j.joep.2004.04.003}.
+%Type = Article
+\bibitem[{Joyce and Kraut(2006)}]{joyce_predicting_2006}
+\bibinfo{author}{Joyce, E.}, \bibinfo{author}{Kraut, R.E.},
+  \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Predicting {Continued} {Participation} in
+  {Newsgroups}}.
+\newblock \bibinfo{journal}{Journal of Computer-Mediated Communication}
+  \bibinfo{volume}{11}, \bibinfo{pages}{723--747}.
+\newblock \DOIprefix\doi{10.1111/j.1083-6101.2006.00033.x}.
+%Type = Article
+\bibitem[{Lakhani(2003)}]{lakhani_how_2003}
+\bibinfo{author}{Lakhani, K.R.}, \bibinfo{year}{2003}.
+\newblock \bibinfo{title}{How open source software works: “free”
+  user-to-user assistance}.
+\newblock \bibinfo{journal}{Research Policy} \bibinfo{volume}{32},
+  \bibinfo{pages}{923--943}.
+%Type = Article
+\bibitem[{Levine et~al.(2020)Levine, Kleiman-Weiner, Schulz, Tenenbaum and
+  Cushman}]{levine_logic_2020}
+\bibinfo{author}{Levine, S.}, \bibinfo{author}{Kleiman-Weiner, M.},
+  \bibinfo{author}{Schulz, L.}, \bibinfo{author}{Tenenbaum, J.},
+  \bibinfo{author}{Cushman, F.}, \bibinfo{year}{2020}.
+\newblock \bibinfo{title}{The logic of universalization guides moral judgment}.
+\newblock \bibinfo{journal}{Proceedings of the National Academy of Sciences}
+  \bibinfo{volume}{117}, \bibinfo{pages}{26158--26169}.
+\newblock \DOIprefix\doi{10.1073/pnas.2014505117}.
+%Type = Article
+\bibitem[{McClelland et~al.(1989)McClelland, Koestner and
+  Weinberger}]{mcclelland_how_1989}
+\bibinfo{author}{McClelland, D.C.}, \bibinfo{author}{Koestner, R.},
+  \bibinfo{author}{Weinberger, J.}, \bibinfo{year}{1989}.
+\newblock \bibinfo{title}{How do self-attributed and implicit motives differ?}
+\newblock \bibinfo{journal}{Psychological Review} \bibinfo{volume}{96},
+  \bibinfo{pages}{690--702}.
+\newblock \DOIprefix\doi{10.1037/0033-295X.96.4.690}. \bibinfo{note}{place: US
+  Publisher: American Psychological Association}.
+%Type = Article
+\bibitem[{McCullough et~al.(2001)McCullough, Kilpatrick, Emmons and
+  Larson}]{mccullough_is_2001}
+\bibinfo{author}{McCullough, M.E.}, \bibinfo{author}{Kilpatrick, S.D.},
+  \bibinfo{author}{Emmons, R.A.}, \bibinfo{author}{Larson, D.B.},
+  \bibinfo{year}{2001}.
+\newblock \bibinfo{title}{Is gratitude a moral affect?}
+\newblock \bibinfo{journal}{Psychological Bulletin} \bibinfo{volume}{127},
+  \bibinfo{pages}{249--266}.
+%Type = Article
+\bibitem[{McCullough et~al.(2008)McCullough, Kimeldorf and
+  Cohen}]{mccullough_adaptation_2008}
+\bibinfo{author}{McCullough, M.E.}, \bibinfo{author}{Kimeldorf, M.B.},
+  \bibinfo{author}{Cohen, A.D.}, \bibinfo{year}{2008}.
+\newblock \bibinfo{title}{An {Adaptation} for {Altruism}: {The} {Social}
+  {Causes}, {Social} {Effects}, and {Social} {Evolution} of {Gratitude}}.
+\newblock \bibinfo{journal}{Current Directions in Psychological Science}
+  \bibinfo{volume}{17}, \bibinfo{pages}{281--285}.
+\newblock \DOIprefix\doi{10.1111/j.1467-8721.2008.00590.x}.
+%Type = Article
+\bibitem[{Molm et~al.(2007)Molm, Collett and Schaefer}]{molm_building_2007}
+\bibinfo{author}{Molm, L.D.}, \bibinfo{author}{Collett, J.L.},
+  \bibinfo{author}{Schaefer, D.R.}, \bibinfo{year}{2007}.
+\newblock \bibinfo{title}{Building {Solidarity} through {Generalized}
+  {Exchange}: {A} {Theory} of {Reciprocity}}.
+\newblock \bibinfo{journal}{American Journal of Sociology}
+  \bibinfo{volume}{113}, \bibinfo{pages}{205--242}.
+\newblock \DOIprefix\doi{10.1086/517900}.
+%Type = Article
+\bibitem[{Mujcic and Leibbrandt(2018)}]{mujcic_indirect_2018}
+\bibinfo{author}{Mujcic, R.}, \bibinfo{author}{Leibbrandt, A.},
+  \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{Indirect reciprocity and prosocial behaviour:
+  evidence from a natural field experiment}.
+\newblock \bibinfo{journal}{The Economic Journal} \bibinfo{volume}{128},
+  \bibinfo{pages}{1683--1699}.
+%Type = Article
+\bibitem[{Nowak and Roch(2007)}]{nowak_upstream_2007}
+\bibinfo{author}{Nowak, M.A.}, \bibinfo{author}{Roch, S.},
+  \bibinfo{year}{2007}.
+\newblock \bibinfo{title}{Upstream reciprocity and the evolution of gratitude}.
+\newblock \bibinfo{journal}{Proceedings of the Royal Society B: Biological
+  Sciences} \bibinfo{volume}{274}, \bibinfo{pages}{605--610}.
+%Type = Article
+\bibitem[{Rosenbaum and Rubin(1983)}]{rosenbaum_rubin_1983}
+\bibinfo{author}{Rosenbaum, P.R.}, \bibinfo{author}{Rubin, D.B.},
+  \bibinfo{year}{1983}.
+\newblock \bibinfo{title}{The central role of the propensity score in
+  observational studies for causal effects}.
+\newblock \bibinfo{journal}{Biometrika} \bibinfo{volume}{70},
+  \bibinfo{pages}{41--55}.
+\newblock \DOIprefix\doi{10.1093/biomet/70.1.41}.
+%Type = Misc
+\bibitem[{{Stack Exchange Inc.}(2024)}]{stack_exchange_inc_how_2024}
+\bibinfo{author}{{Stack Exchange Inc.}}, \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{How does {Stack} {Overflow} work?}
+\newblock \URLprefix \url{https://stackoverflow.com/help}.
+%Type = Misc
+\bibitem[{{Stack Overflow}(2024)}]{stack_overflow_stack_2024}
+\bibinfo{author}{{Stack Overflow}}, \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{Stack {Overflow} {Developer} {Survey} 2024}.
+\newblock \URLprefix \url{https://survey.stackoverflow.co/2024/}.
+%Type = Article
+\bibitem[{Stanca(2009)}]{stanca_measuring_2009}
+\bibinfo{author}{Stanca, L.}, \bibinfo{year}{2009}.
+\newblock \bibinfo{title}{Measuring indirect reciprocity: {Whose} back do we
+  scratch?}
+\newblock \bibinfo{journal}{Journal of Economic Psychology}
+  \bibinfo{volume}{30}, \bibinfo{pages}{190--202}.
+\newblock \DOIprefix\doi{https://doi.org/10.1016/j.joep.2008.07.010}.
+%Type = Article
+\bibitem[{Tsang(2006)}]{tsang_gratitude_2006}
+\bibinfo{author}{Tsang, J.A.}, \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Gratitude and prosocial behaviour: {An} experimental
+  test of gratitude}.
+\newblock \bibinfo{journal}{Cognition and Emotion} \bibinfo{volume}{20},
+  \bibinfo{pages}{138--148}.
+\newblock \DOIprefix\doi{10.1080/02699930500172341}.
+%Type = Article
+\bibitem[{Vaisey(2009)}]{vaisey_motivation_2009}
+\bibinfo{author}{Vaisey, S.}, \bibinfo{year}{2009}.
+\newblock \bibinfo{title}{Motivation and {Justification}: {A}
+  {Dual}‐{Process} {Model} of {Culture} in {Action}}.
+\newblock \bibinfo{journal}{American Journal of Sociology}
+  \bibinfo{volume}{114}, \bibinfo{pages}{1675--1715}.
+\newblock \DOIprefix\doi{10.1086/597179}. \bibinfo{note}{publisher: The
+  University of Chicago Press}.
+%Type = Article
+\bibitem[{Wasko and Faraj(2000)}]{wasko_it_2000}
+\bibinfo{author}{Wasko, M.M.}, \bibinfo{author}{Faraj, S.},
+  \bibinfo{year}{2000}.
+\newblock \bibinfo{title}{“{It} is what one does”: why people participate
+  and help others in electronic communities of practice}.
+\newblock \bibinfo{journal}{The Journal of Strategic Information Systems}
+  \bibinfo{volume}{9}, \bibinfo{pages}{155--173}.
+\newblock \DOIprefix\doi{https://doi.org/10.1016/S0963-8687(00)00045-7}.
+%Type = Article
+\bibitem[{Wasko and Faraj(2005)}]{wasko_why_2005}
+\bibinfo{author}{Wasko, M.M.}, \bibinfo{author}{Faraj, S.},
+  \bibinfo{year}{2005}.
+\newblock \bibinfo{title}{Why {Should} {I} {Share}? {Examining} {Social}
+  {Capital} and {Knowledge} {Contribution} in {Electronic} {Networks} of
+  {Practice}}.
+\newblock \bibinfo{journal}{MIS Quarterly} \bibinfo{volume}{29},
+  \bibinfo{pages}{35--57}.
+\newblock \DOIprefix\doi{10.2307/25148667}.
+
+\end{thebibliography}
