@@ -1,0 +1,46 @@
+%% =========================================================
+%% Computers in Human Behavior — anonymized manuscript
+%% Compile from repo root: pdflatex manuscript && bibtex manuscript && pdflatex manuscript && pdflatex manuscript
+%% Submit this file together with body.tex, appendix.tex, figures, and bibliography files.
+%% Author-identifying material belongs in title_page.tex only.
+%% =========================================================
+\documentclass[preprint,12pt,authoryear]{elsarticle}
+
+\journal{Computers in Human Behavior}
+
+\input{preamble}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{Help Converts Newcomers, Not Veterans: Generalized Reciprocity and Platform Engagement on Stack Overflow}
+
+\begin{abstract}
+\noindent Generalized reciprocity --- the tendency to help others after receiving help oneself --- is widely theorized as a mechanism sustaining cooperation on online knowledge-sharing platforms. Yet robust empirical evidence from field settings remains surprisingly scarce. Prior studies relying on survey self-reports struggle to distinguish reciprocity from other prosocial motives, while observational designs confound reciprocity with baseline user activity, producing upward-biased estimates. We address these empirical challenges by developing a matched difference-in-differences survival analysis that leverages the temporal structure of help-seeking and help-giving on Stack Overflow. Using Cox proportional hazards models on over 21 million questions, we find that receiving an answer significantly increases a user's propensity to help others, but this effect is concentrated among newcomers and declines with platform experience. This pattern suggests that reciprocity functions primarily as a contributor-recruitment mechanism, operating before platform-specific incentives such as reputation and status displace the general moral impulse to reciprocate. Response time moderates the effect, but non-linearly: reciprocity peaks for answers arriving within a re-engagement window of roughly thirty to sixty minutes. These findings contribute to the theory of generalized reciprocity and have implications for platform design.
+\end{abstract}
+
+\begin{keyword}
+generalized reciprocity \sep online communities \sep knowledge sharing \sep survival analysis \sep platform design \sep Stack Overflow
+\end{keyword}
+
+\end{frontmatter}
+
+\input{body}
+
+\section*{Funding}
+This research did not receive any specific grant from funding agencies in the public, commercial, or not-for-profit sectors.
+
+\section*{Ethics statement}
+This study analyzed de-identified, publicly available archival records from Stack Overflow. No interaction with human participants occurred, and no personally identifiable information was collected or analyzed. Ethical approval was not required under applicable institutional policies for secondary analysis of public platform data.
+
+\section*{Data availability}
+Stack Overflow public data dumps were obtained from the Internet Archive (\url{https://archive.org/details/stackexchange}). Analysis code and step-by-step instructions to reproduce all tables and figures are available in a public repository (URL withheld for blind review). Processed analytical datasets used in the matching and survival analyses are available from the corresponding author upon reasonable request.
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references.bib,references-2}
+
+\appendix
+\input{appendix}
+
+\end{document}

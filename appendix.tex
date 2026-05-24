@@ -1,4 +1,4 @@
-\begin{comment}
+\iffalse
 \subsection{Lifetime Contributions of Reciprocity-Activated Users}
 %\placeholder{Include comparison of lifetime contributions for users whose first help was within seven days of receiving an answer vs.\ users whose first help was outside this window.}
 
@@ -17,10 +17,10 @@
 \subsection{Full Regression Tables}
 \label{sec:full_tables}
 %\placeholder{Include complete regression output for all models across all tenure buckets, including all covariates, standard errors, and model diagnostics.}
-\end{comment}
+\fi
 
-\section{Code for the paper}
-Code for the paper can be found in the GitHub repo: \href{https://github.com/svenprue/prosocial-status-online-community}{svenprue/prosocial-status-online-community}
+\section{Replication materials}
+Analysis code and instructions to reproduce all tables and figures are available in a public repository (URL withheld for blind review).
 
 \section{Matching Diagnostics}
 \label{sec:balance_plot}
@@ -67,7 +67,8 @@ Figure \ref{fig:help_rate_by_tenure} shows that the post-question lift in treate
 
 Figure \ref{fig:help_rate_adoption_by_tenure} shows that for experienced users (all panels beyond $<$\,1 Week), the help rate of users still waiting (blue) exceeds that of users who have already received an answer (red), and both exceed the control baseline (grey dashed), up to approximately 1--2 hours post-question. This is consistent with the re-engagement window account: the pending-question state elevates engagement, and answer receipt collapses it back toward control levels. The newcomer panel ($<$\,1 Week) shows the reverse ordering, consistent with the gratitude-and-obligation mechanism dominating for users who do not promptly exit after receiving help.
 
-section{Analysis of Life-Time Contributions \label{sec:lt-contributions}}
+\section{Analysis of Life-Time Contributions}
+\label{sec:lt-contributions}
 What remains unclear is whether users who become contributors through generalized reciprocity continue to contribute consistently and become valuable community members. To explore this, we compare the contributions of reciprocity-activated users with those of all contributors selected for Study 1. Specifically, we examine the number of times users from each group provided and received help up to July 14, 2024. The results are presented in Table \ref{tab:quartile_statistics}. Across all quartiles and at the median, reciprocity-activated users ask and provide more help than their counterparts.
 For example, at the median, reciprocity-activated users provide eight answers and ask 13 questions, compared to six answers and 11 questions among all contributors. Similarly, the 75th percentile of reciprocity-activated users provides 23 answers and asks 29 questions, compared to 19 answers and 22 questions for all contributors.
 These findings suggest that users who begin contributing after receiving help become equally, if not more, engaged in the community's helping dynamics compared to all contributors. Furthermore, this analysis demonstrates that once users start contributing, the act of giving and receiving help becomes (at least temporarily) decoupled.
@@ -113,12 +114,12 @@ F-statistic & 3168$^{***}$ & 2498$^{***}$ \\
 \end{table}
 \fi
 
-\begin{comment}
+\iffalse
 \section{Robustness Checks \label{sec:robustness}}
 To assess the robustness and consistency of my findings, I conducted a series of robustness checks that varied the observation length, the construction of the dependent variable \textit{numHelped}, or model specification.
 
 I assessed the robustness of my findings by varying the observation length. While the reciprocity model used a seven-day observation length per period, I created two equivalent models with ten and three days of observation length. That is, I observe the helping behavior of the user three and ten days before and after receiving help, respectively. The results of these additional models (see Table \ref{tab:rec_models10d} and \ref{tab:rec_models3d}) are consistent with the above results and qualitatively equivalent, indicating that the findings are not sensitive to the specific observation length used.
-\end{comment}
+\fi
 
 
 \section{Implementation Details} All models are estimated using the \texttt{lifelines} CoxTimeVaryingFitter with a small ridge (L2) penalizer applied for numerical stability. The penalizer strength is $\lambda = 5 \times 10^{-3}$ for main-effect models and $\lambda = 10^{-2}$ for models that include response-time interaction terms (where the interaction covariates are correlated with the base treatment indicator). These values are sufficiently small that they introduce negligible shrinkage relative to the scale of the estimated effects, but they ensure stable Hessian inversion in large risk sets. All covariates are mean-centered before fitting; response-time interaction terms are additionally clipped to their 5th--95th percentile range and z-scored as described above. Standard errors are computed from the penalized partial likelihood inverse Hessian without a sandwich (robust) correction. Because matched pairs are constructed across different users and the time-varying covariate structure eliminates the need for within-user corrections, this approach is appropriate; we note that clustering at the match level would be the natural extension if robust SEs were desired. For the pooled experienced-user models (H1), estimation was performed on a random sample of approximately 8,001,064 user-interval rows drawn from 3,306,638 matched pairs (preserving pair integrity) to keep computation feasible; tenure-bucket-specific models (H2, H3) use all available intervals within each stratum.
