@@ -1,6 +1,4 @@
-Highlights
-
-• Help received increases later helping on Stack Overflow, but mainly for newcomers
-• Matched diff-in-differences on 21M questions addresses reciprocity confounding
-• Reciprocity peaks when answers arrive 30-60 minutes after the question is posted
-• Reciprocity recruits contributors before platform status incentives take hold
+Help received increases later helping on Stack Overflow, but mainly for newcomers
+Matched diff-in-differences on 21M questions addresses reciprocity confounding
+Reciprocity peaks when answers arrive 30-60 minutes after the question is posted
+Reciprocity recruits contributors before platform status incentives take hold
