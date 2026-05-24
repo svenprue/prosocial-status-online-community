@@ -72,6 +72,42 @@ def _fmt_se(val: float, decimals: int = 4) -> str:
     return f"({val:.{decimals}f})"
 
 
+# Compact column headers for wide tenure-stratified regression tables
+TENURE_TABLE_HEADERS = [
+    r"\shortstack[c]{$<$ 1\\Week}",
+    r"\shortstack[c]{1 Wk--\\1 Mo}",
+    r"\shortstack[c]{1--6\\Mo}",
+    r"\shortstack[c]{6--12\\Mo}",
+    r"\shortstack[c]{1--3\\Yr}",
+    r"\shortstack[c]{3--6\\Yr}",
+    r"\shortstack[c]{$>$ 6\\Yrs}",
+]
+
+
+def _tenure_table_col_spec(n_buckets: int) -> str:
+    return rf"@{{}}>{{\raggedright\arraybackslash}}p{{2.55cm}}*{{{n_buckets}}}{{c}}@{{}}"
+
+
+def _tenure_table_preamble(caption: str, label: str) -> list[str]:
+    return [
+        r"\begin{table}",
+        rf"\caption{{{caption}}}",
+        rf"\label{{{label}}}",
+        r"\centering",
+        r"\scriptsize",
+        r"\setlength{\tabcolsep}{1.5pt}",
+        r"\resizebox{\linewidth}{!}{%",
+    ]
+
+
+def _tenure_table_postamble() -> list[str]:
+    return [
+        r"\end{tabular}%",
+        r"}",
+        r"\end{table}",
+    ]
+
+
 def _latex_bucket(label: str) -> str:
     """Escape < and > for LaTeX math mode in table labels."""
     return label.replace("<", r"$<$").replace(">", r"$>$")
@@ -282,17 +318,14 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
 
     n_buckets = len(df)
 
-    # Header (bucket labels with < and > in math mode for LaTeX)
-    col_spec = "@{}l" + "c" * n_buckets + "@{}"
-    header_labels = " & ".join(_latex_bucket(b) for b in df["bucket"].tolist())
+    header_labels = " & ".join(TENURE_TABLE_HEADERS[:n_buckets])
 
-    lines = [
-        r"\begin{table}[H]",
-        r"\caption{Cox Regression Results: Effect of Receiving an Answer on Helping Hazard}",
-        r"\label{tab:main_results}",
-        r"\centering",
-        r"\footnotesize",
-        rf"\begin{{tabular}}{{{col_spec}}}",
+    lines = _tenure_table_preamble(
+        "Cox Regression Results: Effect of Receiving an Answer on Helping Hazard",
+        "tab:main_results",
+    )
+    lines += [
+        rf"\begin{{tabular}}{{{_tenure_table_col_spec(n_buckets)}}}",
         r"\toprule",
         rf" & {header_labels} \\",
         r"\midrule",
@@ -370,9 +403,8 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
         r"\bottomrule",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
-        r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _tenure_table_postamble()
     return "\n".join(lines)
 
 
@@ -388,16 +420,14 @@ def generate_speed_table(df: pd.DataFrame) -> str:
     df = df.dropna(subset=["treat_coef"])
 
     n_buckets = len(df)
-    col_spec = "@{}l" + "c" * n_buckets + "@{}"
-    header_labels = " & ".join(_latex_bucket(b) for b in df["bucket"].tolist())
+    header_labels = " & ".join(TENURE_TABLE_HEADERS[:n_buckets])
 
-    lines = [
-        r"\begin{table}[H]",
-        r"\caption{Response Time Moderation of the Reciprocity Effect}",
-        r"\label{tab:speed_results}",
-        r"\centering",
-        r"\footnotesize",
-        rf"\begin{{tabular}}{{{col_spec}}}",
+    lines = _tenure_table_preamble(
+        "Response Time Moderation of the Reciprocity Effect",
+        "tab:speed_results",
+    )
+    lines += [
+        rf"\begin{{tabular}}{{{_tenure_table_col_spec(n_buckets)}}}",
         r"\toprule",
         rf" & {header_labels} \\",
         r"\midrule",
@@ -440,9 +470,8 @@ def generate_speed_table(df: pd.DataFrame) -> str:
     lines += [
         r"\bottomrule",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
-        r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _tenure_table_postamble()
     return "\n".join(lines)
 
 
