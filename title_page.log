@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  24 MAY 2026 14:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  24 MAY 2026 14:28
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -183,8 +183,7 @@ Package: setspace 2022/12/04 v6.7b set line spacing
 ef
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count298
-)
-No file title_page.aux.
+) (./title_page.aux)
 \openout1 = `title_page.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 12.
@@ -205,6 +204,7 @@ LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 12.
 LaTeX Font Info:    ... okay on input line 12.
 LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 12.
 LaTeX Font Info:    ... okay on input line 12.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -240,6 +240,7 @@ LaTeX Font Info:    ... okay on input line 12.
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
 Package hyperref Info: Link coloring OFF on input line 12.
+(./title_page.out) (./title_page.out)
 \@outlinefile=\write3
 \openout3 = `title_page.out'.
 
@@ -249,29 +250,22 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <8> on input line 23.
 LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <6> on input line 23.
-[1
+ [1
 
-{/usr/local/texlive/2026basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-[2] (./title_page.aux)
+{/usr/local/texlive/2026basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map}] [2
+] (./title_page.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
-
-
-Package rerunfilecheck Warning: File `title_page.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-Package rerunfilecheck Info: Checksums for `title_page.out':
-(rerunfilecheck)             Before: <no file>
-(rerunfilecheck)             After:  D41D8CD98F00B204E9800998ECF8427E;0.
+Package rerunfilecheck Info: File `title_page.out' has not changed.
+(rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 8088 strings out of 469006
- 126164 string characters out of 5454813
- 542456 words of memory out of 5000000
- 36742 multiletter control sequences out of 15000+600000
+ 8095 strings out of 469006
+ 126298 string characters out of 5454813
+ 542517 words of memory out of 5000000
+ 36744 multiletter control sequences out of 15000+600000
  631976 words of font info for 54 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
  75i,5n,79p,257b,443s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -279,10 +273,10 @@ Here is how much of TeX's memory you used:
 2.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mr12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/c
 m/cmr8.pfb>
-Output written on title_page.pdf (2 pages, 47603 bytes).
+Output written on title_page.pdf (2 pages, 47470 bytes).
 PDF statistics:
- 39 PDF objects out of 1000 (max. 8388607)
- 28 compressed objects within 1 object stream
- 7 named destinations out of 1000 (max. 500000)
+ 36 PDF objects out of 1000 (max. 8388607)
+ 25 compressed objects within 1 object stream
+ 6 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  24 MAY 2026 14:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  24 MAY 2026 14:28
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -917,21 +917,12 @@ t line 391.
 LaTeX Warning: `h' float specifier changed to `ht'.
 
 [21] [22 <./analysis/output_figures/strength_rec.pdf>]
-(./analysis/output_tables/main_results.tex
-Overfull \hbox (151.85823pt too wide) in paragraph at lines 6--23
- [][] 
- []
-
-) [23] [24
+(./analysis/output_tables/main_results.tex) [23] [24
 
 
-] (./analysis/output_tables/speed_results.tex
-Overfull \hbox (111.36334pt too wide) in paragraph at lines 6--24
- [][] 
- []
-
-) [25]
-<analysis/output_figures/interaction_effect.pdf, id=247, 570.76549pt x 352.4701
+]
+(./analysis/output_tables/speed_results.tex) [25]
+<analysis/output_figures/interaction_effect.pdf, id=248, 570.76549pt x 352.4701
 4pt>
 File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
 <use analysis/output_figures/interaction_effect.pdf>
@@ -942,7 +933,7 @@ n input line 421.
 
 
  <./analysis/output_figures/interaction_effect.pdf>]
-<analysis/output_figures/help_rate_adoption_pooled.pdf, id=328, 569.662pt x 317
+<analysis/output_figures/help_rate_adoption_pooled.pdf, id=329, 569.662pt x 317
 .56894pt>
 File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type 
 pdf)
@@ -975,24 +966,24 @@ cal) 34,
  []
 
 [34] [35]) (./appendix.tex [36]
-<matching/common_support.pdf, id=405, 722.7pt x 361.35pt>
+<matching/common_support.pdf, id=406, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
 Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
 (pdftex.def)             Requested size: 390.0pt x 194.99928pt.
-<matching/love_plot.pdf, id=406, 578.16pt x 433.62pt>
+<matching/love_plot.pdf, id=407, 578.16pt x 433.62pt>
 File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
 Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
 (pdftex.def)             Requested size: 390.0pt x 292.4956pt.
-<analysis/output_figures/help_rate_by_tenure.pdf, id=407, 724.67491pt x 858.235
+<analysis/output_figures/help_rate_by_tenure.pdf, id=408, 724.67491pt x 858.235
 1pt>
 File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_by_tenure.pdf  used 
 on input line 50.
 (pdftex.def)             Requested size: 390.0pt x 461.88168pt.
-<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=408, 714.25598pt 
+<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=409, 714.25598pt 
 x 1030.28284pt>
 File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
 pe pdf)
@@ -1012,55 +1003,52 @@ Overfull \hbox (6.9718pt too wide) in paragraph at lines 80--90
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
  ) 
 Here is how much of TeX's memory you used:
- 19316 strings out of 469006
- 388253 string characters out of 5454813
+ 19319 strings out of 469006
+ 388278 string characters out of 5454813
  767058 words of memory out of 5000000
- 47609 multiletter control sequences out of 15000+600000
- 650819 words of font info for 100 fonts, out of 8000000 for 9000
+ 47611 multiletter control sequences out of 15000+600000
+ 651505 words of font info for 101 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 89i,15n,107p,1661b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 89i,16n,107p,1661b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfou
 r/jknappen/ec/ectt1200.600pk> </Users/lenardstrahringer/Library/texlive/2026bas
-ic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.600pk> </Users/lenardstrahrin
-ger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.60
+ic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti0800.600pk> </Users/lenardstrahrin
+ger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.60
 0pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljf
-our/jknappen/ec/ecti1095.600pk> </Users/lenardstrahringer/Library/texlive/2026b
-asic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.600pk> </Users/lenardstrahr
-inger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1000.
+our/jknappen/ec/ecrm1095.600pk> </Users/lenardstrahringer/Library/texlive/2026b
+asic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1095.600pk> </Users/lenardstrahr
+inger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.
 600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/l
-jfour/jknappen/ec/ecrm1000.600pk> </Users/lenardstrahringer/Library/texlive/202
-6basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm0800.600pk> </Users/lenardstra
-hringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/eccc120
+jfour/jknappen/ec/ecti1000.600pk> </Users/lenardstrahringer/Library/texlive/202
+6basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1000.600pk> </Users/lenardstra
+hringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm080
 0.600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk
-/ljfour/jknappen/ec/ecti1200.600pk> </Users/lenardstrahringer/Library/texlive/2
-026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1200.600pk> </Users/lenardst
-rahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1
+/ljfour/jknappen/ec/eccc1200.600pk> </Users/lenardstrahringer/Library/texlive/2
+026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1200.600pk> </Users/lenardst
+rahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1
 200.600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/
-pk/ljfour/jknappen/ec/ecrm1728.600pk></usr/local/texlive/2026basic/texmf-dist/f
-onts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2026basic/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/local/texlive/2026basic/texm
-f-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026basic/
-texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb></usr/local/texlive/2026ba
-sic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/202
-6basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/
-2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/tex
-live/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/
-texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/loc
-al/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/l
-ocal/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></u
-sr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb>
-</usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.p
-fb>
-Output written on manuscript.pdf (42 pages, 610319 bytes).
+pk/ljfour/jknappen/ec/ecbx1200.600pk> </Users/lenardstrahringer/Library/texlive
+/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk></usr/local/tex
+live/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local
+/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/l
+ocal/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></u
+sr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb
+></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.
+pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmm
+i8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/
+cmmib10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmr10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmr12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/a
+msfonts/cm/cmr8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
+/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/pu
+blic/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1
+/public/amsfonts/cm/cmsy8.pfb>
+Output written on manuscript.pdf (42 pages, 625333 bytes).
 PDF statistics:
- 1306 PDF objects out of 1440 (max. 8388607)
- 237 compressed objects within 3 object streams
+ 1363 PDF objects out of 1440 (max. 8388607)
+ 241 compressed objects within 3 object streams
  0 named destinations out of 1000 (max. 500000)
  53 words of extra memory for PDF output out of 10000 (max. 10000000)
 
