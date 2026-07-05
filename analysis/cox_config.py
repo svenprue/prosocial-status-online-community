@@ -13,6 +13,8 @@ BUCKET_ORDER = [
 ROUND_TO_HOURS = 1
 MAX_FIT_ROWS = 8_000_000
 SUBSAMPLE_SEED = 42
+VARIANCE_ESTIMATOR = "robust_sandwich"
+CLUSTER_COL = "match_id"
 
 CONTINUOUS_COVARIATES = [
     "hasAnswer_response_time_interaction",
@@ -34,7 +36,8 @@ COVARIATES_SPEED = COVARIATES_MAIN + [
     "treated_post_question_response_time_interaction",
 ]
 
-RT_BIN_EDGES_HOURS = [0, 0.25, 0.5, 1, 2, 4, 8, 12]
+RT_BIN_EDGES_HOURS = [0, 0.25, 0.5, 1, 2, 4, 8, 12, 24, 72, float("inf")]
 RT_BIN_LABELS = [
     "0-15 min", "15-30 min", "30-60 min", "1-2 hr", "2-4 hr", "4-8 hr", "8-12 hr",
+    "12-24 hr", "1-3 days", ">3 days",
 ]

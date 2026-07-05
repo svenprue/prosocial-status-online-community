@@ -93,8 +93,12 @@ def _compute_descriptives(timelines: pd.DataFrame, events: pd.DataFrame) -> dict
 
 def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.DataFrame:
     """Merge intervals with timelines and add phase/response-time covariates."""
+    timeline_cols = ["match_id", "question_id", "hasAnswer", "t_question", "t_answer"]
+    for optional_col in ["user_id", "question_year"]:
+        if optional_col in timelines.columns:
+            timeline_cols.append(optional_col)
     full_df = intervals.merge(
-        timelines[["match_id", "question_id", "hasAnswer", "t_question", "t_answer"]],
+        timelines[timeline_cols],
         on=["match_id", "question_id"],
         how="inner",
     )
@@ -146,7 +150,7 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
     full_df["response_time_hours"] = full_df["response_time_hours"].fillna(0.0)
 
     cols = [
-        "match_id", "unique_id", "start", "stop", "event_occurred",
+        "match_id", "question_id", "unique_id", "start", "stop", "event_occurred",
         "hasAnswer", "phase_post_question", "treated_post_question",
         "phase_post", "is_treated_active",
         "hasAnswer_response_time_interaction",
@@ -155,6 +159,9 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
         "tenure_bucket",
         "response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3",
     ]
+    for optional_col in ["user_id", "question_year"]:
+        if optional_col in full_df.columns:
+            cols.append(optional_col)
     return full_df[cols].replace([np.inf, -np.inf], np.nan).dropna()
 
 
@@ -171,7 +178,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
         print("Recomputing descriptives from timelines …")
         timelines = pd.read_parquet(f"{input_folder}/study_timelines.parquet")
         events = pd.read_parquet(f"{input_folder}/study_events.parquet")
-        for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days"]:
+        for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days", "question_year"]:
             if col in timelines.columns:
                 timelines[col] = timelines[col].astype(float)
         if "t_event" in events.columns:
@@ -191,7 +198,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     timelines = pd.read_parquet(f"{input_folder}/study_timelines.parquet")
     events = pd.read_parquet(f"{input_folder}/study_events.parquet")
     print(f"Loaded {len(timelines):,} timelines, {len(events):,} events")
-    for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days"]:
+    for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days", "question_year"]:
         if col in timelines.columns:
             timelines[col] = timelines[col].astype(float)
     if "t_event" in events.columns:
@@ -207,19 +214,28 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     descriptives = _compute_descriptives(timelines, events)
 
     print("Constructing event intervals …")
+    boundary_id_vars = ["match_id", "question_id", "hasAnswer", "t_answer", "tenure_bucket"]
+    if "question_year" in timelines.columns:
+        boundary_id_vars.append("question_year")
     boundaries = timelines.melt(
-        id_vars=["match_id", "question_id", "hasAnswer", "t_answer", "tenure_bucket"],
+        id_vars=boundary_id_vars,
         value_vars=["t_start", "t_question", "t_end"],
         value_name="time",
-    )[["match_id", "question_id", "tenure_bucket", "time"]]
-    answer_boundaries = timelines[["match_id", "question_id", "tenure_bucket", "t_answer"]].rename(columns={"t_answer": "time"})
+    )[["match_id", "question_id", "tenure_bucket", "time"] + (["question_year"] if "question_year" in timelines.columns else [])]
+    answer_cols = ["match_id", "question_id", "tenure_bucket", "t_answer"]
+    if "question_year" in timelines.columns:
+        answer_cols.append("question_year")
+    answer_boundaries = timelines[answer_cols].rename(columns={"t_answer": "time"})
     event_times = events[["match_id", "question_id", "t_event"]].rename(columns={"t_event": "time"})
     event_times["is_event"] = 1
     all_times = pd.concat([boundaries, answer_boundaries, event_times], ignore_index=True)
     all_times["is_event"] = all_times["is_event"].fillna(0)
     all_times = all_times.sort_values(["match_id", "question_id", "time"])
+    agg_cols = {"is_event": "max", "tenure_bucket": "first"}
+    if "question_year" in all_times.columns:
+        agg_cols["question_year"] = "first"
     all_times = all_times.groupby(["match_id", "question_id", "time"], as_index=False).agg(
-        {"is_event": "max", "tenure_bucket": "first"}
+        agg_cols
     )
     all_times["start"] = all_times["time"]
     all_times["stop"] = all_times.groupby(["match_id", "question_id"])["time"].shift(-1)
@@ -239,6 +255,11 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
         n_bad = intervals["tenure_bucket"].isna().sum()
         intervals = intervals.dropna(subset=["tenure_bucket"])
         print(f"  Dropped {n_bad} interval rows with no tenure_bucket (no boundaries for that question).")
+    if "question_year" in intervals.columns:
+        intervals["question_year"] = (
+            intervals.groupby(["match_id", "question_id"], group_keys=False)["question_year"]
+            .apply(lambda s: s.ffill().bfill())
+        )
 
     print("Computing covariates …")
     model_df = _build_covariates(intervals, timelines)

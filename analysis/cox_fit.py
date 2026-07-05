@@ -2,6 +2,7 @@
 import os
 import pickle
 import time as timer
+import inspect
 from multiprocessing import Pool, cpu_count
 import pandas as pd
 import numpy as np
@@ -19,6 +20,8 @@ from cox_config import (
     COVARIATES_SPEED,
     RT_BIN_EDGES_HOURS,
     RT_BIN_LABELS,
+    VARIANCE_ESTIMATOR,
+    CLUSTER_COL,
 )
 
 
@@ -54,12 +57,16 @@ def fit_cox_cached(
     use_cache: bool = True,
     round_to_hours: float = None,
     initial_point=None,
+    robust: bool = False,
+    cluster_col: str = CLUSTER_COL,
+    save_cache: bool = True,
 ):
     """Fit Cox time-varying model; load from cache if present."""
     if round_to_hours is None:
         round_to_hours = ROUND_TO_HOURS
     base_suffix = f"_{round_to_hours}h" if round_to_hours and round_to_hours != 0.1 else ""
-    cache_name = f"{model_name}{base_suffix}"
+    variance_suffix = f"_{VARIANCE_ESTIMATOR}" if robust else ""
+    cache_name = f"{model_name}{base_suffix}{variance_suffix}"
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = _model_path(cache_name)
 
@@ -72,7 +79,7 @@ def fit_cox_cached(
             print(f"  ⚠ Cache load failed ({e}), refitting…")
 
     keep = ["unique_id", "start", "stop", "event_occurred"] + covariates
-    extra = ["match_id"] if "match_id" in subset_df.columns else []
+    extra = [cluster_col] if robust and cluster_col and cluster_col in subset_df.columns else []
     fit_df = subset_df[[c for c in keep + extra if c in subset_df.columns]].copy()
     if round_to_hours and round_to_hours > 0:
         fit_df["start"] = (fit_df["start"] / round_to_hours).round() * round_to_hours
@@ -93,7 +100,6 @@ def fit_cox_cached(
             target_n = min(target_n, len(match_ids))
             sampled = rng.choice(match_ids, size=target_n, replace=False)
             fit_df = fit_df[fit_df["match_id"].isin(sampled)].copy()
-            fit_df = fit_df.drop(columns=["match_id"])
         else:
             unique_ids = fit_df["unique_id"].unique()
             target_n = max(1, int(MAX_FIT_ROWS * len(unique_ids) / len(fit_df)))
@@ -120,7 +126,14 @@ def fit_cox_cached(
             fit_df[col] = fit_df[col] + rng.standard_normal(len(fit_df)) * 1e-8
 
     n_events = int(fit_df["event_occurred"].sum())
-    print(f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events:,} events …")
+    cluster_for_fit = cluster_col if robust and cluster_col and cluster_col in fit_df.columns else None
+    if robust and cluster_col and cluster_for_fit is None:
+        raise ValueError(
+            f"Requested clustered Cox SEs with cluster_col='{cluster_col}', but that column is absent. "
+            "Regenerate the model dataframe or call fit_cox_cached(..., robust=False)."
+        )
+    variance_label = f"clustered by {cluster_for_fit}" if cluster_for_fit else "model-based"
+    print(f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events:,} events, SEs {variance_label} …")
     if n_events < 10:
         print("  ⚠ Too few events, skipping.")
         return None
@@ -141,26 +154,55 @@ def fit_cox_cached(
     ctv = CoxTimeVaryingFitter(penalizer=effective_penalizer)
     fit_opts = {"step_size": 0.25 if has_continuous else 0.5, "max_steps": 1000} if round_to_hours and round_to_hours >= 1 else None
     t0 = timer.time()
-    try:
-        ctv.fit(
-            fit_df,
-            id_col="unique_id",
-            event_col="event_occurred",
-            start_col="start",
-            stop_col="stop",
-            show_progress=False,
-            initial_point=init_arr,
-            fit_options=fit_opts,
-            robust=False,
+    fit_kwargs = {
+        "df": fit_df,
+        "id_col": "unique_id",
+        "event_col": "event_occurred",
+        "start_col": "start",
+        "stop_col": "stop",
+        "show_progress": False,
+        "initial_point": init_arr,
+        "fit_options": fit_opts,
+    }
+    fit_signature = inspect.signature(ctv.fit)
+    if "robust" in fit_signature.parameters:
+        fit_kwargs["robust"] = bool(cluster_for_fit)
+    if cluster_for_fit and "cluster_col" in fit_signature.parameters:
+        fit_kwargs["cluster_col"] = cluster_for_fit
+    elif cluster_for_fit and "robust" in fit_signature.parameters:
+        fit_kwargs["df"] = fit_df.drop(columns=[cluster_for_fit])
+        print(
+            "  ⚠ lifelines CoxTimeVaryingFitter.fit does not expose cluster_col; "
+            "using its robust=True sandwich variance without an explicit cluster column."
         )
+    elif cluster_for_fit:
+        raise RuntimeError(
+            "Installed lifelines CoxTimeVaryingFitter.fit exposes neither cluster_col nor robust; "
+            "use a lifelines version with robust variance support or run a matched-pair bootstrap."
+        )
+    try:
+        ctv.fit(**fit_kwargs)
+    except NotImplementedError as e:
+        print(
+            f"  ⚠ Robust CoxTimeVaryingFitter variance is unavailable in this lifelines version: {e}. "
+            "Use analysis/pair_bootstrap_se.py for matched-pair bootstrap uncertainty."
+        )
+        return None
     except ConvergenceError as e:
         print(f"  ⚠ Convergence failed: {e}. Skipping '{cache_name}'.")
         return None
     print(f"  ✓ Fit in {timer.time() - t0:.1f}s")
-    meta = {"n_events": n_events, "n_rows": len(fit_df)}
+    meta = {
+        "n_events": n_events,
+        "n_rows": len(fit_df),
+        "variance_estimator": VARIANCE_ESTIMATOR if cluster_for_fit else "model_based",
+        "cluster_col": cluster_for_fit,
+    }
     if subsampled:
         meta["n_rows_original"] = n_rows_original
     result = CachedCoxResult(ctv, meta=meta)
+    if not save_cache:
+        return result
     try:
         with open(path, "wb") as f:
             pickle.dump(result, f)

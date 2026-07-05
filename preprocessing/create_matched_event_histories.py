@@ -46,6 +46,7 @@ def generate_event_history_dataset(
             m.questionId AS question_id,
             m.userId AS user_id,
             m.hasAnswer,
+            m.year AS question_year,
             COALESCE(t.responseTimeHours, m.responseTimeHours) AS match_response_hours
         FROM matched_raw m
         LEFT JOIN treatment_times t ON m.match_id = t.match_id
@@ -77,6 +78,7 @@ def generate_event_history_dataset(
             mt.question_id,
             mt.user_id,
             mt.hasAnswer,
+            mt.question_year,
             mt.match_response_hours,
             rq.ts AS question_ts,
 
@@ -126,6 +128,7 @@ def generate_event_history_dataset(
         COPY (
             SELECT
                 match_id, question_id, user_id, hasAnswer,
+                question_year,
                 user_tenure_days,
                 date_diff('second', question_ts, window_start_ts) / 3600.0 AS t_start,
                 0.0 AS t_question,

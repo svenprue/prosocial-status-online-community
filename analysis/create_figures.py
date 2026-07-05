@@ -26,6 +26,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+from cox_config import RT_BIN_LABELS
+from effect_sizes import (
+    build_absolute_effects,
+    generate_absolute_effects_latex_table,
+    write_absolute_effects_csv,
+)
 
 # =====================================================================
 # Configuration (paths relative to this script so running from any cwd works)
@@ -111,6 +117,13 @@ def _tenure_table_postamble() -> list[str]:
 def _latex_bucket(label: str) -> str:
     """Escape < and > for LaTeX math mode in table labels."""
     return label.replace("<", r"$<$").replace(">", r"$>$")
+
+
+def _standard_error_note(n_cols: int) -> str:
+    return (
+        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Cox-table standard errors are "
+        r"model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\"
+    )
 
 
 # =====================================================================
@@ -296,6 +309,7 @@ def generate_regression_all_table(
 
     lines += [
         r"\bottomrule",
+        _standard_error_note(n_cols + 1),
         rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\footnotesize $^{{***}}p<0.001$; $^{{**}}p<0.01$; $^{{*}}p<0.05$; $^{{\dagger}}p<0.1$}} \\",
         r"\end{tabular}",
         r"\end{table}",
@@ -402,6 +416,7 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
     lines += [
         r"\bottomrule",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\",
+        _standard_error_note(n_buckets + 1),
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
     ]
     lines += _tenure_table_postamble()
@@ -469,9 +484,124 @@ def generate_speed_table(df: pd.DataFrame) -> str:
 
     lines += [
         r"\bottomrule",
+        _standard_error_note(n_buckets + 1),
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
     ]
     lines += _tenure_table_postamble()
+    return "\n".join(lines)
+
+
+def generate_response_time_bins_table(df: pd.DataFrame) -> str:
+    """Generate LaTeX table for non-parametric response-time-bin treatment effects."""
+    if df.empty or "treat_hr" not in df.columns:
+        return ""
+    df = df.copy()
+    df["bucket_order"] = df["bucket"].map(
+        {label: i for i, label in enumerate(RT_BIN_LABELS)}
+    ).fillna(999)
+    df = df.sort_values("bucket_order")
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Treatment Effect by Response-Time Bin}",
+        r"\label{tab:response_time_bins}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Response time} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        p = r.get("treat_p", np.nan)
+        stars = _sig_stars(p) if pd.notna(p) else ""
+        n = int(r.get("n_questions", r.get("n_rows", 0)))
+        events = int(r.get("n_events", 0))
+        lines.append(
+            rf"{_latex_bucket(str(r['bucket']))} & {r['treat_hr']:.2f}{stars} "
+            rf"& [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}] "
+            rf"& {n:,} & {events:,} \\"
+        )
+    lines += [
+        r"\bottomrule",
+        _standard_error_note(5),
+        r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
+        r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+def generate_selection_bounds_table(df: pd.DataFrame) -> str:
+    """Generate a compact table from selection_sensitivity.py outputs."""
+    if df.empty or "adjusted_event_rate_rr_proxy" not in df.columns:
+        return ""
+    keep_fracs = [0.0, 0.10, 0.25, 0.50]
+    df = df.loc[
+        df["assumed_control_zero_post_event_fraction"].round(2).isin(keep_fracs)
+    ].copy()
+    if df.empty:
+        return ""
+    scope_order = {scope: i for i, scope in enumerate(["All"] + BUCKET_ORDER)}
+    df["scope_order"] = df["scope"].map(scope_order).fillna(999)
+    df = df.sort_values(["scope_order", "assumed_control_zero_post_event_fraction"])
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Selection Sensitivity Based on Zero Post-Question Helping}",
+        r"\label{tab:selection_bounds}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Scope} & \textbf{Assumed frac.} & \textbf{Base HR} & \textbf{Control zero share} & \textbf{Adjusted RR proxy} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        lines.append(
+            rf"{_latex_bucket(str(r['scope']))} & {r['assumed_control_zero_post_event_fraction']:.2f} "
+            rf"& {r['base_hr']:.2f} & {r['control_zero_post_help_share']:.1%} "
+            rf"& {r['adjusted_event_rate_rr_proxy']:.2f} \\"
+        )
+    lines += [
+        r"\bottomrule",
+        r"\multicolumn{5}{@{}l}{\footnotesize Assumed frac. is the fraction of zero-post-help control questions assigned one latent help event.} \\",
+        r"\multicolumn{5}{@{}l}{\footnotesize Adjusted RR is an event-rate proxy, not a refitted Cox hazard ratio.} \\",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
+    """Generate LaTeX table for matched-pair bootstrap uncertainty."""
+    if df.empty or "bootstrap_hr_ci_lo" not in df.columns:
+        return ""
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Matched-Pair Bootstrap Uncertainty for Model A}",
+        r"\label{tab:pair_bootstrap}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Scope} & \textbf{HR} & \textbf{Bootstrap 95\% CI} & \textbf{Replicates} & \textbf{N} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        lines.append(
+            rf"{_latex_bucket(str(r['scope']))} & {r['base_hr']:.2f} "
+            rf"& [{r['bootstrap_hr_ci_lo']:.2f}, {r['bootstrap_hr_ci_hi']:.2f}] "
+            rf"& {int(r['n_bootstrap_success'])}/{int(r['n_bootstrap_requested'])} "
+            rf"& {int(r['n_questions']):,} \\"
+        )
+    lines += [
+        r"\bottomrule",
+        r"\multicolumn{5}{@{}l}{\footnotesize Replicates resample whole matched pairs with replacement.} \\",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
     return "\n".join(lines)
 
 
@@ -747,6 +877,8 @@ def main():
     main_all_path = os.path.join(CACHE_DIR, "results_main_all.csv")
     speed_all_path = os.path.join(CACHE_DIR, "results_speed_all.csv")
     rt_bins_path = os.path.join(CACHE_DIR, "results_response_time_bins.csv")
+    selection_bounds_path = os.path.join(CACHE_DIR, "results_selection_bounds.csv")
+    pair_bootstrap_path = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
 
@@ -759,6 +891,8 @@ def main():
     df_main_all = pd.read_csv(main_all_path) if os.path.exists(main_all_path) else pd.DataFrame()
     df_speed_all = pd.read_csv(speed_all_path) if os.path.exists(speed_all_path) else pd.DataFrame()
     df_rt_bins = pd.read_csv(rt_bins_path) if os.path.exists(rt_bins_path) else pd.DataFrame()
+    df_selection_bounds = pd.read_csv(selection_bounds_path) if os.path.exists(selection_bounds_path) else pd.DataFrame()
+    df_pair_bootstrap = pd.read_csv(pair_bootstrap_path) if os.path.exists(pair_bootstrap_path) else pd.DataFrame()
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
     descriptives = {}
     if os.path.exists(desc_path):
@@ -797,6 +931,40 @@ def main():
     if not df_speed.empty:
         tex = generate_speed_table(df_speed)
         out = os.path.join(TABLE_DIR, "speed_results.tex")
+        with open(out, "w") as f:
+            f.write(tex)
+        print(f"✓ {out}")
+
+    # Non-parametric response-time-bin treatment effects
+    if not df_rt_bins.empty:
+        tex = generate_response_time_bins_table(df_rt_bins)
+        out = os.path.join(TABLE_DIR, "response_time_bins.tex")
+        with open(out, "w") as f:
+            f.write(tex)
+        print(f"✓ {out}")
+
+    if not df_selection_bounds.empty:
+        tex = generate_selection_bounds_table(df_selection_bounds)
+        if tex:
+            out = os.path.join(TABLE_DIR, "selection_bounds.tex")
+            with open(out, "w") as f:
+                f.write(tex)
+            print(f"✓ {out}")
+
+    if not df_pair_bootstrap.empty:
+        tex = generate_pair_bootstrap_table(df_pair_bootstrap)
+        if tex:
+            out = os.path.join(TABLE_DIR, "pair_bootstrap.tex")
+            with open(out, "w") as f:
+                f.write(tex)
+            print(f"✓ {out}")
+
+    # Conservative absolute-effect and NNT proxies
+    df_absolute = build_absolute_effects()
+    if not df_absolute.empty:
+        write_absolute_effects_csv(df_absolute)
+        tex = generate_absolute_effects_latex_table(df_absolute)
+        out = os.path.join(TABLE_DIR, "absolute_effects.tex")
         with open(out, "w") as f:
             f.write(tex)
         print(f"✓ {out}")
