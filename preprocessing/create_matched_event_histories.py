@@ -32,9 +32,24 @@ def generate_event_history_dataset(
     matched_df = pd.read_parquet(matched_questions_path)
     con.register("matched_raw", matched_df)
 
+    # Question-level covariates that newer matched files carry (answer quality
+    # for the quality-confound check; ViewCount for the exposure placebo).
+    # Absent columns are tolerated so older matched files still run.
+    optional_question_covs = [
+        c for c in ('hasAcceptedAnswer', 'firstAnswerScore', 'firstAnswerVoteCount', 'viewCount')
+        if c in matched_df.columns
+    ]
+    if optional_question_covs:
+        print(f"Carrying question covariates into timelines: {optional_question_covs}")
+    else:
+        print("No optional question covariates found in matched file (older matching run?)")
+    opt_select_m = "".join(f",\n            m.{c}" for c in optional_question_covs)
+    opt_select_mt = "".join(f",\n            mt.{c}" for c in optional_question_covs)
+    opt_select_plain = "".join(f", {c}" for c in optional_question_covs)
+
     # 2. Create match timelines (one row per matched question; timelines keyed by question_id)
     print("Aligning timelines for matched pairs (per question_id)...")
-    con.execute("""
+    con.execute(f"""
         CREATE TEMPORARY TABLE match_timelines AS
         WITH treatment_times AS (
             SELECT match_id, responseTimeHours
@@ -47,7 +62,7 @@ def generate_event_history_dataset(
             m.userId AS user_id,
             m.hasAnswer,
             m.year AS question_year,
-            COALESCE(t.responseTimeHours, m.responseTimeHours) AS match_response_hours
+            COALESCE(t.responseTimeHours, m.responseTimeHours) AS match_response_hours{opt_select_m}
         FROM matched_raw m
         LEFT JOIN treatment_times t ON m.match_id = t.match_id
         WHERE COALESCE(t.responseTimeHours, m.responseTimeHours) IS NOT NULL
@@ -79,7 +94,7 @@ def generate_event_history_dataset(
             mt.user_id,
             mt.hasAnswer,
             mt.question_year,
-            mt.match_response_hours,
+            mt.match_response_hours,{opt_select_mt}
             rq.ts AS question_ts,
 
             -- Asker tenure: days between asker's registration and this question
@@ -129,7 +144,7 @@ def generate_event_history_dataset(
             SELECT
                 match_id, question_id, user_id, hasAnswer,
                 question_year,
-                user_tenure_days,
+                user_tenure_days{opt_select_plain},
                 date_diff('second', question_ts, window_start_ts) / 3600.0 AS t_start,
                 0.0 AS t_question,
                 date_diff('second', question_ts, answer_ts) / 3600.0 AS t_answer,
@@ -146,7 +161,91 @@ def generate_event_history_dataset(
             FROM user_helps
         ) TO '{os.path.join(output_folder, "study_events.parquet")}' (FORMAT PARQUET);
     """)
-    
+
+    # 7. Composite reciprocity events (R2 P1/P4): answers + comments on others'
+    # posts + accept-actions on the asker's OTHER questions. Written to a
+    # SEPARATE file with a help_type column so the primary answers-only
+    # study_events.parquet (and every model reading it) is unchanged; the
+    # composite robustness re-estimation opts in explicitly.
+    # Upvotes are NOT included: the public dump anonymizes Votes.UserId except
+    # VoteTypeId 5/8, so upvotes-given cannot be attributed to the asker.
+    comments_path = os.path.join(input_folder, 'Comments.parquet')
+    votes_path = os.path.join(input_folder, 'Votes.parquet')
+    if os.path.exists(comments_path):
+        print("Finding composite help events (comments, accepts) within each question's window...")
+        con.execute(f"""
+            CREATE VIEW raw_comments AS
+            SELECT PostId, UserId, CreationDate::TIMESTAMP AS ts
+            FROM '{comments_path}'
+            WHERE UserId IS NOT NULL
+        """)
+        con.execute("""
+            CREATE VIEW raw_post_owners AS
+            SELECT Id, OwnerUserId FROM raw_questions
+            UNION ALL
+            SELECT Id, OwnerUserId FROM raw_answers
+        """)
+        # Comments by the asker on posts they do not own (full-precision timestamps)
+        con.execute("""
+            CREATE TEMPORARY TABLE user_comment_helps AS
+            SELECT
+                sw.match_id,
+                sw.question_id,
+                sw.user_id,
+                date_diff('second', sw.question_ts, c.ts) / 3600.0 AS t_event
+            FROM study_windows sw
+            JOIN raw_comments c ON sw.user_id = c.UserId
+            JOIN raw_post_owners po ON c.PostId = po.Id
+            WHERE c.ts >= sw.window_start_ts
+              AND c.ts <= sw.window_end_ts
+              AND (po.OwnerUserId IS NULL OR po.OwnerUserId != sw.user_id)
+        """)
+        # Accept-actions: the asker accepts an answer on one of their OTHER
+        # questions (the focal question's accept is mechanically tied to
+        # treatment and excluded). NOTE: dump vote timestamps are date-only,
+        # so these events have day granularity.
+        if os.path.exists(votes_path):
+            con.execute(f"""
+                CREATE TEMPORARY TABLE user_accept_helps AS
+                SELECT
+                    sw.match_id,
+                    sw.question_id,
+                    sw.user_id,
+                    date_diff('second', sw.question_ts, v.CreationDate::TIMESTAMP) / 3600.0 AS t_event
+                FROM study_windows sw
+                JOIN raw_questions q2 ON q2.OwnerUserId = sw.user_id AND q2.Id != sw.question_id
+                JOIN raw_answers a2 ON a2.ParentId = q2.Id
+                JOIN (SELECT PostId, CreationDate FROM '{votes_path}' WHERE VoteTypeId = 1) v
+                  ON v.PostId = a2.Id
+                WHERE v.CreationDate::TIMESTAMP >= sw.window_start_ts
+                  AND v.CreationDate::TIMESTAMP <= sw.window_end_ts
+            """)
+            accept_union = """
+            UNION ALL
+            SELECT match_id, question_id, user_id, t_event, 'accept' AS help_type
+            FROM user_accept_helps"""
+        else:
+            print(f"WARNING: {votes_path} not found; composite events will lack accept-actions.")
+            accept_union = ""
+        con.execute(f"""
+            COPY (
+                SELECT match_id, question_id, user_id,
+                       relative_help_time_hours AS t_event, 'answer' AS help_type
+                FROM user_helps
+                UNION ALL
+                SELECT match_id, question_id, user_id, t_event, 'comment' AS help_type
+                FROM user_comment_helps{accept_union}
+            ) TO '{os.path.join(output_folder, "study_events_composite.parquet")}' (FORMAT PARQUET);
+        """)
+        n_comment_events = con.execute("SELECT COUNT(*) FROM user_comment_helps").fetchone()[0]
+        print(f" - Composite: comment help events found: {n_comment_events:,}")
+        if accept_union:
+            n_accept_events = con.execute("SELECT COUNT(*) FROM user_accept_helps").fetchone()[0]
+            print(f" - Composite: accept help events found: {n_accept_events:,} (day-granular timing)")
+    else:
+        print(f"NOTE: {comments_path} not found; skipping composite reciprocity events "
+              f"(run preprocessing/processing_data_dump.py with Comments.xml to enable).")
+
     print(f"Success! Output saved to {output_folder}")
 
     # Stats (unit = question_id / matched question)

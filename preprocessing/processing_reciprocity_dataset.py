@@ -15,6 +15,73 @@ pd.set_option('display.max_columns', None)
 pd.set_option('display.width', None)
 pd.set_option('display.max_colwidth', None)
 
+# Static question-level covariates joined from posts_questions.parquet at the
+# end of processing (kept out of the event stream upstream): dump column name
+# -> processed-dataset column name
+QUESTION_COVARIATE_MAP = {
+    'ViewCount': 'viewCount',
+    'BodyLenChars': 'bodyLenChars',
+    'BodyLenWords': 'bodyLenWords',
+    'NCodeBlocks': 'numCodeBlocks',
+    'NInlineCode': 'numInlineCode',
+    'CodeLenChars': 'codeLenChars',
+    'NParagraphs': 'numParagraphs',
+    'NLinks': 'numLinks',
+    'NImages': 'numImages',
+    'NLists': 'numLists',
+    'NBlockquotes': 'numBlockquotes',
+    'NSentences': 'numSentences',
+    'NLongWords': 'numLongWords',
+    'AvgWordLenChars': 'avgWordLenChars',
+    'TitleLenChars': 'titleLenChars',
+    'TitleLenWords': 'titleLenWords',
+    'TitleIsQuestion': 'titleIsQuestion',
+}
+
+
+def attach_question_covariates(output_file: str, posts_questions_file: str) -> None:
+    """
+    Left-join static question covariates (ViewCount, text metrics) onto the
+    processed one-row-per-question dataset by question id. Runs in DuckDB with
+    a memory cap + disk spill so it also works on small machines.
+    Skips gracefully if posts_questions.parquet lacks the new columns.
+    """
+    if not os.path.exists(posts_questions_file):
+        print(f"posts_questions file not found ({posts_questions_file}); skipping question covariates")
+        return
+
+    con = duckdb.connect()
+    con.execute("SET memory_limit='8GB'")
+    temp_dir = os.path.join(os.path.dirname(output_file), "duckdb_tmp")
+    os.makedirs(temp_dir, exist_ok=True)
+    con.execute(f"SET temp_directory='{Path(temp_dir).as_posix()}'")
+
+    available = {
+        row[0] for row in
+        con.execute(f"DESCRIBE SELECT * FROM read_parquet('{posts_questions_file}')").fetchall()
+    }
+    cov_cols = {src: dst for src, dst in QUESTION_COVARIATE_MAP.items() if src in available}
+    if not cov_cols:
+        print("posts_questions.parquet has no question-covariate columns (old conversion?); skipping join")
+        con.close()
+        return
+
+    select_covs = ",\n                ".join(f'q."{src}" AS "{dst}"' for src, dst in cov_cols.items())
+    tmp_output = output_file + ".tmp.parquet"
+    con.execute(f"""
+        COPY (
+            SELECT
+                m.*,
+                {select_covs}
+            FROM read_parquet('{output_file}') m
+            LEFT JOIN read_parquet('{posts_questions_file}') q
+              ON m.questionId = q.Id
+        ) TO '{tmp_output}' (FORMAT PARQUET)
+    """)
+    con.close()
+    os.replace(tmp_output, output_file)
+    print(f"Attached question covariates ({', '.join(cov_cols.values())}) to {output_file}")
+
 
 @njit
 def calculate_metrics_jit(
@@ -315,6 +382,13 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
         non_history_chunk["month"] = non_history_chunk["timestamp"].dt.month
         non_history_chunk["year"] = non_history_chunk["timestamp"].dt.year
 
+        # Posting-time covariates from the question timestamp itself (the row
+        # 'timestamp' of the aggregated first event is phase_one_start, i.e.
+        # question time minus the window, so it must not be used for these)
+        question_ts = pd.to_datetime(non_history_chunk["question_timestamp"], errors="coerce")
+        non_history_chunk["postHour"] = question_ts.dt.hour
+        non_history_chunk["postDayOfWeek"] = question_ts.dt.dayofweek
+
         # Aggregate to one row per question (event_id); all matching covariates at question level
         print("Aggregating data by event_id (question level)...")
         group_cols = ["event_id"]
@@ -335,6 +409,10 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
             "numHelped": "sum",
             "year": "first",
             "month": "first",
+            "postHour": "first",
+            "postDayOfWeek": "first",
+            "first_answer_score": "first",
+            "first_answer_vote_count": "first",
             "numQuestionsAskedAT": "first",
             "numHelpProvidedAT": "first",
             "numQuestionsAsked30D": "first",
@@ -385,6 +463,16 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
 
             agg_df["mainTagId"] = agg_df["tag_ids"].apply(_get_main_tag_id)
 
+            def _count_tags(val):
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return 0
+                try:
+                    return len(val)
+                except TypeError:
+                    return 0
+
+            agg_df["numTags"] = agg_df["tag_ids"].apply(_count_tags)
+
         # Create additional metrics needed for matching
         print("Calculating additional metrics...")
         agg_df['hasHelped'] = (agg_df['numHelped'] > 0).astype(int)
@@ -403,6 +491,8 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
             'has_unhelpful_answer': 'hasUnhelpfulAnswer',
             'has_accepted_answer': 'hasAcceptedAnswer',
             'has_self_answer': 'hasSelfAnswer',
+            'first_answer_score': 'firstAnswerScore',
+            'first_answer_vote_count': 'firstAnswerVoteCount',
         }
         agg_df = agg_df.rename(columns=column_rename_map)
 
@@ -515,6 +605,10 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
     print(f"Written output file {output_file} with {len(merged_df):,} rows")
     del merged_df
     gc.collect()
+
+    # Join static question covariates (ViewCount, text metrics) by question id
+    posts_questions_file = os.path.join(os.path.dirname(str(input_file)), "posts_questions.parquet")
+    attach_question_covariates(str(output_file), posts_questions_file)
 
     # Cleanup temp dir
     try:

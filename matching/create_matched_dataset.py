@@ -48,6 +48,18 @@ REQUIRED_COLUMNS = [
     'numHelpProvided7D', 'questionId', 'tag_ids',
 ]
 
+# Columns added by the revision preprocessing (observable-selection covariates,
+# answer quality, ViewCount). Loaded and carried into matched_questions.parquet
+# when present; absent columns are tolerated so older processed files still run.
+OPTIONAL_COLUMNS = [
+    'postHour', 'postDayOfWeek', 'numTags', 'viewCount',
+    'bodyLenChars', 'bodyLenWords', 'numCodeBlocks', 'numInlineCode', 'codeLenChars',
+    'numParagraphs', 'numLinks', 'numImages', 'numLists', 'numBlockquotes',
+    'numSentences', 'numLongWords', 'avgWordLenChars',
+    'titleLenChars', 'titleLenWords', 'titleIsQuestion',
+    'firstAnswerScore', 'firstAnswerVoteCount',
+]
+
 CONTINUOUS_COVS = [
     'timeSinceFirstActivityDays', 'numQuestionsAskedAT', 'numHelpProvidedAT',
     'numQuestionsAsked30D', 'numHelpProvided30D', 'numQuestionsAsked7D',
@@ -585,7 +597,11 @@ def main():
     # Request columns that exist (parquet may use mainTagId or main_tag_id)
     import pyarrow.parquet as pq
     parquet_names = set(pq.read_schema(data_path).names)
-    df = pd.read_parquet(data_path, columns=REQUIRED_COLUMNS)
+    available_optional = [c for c in OPTIONAL_COLUMNS if c in parquet_names]
+    missing_optional = [c for c in OPTIONAL_COLUMNS if c not in parquet_names]
+    if missing_optional:
+        print(f"  Note: optional covariate columns absent from parquet (older preprocessing run?): {missing_optional}")
+    df = pd.read_parquet(data_path, columns=REQUIRED_COLUMNS + available_optional)
     def _first_tag_id(x):
         s = _safe_tag_list(x)
         return next(iter(s), pd.NA) if s else pd.NA
@@ -605,6 +621,30 @@ def main():
     n_treated = (df['hasAnswer'] == 1).sum()
     n_control = (df['hasAnswer'] == 0).sum()
     print(f"  Treatment: hasAnswer=1 → {n_treated:,}, hasAnswer=0 → {n_control:,} (total {len(df):,})")
+
+    # Observable-selection covariates (R1 Q3): posting time enters cyclically /
+    # binned, question length as log. ViewCount is deliberately NOT a propensity
+    # covariate (it accrues after treatment); it is only carried through for the
+    # placebo analysis. Only covariates present in the parquet are used.
+    extra_matching_covs = []
+    if 'postHour' in df.columns:
+        hours = pd.to_numeric(df['postHour'], errors='coerce')
+        df['postHourSin'] = np.sin(2 * np.pi * hours / 24)
+        df['postHourCos'] = np.cos(2 * np.pi * hours / 24)
+        extra_matching_covs += ['postHourSin', 'postHourCos']
+    if 'postDayOfWeek' in df.columns:
+        df['isWeekend'] = (pd.to_numeric(df['postDayOfWeek'], errors='coerce') >= 5).astype(float)
+        extra_matching_covs.append('isWeekend')
+    if 'numTags' in df.columns:
+        df['numTags'] = pd.to_numeric(df['numTags'], errors='coerce')
+        extra_matching_covs.append('numTags')
+    if 'bodyLenChars' in df.columns:
+        df['logBodyLenChars'] = np.log1p(pd.to_numeric(df['bodyLenChars'], errors='coerce'))
+        extra_matching_covs.append('logBodyLenChars')
+    if extra_matching_covs:
+        print(f"  Additional propensity covariates (observable selection): {extra_matching_covs}")
+    else:
+        print("  No additional observable-selection covariates available in input parquet.")
 
     # Tag-related covariates for propensity score
     print(f"\n--- Tag covariates ---")
@@ -710,6 +750,10 @@ def main():
         tag_covariates = [f'tag_{i}' for i in range(len(top_tag_ids))]
         continuous_covariates = CONTINUOUS_COVS
         print(f"PSM tag covariates: {len(tag_covariates)} tag dummies (legacy)")
+
+    # Observable-selection covariates (R1 Q3) enter the propensity model alongside
+    # the activity-history covariates
+    continuous_covariates = continuous_covariates + extra_matching_covs
 
     # Exact-match: same year AND same main tag (treated and controls only matched within stratum)
     main_tag_str = df['mainTagId'].astype("Int64").astype(str).replace("<NA>", "NA").replace("nan", "NA").fillna("NA")
