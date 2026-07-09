@@ -137,18 +137,32 @@ def _extract_model_row(result, model_name: str, n_questions: int) -> dict | None
         print(f"⚠ {model_name}: missing is_treated_active in fitted summary; skipping row.")
         return None
 
-    row = summary.loc["is_treated_active"]
-    ci_low = float(row["coef lower 95%"])
-    ci_high = float(row["coef upper 95%"])
+    # Report the SUMMED DiD (treated_post_question + is_treated_active), the treatment
+    # effect, rather than the is_treated_active increment over the waiting-period term.
+    try:
+        from cox_fit import _linear_combo, DID_TERMS
+        combo = _linear_combo(result, DID_TERMS)
+    except Exception:
+        combo = None
+    inc = summary.loc["is_treated_active"]
+    if combo is None:
+        combo = {
+            "hr": float(np.exp(inc["coef"])),
+            "ci_lo": float(np.exp(inc["coef lower 95%"])),
+            "ci_hi": float(np.exp(inc["coef upper 95%"])),
+            "se": float(inc["se(coef)"]),
+            "p": float(inc["p"]),
+        }
     return {
         "model": model_name,
         "N": int(n_questions),
         "events": int(result.meta.get("n_events", 0)),
-        "HR": float(np.exp(row["coef"])),
-        "CI_low": float(np.exp(ci_low)),
-        "CI_high": float(np.exp(ci_high)),
-        "SE": float(row["se(coef)"]),
-        "p": float(row["p"]),
+        "HR": combo["hr"],
+        "CI_low": combo["ci_lo"],
+        "CI_high": combo["ci_hi"],
+        "SE": combo["se"],
+        "p": combo["p"],
+        "HR_increment_only": float(np.exp(inc["coef"])),
     }
 
 
@@ -217,7 +231,7 @@ def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use
             if pre_row is not None:
                 rows.append(pre_row)
 
-    results = pd.DataFrame(rows, columns=["model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p"])
+    results = pd.DataFrame(rows, columns=["model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p", "HR_increment_only"])
     out_path = os.path.join(CACHE_DIR, "results_cohort_robustness.csv")
     results.to_csv(out_path, index=False)
     print(f"✓ Saved cohort robustness results to {out_path}")

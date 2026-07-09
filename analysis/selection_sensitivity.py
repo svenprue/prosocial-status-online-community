@@ -98,6 +98,25 @@ def compute_churn_summary(input_folder: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def _base_hr_fields(r: pd.Series) -> dict:
+    """Prefer the summed DiD (did_*) columns; fall back to legacy is_treated_active."""
+    if pd.notna(r.get("did_hr", np.nan)):
+        return {
+            "base_hr": r.get("did_hr", np.nan),
+            "base_ci_lo": r.get("did_ci_lo", np.nan),
+            "base_ci_hi": r.get("did_ci_hi", np.nan),
+            "base_se": r.get("did_se", np.nan),
+            "base_p": r.get("did_p", np.nan),
+        }
+    return {
+        "base_hr": r.get("treat_hr", np.nan),
+        "base_ci_lo": r.get("treat_ci_lo", np.nan),
+        "base_ci_hi": r.get("treat_ci_hi", np.nan),
+        "base_se": r.get("treat_se", np.nan),
+        "base_p": r.get("treat_p", np.nan),
+    }
+
+
 def _base_model_rows(cache_dir: str) -> pd.DataFrame:
     rows = []
     main_all_path = os.path.join(cache_dir, "results_main_all.csv")
@@ -105,29 +124,13 @@ def _base_model_rows(cache_dir: str) -> pd.DataFrame:
         df = pd.read_csv(main_all_path)
         if not df.empty:
             r = df.iloc[0]
-            rows.append({
-                "scope": "All",
-                "model": r.get("model", "AllData_Main"),
-                "base_hr": r.get("treat_hr", np.nan),
-                "base_ci_lo": r.get("treat_ci_lo", np.nan),
-                "base_ci_hi": r.get("treat_ci_hi", np.nan),
-                "base_se": r.get("treat_se", np.nan),
-                "base_p": r.get("treat_p", np.nan),
-            })
+            rows.append({"scope": "All", "model": r.get("model", "AllData_Main"), **_base_hr_fields(r)})
 
     main_path = os.path.join(cache_dir, "results_main.csv")
     if os.path.exists(main_path):
         df = pd.read_csv(main_path)
         for _, r in df.iterrows():
-            rows.append({
-                "scope": r.get("bucket"),
-                "model": f"ModelA_{r.get('bucket')}",
-                "base_hr": r.get("treat_hr", np.nan),
-                "base_ci_lo": r.get("treat_ci_lo", np.nan),
-                "base_ci_hi": r.get("treat_ci_hi", np.nan),
-                "base_se": r.get("treat_se", np.nan),
-                "base_p": r.get("treat_p", np.nan),
-            })
+            rows.append({"scope": r.get("bucket"), "model": f"ModelA_{r.get('bucket')}", **_base_hr_fields(r)})
     return pd.DataFrame(rows)
 
 

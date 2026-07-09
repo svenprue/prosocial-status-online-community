@@ -693,7 +693,7 @@ def generate_selection_bounds_table(df: pd.DataFrame) -> str:
     for _, r in df.iterrows():
         lines.append(
             rf"{_latex_bucket(str(r['scope']))} & {r['assumed_control_zero_post_event_fraction']:.2f} "
-            rf"& {r['base_hr']:.2f} & {r['control_zero_post_help_share']:.1%} "
+            rf"& {r['base_hr']:.2f} & {r['control_zero_post_help_share'] * 100:.1f}\% "
             rf"& {r['adjusted_event_rate_rr_proxy']:.2f} \\"
         )
     lines += [
@@ -712,7 +712,7 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
         return ""
     lines = [
         r"\begin{table}[H]",
-        r"\caption{Matched-Pair Bootstrap Uncertainty for Model A}",
+        r"\caption{Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect (Model A)}",
         r"\label{tab:pair_bootstrap}",
         r"\centering",
         r"\footnotesize",

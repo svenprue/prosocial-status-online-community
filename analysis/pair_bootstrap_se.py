@@ -6,6 +6,10 @@ NotImplementedError, and it does not wire a public ``cluster_col`` argument for
 time-varying fits. This script implements the reviewer-requested matched-pair
 alternative by resampling whole match_id pairs and refitting Model A.
 
+The bootstrapped statistic (base_coef / base_hr and the CIs) is the SUMMED DiD
+contrast, treated_post_question + is_treated_active — the treatment effect, not
+the is_treated_active increment over the waiting-period term.
+
 Outputs:
   analysis/model_cache/results_pair_bootstrap.csv
 
@@ -66,9 +70,21 @@ def _bootstrap_sample_by_match(
 
 
 def _coef_from_result(result) -> float | None:
+    """Return the SUMMED DiD coefficient (treated_post_question + is_treated_active).
+
+    This is the treatment effect (post-answer vs. pre-question baseline, treated vs.
+    control); the bootstrap therefore quantifies uncertainty in the effect itself, not
+    in the is_treated_active increment over the waiting-period term.
+    """
     if result is None or "is_treated_active" not in result.summary_df.index:
         return None
-    return float(result.summary_df.loc["is_treated_active", "coef"])
+    s = result.summary_df
+    try:
+        from cox_fit import DID_TERMS
+    except Exception:
+        DID_TERMS = ["treated_post_question", "is_treated_active"]
+    terms = [t for t in DID_TERMS if t in s.index]
+    return float(s.loc[terms, "coef"].sum())
 
 
 def run_pair_bootstrap(

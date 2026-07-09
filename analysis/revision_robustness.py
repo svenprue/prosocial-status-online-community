@@ -23,7 +23,7 @@ from cox_config import (
     BUCKET_ORDER,
 )
 from cox_data import load_and_prepare, create_tenure_buckets
-from cox_fit import fit_cox_cached
+from cox_fit import fit_cox_cached, _linear_combo, DID_TERMS
 
 
 def _default_input_folder() -> str:
@@ -36,16 +36,30 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
     summary = result.summary_df
     if "is_treated_active" not in summary.index:
         return None
-    row = summary.loc["is_treated_active"]
+    # Report the SUMMED DiD (treated_post_question + is_treated_active) — the treatment
+    # effect (post-answer vs. pre-question baseline, treated vs. control) — not the raw
+    # is_treated_active coefficient, which is only the post-answer increment over the
+    # (potentially large) waiting-period term.
+    combo = _linear_combo(result, DID_TERMS)
+    inc = summary.loc["is_treated_active"]
+    if combo is None:
+        combo = {
+            "hr": float(np.exp(inc["coef"])),
+            "ci_lo": float(np.exp(inc["coef lower 95%"])),
+            "ci_hi": float(np.exp(inc["coef upper 95%"])),
+            "se": float(inc["se(coef)"]),
+            "p": float(inc["p"]),
+        }
     return {
         "model": model_name,
         "N_questions": int(n_questions),
         "events": int(result.meta.get("n_events", 0)),
-        "HR": float(np.exp(row["coef"])),
-        "CI_low": float(np.exp(row["coef lower 95%"])),
-        "CI_high": float(np.exp(row["coef upper 95%"])),
-        "SE": float(row["se(coef)"]),
-        "p": float(row["p"]),
+        "HR": combo["hr"],
+        "CI_low": combo["ci_lo"],
+        "CI_high": combo["ci_hi"],
+        "SE": combo["se"],
+        "p": combo["p"],
+        "HR_increment_only": float(np.exp(inc["coef"])),  # is_treated_active alone, reference
     }
 
 
