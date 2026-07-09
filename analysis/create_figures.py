@@ -380,6 +380,59 @@ def generate_revision_robustness_table(
     return "\n".join(lines)
 
 
+def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
+    """ISS-04 decomposition: the summed DiD treatment effect by help type, split into
+    its waiting-period (beta_2, anticipatory engagement) and answer-arrival (beta_4)
+    components. Makes visible where a reciprocity signal is cleanly identified
+    (answers) versus dominated by the pre-answer activity pre-trend (comments)."""
+    if df.empty or "HR" not in df.columns:
+        return ""
+    label_map = {
+        "answers_only": "Answers only",
+        "comments_only": "Comments only",
+        "accepts_only": r"Accepts only$^{a}$",
+        "answers_comments": "Answers $+$ comments",
+        "composite_all": r"All types$^{a}$",
+    }
+    order = {k: i for i, k in enumerate(
+        ["answers_only", "comments_only", "accepts_only", "answers_comments", "composite_all"]
+    )}
+    df = df.copy()
+    if "outcome" in df.columns:
+        df["_o"] = df["outcome"].map(order).fillna(99)
+        df = df.sort_values("_o")
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Reciprocity Effect Decomposed by Help Type (ISS-04)}",
+        r"\label{tab:outcome_decomposition}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lcccr@{}}",
+        r"\toprule",
+        r"\textbf{Outcome} & \textbf{Treatment HR [95\% CI]} & \textbf{Waiting $\beta_2$} & \textbf{Arrival $\beta_4$} & \textbf{Events} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        name = label_map.get(str(r.get("outcome", "")), str(r.get("outcome", "")).replace("_", r"\_"))
+        hr, lo, hi = r.get("HR", np.nan), r.get("CI_low", np.nan), r.get("CI_high", np.nan)
+        hr_txt = f"{hr:.2f}" if pd.notna(hr) else "—"
+        ci_txt = f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else ""
+        b2, b4 = r.get("waiting_coef", np.nan), r.get("arrival_coef", np.nan)
+        b2_txt = f"{b2:+.2f}" if pd.notna(b2) else "—"
+        b4_txt = f"{b4:+.2f}" if pd.notna(b4) else "—"
+        events = int(r.get("events", 0)) if pd.notna(r.get("events", np.nan)) else 0
+        lines.append(rf"{name} & {hr_txt}\,{ci_txt} & {b2_txt} & {b4_txt} & {events:,} \\")
+    lines += [
+        r"\bottomrule",
+        r"\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\",
+        r"\multicolumn{5}{@{}l}{\footnotesize $^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.} \\",
+        _standard_error_note(5),
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
 def generate_viewcount_placebo_table(df: pd.DataFrame) -> str:
     if df.empty:
         return ""
@@ -1109,7 +1162,6 @@ def main():
     revision_tables = [
         ("results_observable_controls.csv", "Observable Selection Controls (ISS-02)", "tab:observable_controls", "observable_controls.tex", "spec"),
         ("results_answer_quality.csv", "Answer-Quality Robustness (ISS-06)", "tab:answer_quality_robustness", "answer_quality_robustness.tex", "spec"),
-        ("results_composite_outcome.csv", "Composite vs Answers-Only Outcome (ISS-04)", "tab:composite_outcome", "composite_outcome.tex", "outcome"),
         ("results_newcomer_robustness.csv", "Newcomer Bucket Robustness ($<$ 1 Week)", "tab:newcomer_robustness", "newcomer_robustness.tex", "model"),
         ("results_cohort_robustness.csv", "Cohort Heterogeneity Robustness (ISS-10)", "tab:cohort_robustness", "cohort_robustness.tex", "model"),
     ]
@@ -1122,6 +1174,18 @@ def main():
             tex = generate_revision_robustness_table(df_rev, caption, label, spec_col=spec_col)
             if tex:
                 out = os.path.join(TABLE_DIR, out_name)
+                with open(out, "w") as f:
+                    f.write(tex)
+                print(f"✓ {out}")
+
+    # ISS-04 outcome decomposition (dedicated table: summed DiD + beta_2/beta_4 by help type)
+    composite_path = os.path.join(CACHE_DIR, "results_composite_outcome.csv")
+    if os.path.exists(composite_path) and os.path.getsize(composite_path) > 1:
+        df_comp = pd.read_csv(composite_path)
+        if not df_comp.empty:
+            tex = generate_outcome_decomposition_table(df_comp)
+            if tex:
+                out = os.path.join(TABLE_DIR, "composite_outcome.tex")
                 with open(out, "w") as f:
                     f.write(tex)
                 print(f"✓ {out}")

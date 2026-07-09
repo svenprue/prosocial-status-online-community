@@ -39,17 +39,24 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
     # Report the SUMMED DiD (treated_post_question + is_treated_active) — the treatment
     # effect (post-answer vs. pre-question baseline, treated vs. control) — not the raw
     # is_treated_active coefficient, which is only the post-answer increment over the
-    # (potentially large) waiting-period term.
-    combo = _linear_combo(result, DID_TERMS)
-    inc = summary.loc["is_treated_active"]
+    # (potentially large) waiting-period term. We also return the decomposition:
+    # beta_2 (waiting-period / "anticipatory engagement" pre-trend) and beta_4 (the
+    # increment at answer arrival, net of that pre-trend).
+    inc = summary.loc["is_treated_active"]                       # beta_4
+    combo = _linear_combo(result, DID_TERMS)                     # beta_2 + beta_4
     if combo is None:
         combo = {
+            "coef": float(inc["coef"]),
             "hr": float(np.exp(inc["coef"])),
             "ci_lo": float(np.exp(inc["coef lower 95%"])),
             "ci_hi": float(np.exp(inc["coef upper 95%"])),
             "se": float(inc["se(coef)"]),
             "p": float(inc["p"]),
         }
+    waiting_coef = (
+        float(summary.loc["treated_post_question", "coef"])
+        if "treated_post_question" in summary.index else float("nan")
+    )
     return {
         "model": model_name,
         "N_questions": int(n_questions),
@@ -59,7 +66,11 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
         "CI_high": combo["ci_hi"],
         "SE": combo["se"],
         "p": combo["p"],
-        "HR_increment_only": float(np.exp(inc["coef"])),  # is_treated_active alone, reference
+        "did_coef": combo.get("coef", float("nan")),      # beta_2 + beta_4
+        "waiting_coef": waiting_coef,                       # beta_2 (pre-trend)
+        "HR_waiting": float(np.exp(waiting_coef)) if np.isfinite(waiting_coef) else float("nan"),
+        "arrival_coef": float(inc["coef"]),                 # beta_4 (arrival increment)
+        "HR_increment_only": float(np.exp(inc["coef"])),   # exp(beta_4), reference
     }
 
 
@@ -110,13 +121,58 @@ def run_answer_quality(input_folder: str, use_cache: bool) -> pd.DataFrame:
 
 
 def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
-    print("\n=== ISS-04 partial: Composite vs answers-only outcome ===")
+    """ISS-04: decompose the reciprocity outcome by help type.
+
+    Fits the same Model A on each help-type subset so the treatment effect can be
+    read component-by-component. Each row reports the summed DiD (HR) together with
+    its decomposition into the waiting-period coefficient (beta_2, "anticipatory
+    engagement" pre-trend) and the answer-arrival increment (beta_4). This directly
+    answers R2's point 4: whether newcomers' low-effort actions (comments) carry a
+    reciprocity signal, or whether that signal is pre-answer activity selection.
+
+    Note on inputs: the help-type filter can only surface types that are present in
+    ``study_events.parquet``. The default pipeline excludes ``accept`` events (see
+    create_matched_event_histories.py: include_accept_help=False), so the
+    ``accepts_only`` and ``composite_all`` rows will be skipped unless ``input_folder``
+    points to an event history generated with ``include_accept_help=True``. Comments
+    are counted only on *other users'* questions (own-question comments are excluded),
+    and ``accepts`` (accepting an answer on one's own question) measure direct
+    reciprocity to the helper, not the generalized reciprocity this study models --- we
+    report them separately and labeled, never blended into the primary outcome.
+    """
+    print("\n=== ISS-04: Outcome decomposition by help type ===")
+    outcomes = [
+        ("answers_only", ["answer"]),
+        ("comments_only", ["comment"]),
+        ("accepts_only", ["accept"]),                       # direct (dyadic) reciprocity; treated-only by construction
+        ("answers_comments", ["answer", "comment"]),        # generalized-reciprocity composite, no accepts
+        ("composite_all", ["answer", "comment", "accept"]),  # matches the earlier with-accepts run
+    ]
     rows = []
-    for label, types in [("answers_only", ["answer"]), ("composite_acc", ["answer", "comment", "accept"])]:
+    for label, types in outcomes:
         model_df, _ = load_and_prepare(input_folder, event_help_types=types)
+        if {"event_occurred", "hasAnswer"}.issubset(model_df.columns):
+            control_events = int(model_df.loc[model_df["hasAnswer"] == 0, "event_occurred"].sum())
+            treated_events = int(model_df.loc[model_df["hasAnswer"] == 1, "event_occurred"].sum())
+        else:
+            control_events = treated_events = -1
+        if control_events == 0:
+            print(
+                f"  ⚠ {label}: control group has zero events (treated-only outcome by "
+                "construction); the treatment contrast is degenerate and is reported for "
+                "reference only, flagged via control_events=0."
+            )
         row = _fit_subset(model_df, f"ModelA_AllData_{label}", COVARIATES_MAIN, use_cache)
         if row:
-            rows.append({**row, "outcome": label})
+            rows.append({
+                **row,
+                "outcome": label,
+                "help_types": "+".join(types),
+                "control_events": control_events,
+                "treated_events": treated_events,
+            })
+        else:
+            print(f"  ⚠ {label}: no result (type absent from study_events, or too few events) — skipped.")
     out = pd.DataFrame(rows)
     path = os.path.join(CACHE_DIR, "results_composite_outcome.csv")
     out.to_csv(path, index=False)
