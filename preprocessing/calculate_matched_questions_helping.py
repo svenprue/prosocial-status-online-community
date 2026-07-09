@@ -3,6 +3,8 @@ import duckdb
 import pandas as pd
 from pathlib import Path
 
+from input_paths import resolve_input_file
+
 def calculate_helping_for_matched_questions(
         matched_questions_path: str,
         input_folder: str,
@@ -57,8 +59,8 @@ def calculate_helping_for_matched_questions(
     con.register("matched_questions", matched_df)
 
     # Load raw data
-    questions_path = os.path.join(input_folder, 'posts_questions.parquet')
-    answers_path = os.path.join(input_folder, 'posts_answers.parquet')
+    questions_path = resolve_input_file("posts_questions")
+    answers_path = resolve_input_file("posts_answers")
 
     print("\nLoading raw Stack Overflow data...")
 
@@ -227,14 +229,14 @@ def calculate_helping_for_matched_questions(
     print(f"\nSuccessfully saved results to {output_path}")
 
 if __name__ == "__main__":
-    # Define paths
-    matched_questions_path = Path("..") / "data" / "input" / "matched_questions.parquet"
-    input_data_folder = Path("..") / "data" / "input"
-    output_data_folder = Path("..") / "data" / "study_datasets"
+    _script_dir = Path(__file__).resolve().parent
+    _project_root = _script_dir.parent
+    matched_questions_path = _project_root / "data" / "input" / "matched_questions.parquet"
+    input_data_folder = _project_root / "data" / "input"
+    output_data_folder = _project_root / "data" / "study_datasets"
 
-    # Run the calculation
     calculate_helping_for_matched_questions(
-        matched_questions_path=matched_questions_path,
-        input_folder=input_data_folder,
-        output_folder=output_data_folder
+        matched_questions_path=str(matched_questions_path),
+        input_folder=str(input_data_folder),
+        output_folder=str(output_data_folder),
     )

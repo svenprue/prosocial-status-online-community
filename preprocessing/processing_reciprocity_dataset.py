@@ -381,6 +381,19 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
 
         non_history_chunk["month"] = non_history_chunk["timestamp"].dt.month
         non_history_chunk["year"] = non_history_chunk["timestamp"].dt.year
+        non_history_chunk["postHour"] = (non_history_chunk["timestamp"].dt.hour // 4).astype(np.float64)
+        non_history_chunk["postDayOfWeek"] = non_history_chunk["timestamp"].dt.dayofweek.astype(np.float64)
+        non_history_chunk["numTags"] = non_history_chunk["tag_ids"].apply(
+            lambda x: len(x) if isinstance(x, (list, tuple, np.ndarray)) else 0
+        ).astype(np.float64)
+
+        revision_cols = [
+            "view_count", "body_len_chars", "title_len_chars", "n_code_blocks",
+            "owner_reputation", "first_answer_body_len_chars",
+        ]
+        for col in revision_cols:
+            if col not in non_history_chunk.columns:
+                non_history_chunk[col] = np.nan
 
         # Posting-time covariates from the question timestamp itself (the row
         # 'timestamp' of the aggregated first event is phase_one_start, i.e.
@@ -424,6 +437,16 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
             "days_since_registration_at_phase_one_start": "first",
             "helps_given_between_question_and_answer": "first",
             "tag_ids": "first",
+            "postHour": "first",
+            "postDayOfWeek": "first",
+            "numTags": "first",
+            "view_count": "first",
+            "body_len_chars": "first",
+            "title_len_chars": "first",
+            "n_code_blocks": "first",
+            "owner_reputation": "first",
+            "first_answer_body_len_chars": "first",
+            "first_answer_score": "first",
         }
 
         # Apply aggregation (one row per question)
@@ -491,6 +514,12 @@ def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp
             'has_unhelpful_answer': 'hasUnhelpfulAnswer',
             'has_accepted_answer': 'hasAcceptedAnswer',
             'has_self_answer': 'hasSelfAnswer',
+            'view_count': 'viewCount',
+            'body_len_chars': 'bodyLenChars',
+            'title_len_chars': 'titleLenChars',
+            'n_code_blocks': 'nCodeBlocks',
+            'owner_reputation': 'ownerReputation',
+            'first_answer_body_len_chars': 'firstAnswerBodyLenChars',
             'first_answer_score': 'firstAnswerScore',
             'first_answer_vote_count': 'firstAnswerVoteCount',
         }

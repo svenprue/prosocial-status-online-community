@@ -3,6 +3,8 @@ import duckdb
 import pandas as pd
 from pathlib import Path
 
+from input_paths import resolve_input_file
+
 
 def process_accepted_answer_data(
         input_folder: str,
@@ -25,11 +27,11 @@ def process_accepted_answer_data(
     con.execute("PRAGMA threads=28;")
     con.execute("PRAGMA enable_progress_bar;")
 
-    questions_path = os.path.join(input_folder, 'posts_questions.parquet')
-    answers_path = os.path.join(input_folder, 'posts_answers.parquet')
-    votes_path = os.path.join(input_folder, 'Votes.parquet')
-    badges_path = os.path.join(input_folder, 'Badges.parquet')
-    users_path = os.path.join(input_folder, 'Users.parquet')
+    questions_path = resolve_input_file("posts_questions")
+    answers_path = resolve_input_file("posts_answers")
+    votes_path = resolve_input_file("votes")
+    badges_path = resolve_input_file("badges")
+    users_path = resolve_input_file("users")
 
     con.execute(f"""
         CREATE TEMPORARY VIEW questions AS
@@ -38,7 +40,13 @@ def process_accepted_answer_data(
             OwnerUserId AS owner_user_id,
             AcceptedAnswerId AS accepted_answer_id,
             CAST(CreationDate AS TIMESTAMP) AS creation_date,
-            Tags AS tags
+            Tags AS tags,
+            TRY_CAST(ViewCount AS DOUBLE) AS view_count,
+            TRY_CAST(BodyLenChars AS INTEGER) AS body_len_chars,
+            TRY_CAST(BodyLenWords AS INTEGER) AS body_len_words,
+            TRY_CAST(TitleLenChars AS INTEGER) AS title_len_chars,
+            TRY_CAST(TitleLenWords AS INTEGER) AS title_len_words,
+            TRY_CAST(NCodeBlocks AS INTEGER) AS n_code_blocks
         FROM '{questions_path}'
     """)
 
@@ -49,7 +57,8 @@ def process_accepted_answer_data(
             OwnerUserId AS owner_user_id,
             ParentId AS parent_question_id,
             CAST(Score AS INTEGER) AS score,
-            CAST(CreationDate AS TIMESTAMP) AS creation_date
+            CAST(CreationDate AS TIMESTAMP) AS creation_date,
+            TRY_CAST(BodyLenChars AS INTEGER) AS body_len_chars
         FROM '{answers_path}'
     """)
 
@@ -76,7 +85,8 @@ def process_accepted_answer_data(
         CREATE TEMPORARY VIEW users AS
         SELECT
             Id AS user_id,
-            CAST(CreationDate AS TIMESTAMP) AS registration_date
+            CAST(CreationDate AS TIMESTAMP) AS registration_date,
+            TRY_CAST(Reputation AS INTEGER) AS reputation
         FROM '{users_path}'
     """)
 
@@ -150,6 +160,7 @@ def process_accepted_answer_data(
             first_answers AS (
                 SELECT
                     question_id,
+                    answer_id,
                     creation_date AS first_answer_timestamp,
                     score AS first_answer_score,
                     vote_count AS first_answer_vote_count
@@ -203,11 +214,19 @@ def process_accepted_answer_data(
                 fa.first_answer_timestamp,
                 fa.first_answer_score,
                 fa.first_answer_vote_count,
+                fa.answer_id AS first_answer_id,
+                abl.body_len_chars AS first_answer_body_len_chars,
                 aa.accepted_answer_timestamp,
-                aa.accepted_answer_vote_timestamp
+                aa.accepted_answer_vote_timestamp,
+                q.view_count,
+                q.body_len_chars,
+                q.title_len_chars,
+                q.n_code_blocks,
+                u.reputation AS owner_reputation
             FROM questions q
-            LEFT JOIN first_answers fa ON q.question_id = fa.question_id  -- LEFT JOIN to include ALL questions
-            LEFT JOIN users u ON q.owner_user_id = u.user_id  -- LEFT JOIN to include users even without registration data
+            LEFT JOIN first_answers fa ON q.question_id = fa.question_id
+            LEFT JOIN answers abl ON fa.answer_id = abl.answer_id
+            LEFT JOIN users u ON q.owner_user_id = u.user_id
             LEFT JOIN accepted_answers aa ON q.question_id = aa.question_id
             LEFT JOIN answer_counts ac ON q.question_id = ac.question_id
             LEFT JOIN self_answers sa ON q.question_id = sa.question_id
@@ -269,6 +288,7 @@ def process_accepted_answer_data(
             first_answers AS (
                 SELECT
                     question_id,
+                    answer_id,
                     creation_date AS first_answer_timestamp,
                     score AS first_answer_score,
                     vote_count AS first_answer_vote_count
@@ -323,15 +343,23 @@ def process_accepted_answer_data(
                     fa.first_answer_timestamp,
                     fa.first_answer_score,
                     fa.first_answer_vote_count,
+                    fa.answer_id AS first_answer_id,
+                    abl.body_len_chars AS first_answer_body_len_chars,
                     aa.accepted_answer_timestamp,
                     aa.accepted_answer_vote_timestamp,
+                    q.view_count,
+                    q.body_len_chars,
+                    q.title_len_chars,
+                    q.n_code_blocks,
+                    u.reputation AS owner_reputation,
                     ROW_NUMBER() OVER (
                         PARTITION BY q.owner_user_id
                         ORDER BY RANDOM()
                     ) AS rn
                 FROM questions q
-                LEFT JOIN first_answers fa ON q.question_id = fa.question_id  -- LEFT JOIN to include ALL questions
-                LEFT JOIN users u ON q.owner_user_id = u.user_id  -- LEFT JOIN to include users even without registration data
+                LEFT JOIN first_answers fa ON q.question_id = fa.question_id
+                LEFT JOIN answers abl ON fa.answer_id = abl.answer_id
+                LEFT JOIN users u ON q.owner_user_id = u.user_id
                 LEFT JOIN accepted_answers aa ON q.question_id = aa.question_id
                 LEFT JOIN answer_counts ac ON q.question_id = ac.question_id
                 LEFT JOIN self_answers sa ON q.question_id = sa.question_id
@@ -348,8 +376,17 @@ def process_accepted_answer_data(
                 has_accepted_answer,
                 has_self_answer,
                 first_answer_timestamp,
+                first_answer_score,
+                first_answer_vote_count,
+                first_answer_id,
+                first_answer_body_len_chars,
                 accepted_answer_timestamp,
-                accepted_answer_vote_timestamp
+                accepted_answer_vote_timestamp,
+                view_count,
+                body_len_chars,
+                title_len_chars,
+                n_code_blocks,
+                owner_reputation
             FROM raw
             WHERE rn = 1;
         """)
@@ -498,8 +535,15 @@ def process_accepted_answer_data(
             eq.first_answer_timestamp,
             eq.first_answer_score,
             eq.first_answer_vote_count,
+            eq.first_answer_id,
+            eq.first_answer_body_len_chars,
             eq.accepted_answer_timestamp,
             eq.accepted_answer_vote_timestamp,
+            eq.view_count,
+            eq.body_len_chars,
+            eq.title_len_chars,
+            eq.n_code_blocks,
+            eq.owner_reputation,
             COALESCE(hg.helps_given_between_question_and_answer, 0) AS helps_given_between_question_and_answer,
             u.registration_date,
             qt.tag_ids,
@@ -544,6 +588,13 @@ def process_accepted_answer_data(
                                             NULL AS first_answer_timestamp,
                                             NULL AS first_answer_score,
                                             NULL AS first_answer_vote_count,
+                                            NULL AS first_answer_id,
+                                            NULL AS first_answer_body_len_chars,
+                                            NULL AS view_count,
+                                            NULL AS body_len_chars,
+                                            NULL AS title_len_chars,
+                                            NULL AS n_code_blocks,
+                                            NULL AS owner_reputation,
                                             NULL AS accepted_answer_timestamp,
                                             NULL AS accepted_answer_vote_timestamp,
                                             NULL AS question_timestamp,
@@ -575,6 +626,13 @@ def process_accepted_answer_data(
                                              NULL AS first_answer_timestamp,
                                              NULL AS first_answer_score,
                                              NULL AS first_answer_vote_count,
+                                             NULL AS first_answer_id,
+                                             NULL AS first_answer_body_len_chars,
+                                             NULL AS view_count,
+                                             NULL AS body_len_chars,
+                                             NULL AS title_len_chars,
+                                             NULL AS n_code_blocks,
+                                             NULL AS owner_reputation,
                                              NULL AS accepted_answer_timestamp,
                                              NULL AS accepted_answer_vote_timestamp,
                                              NULL AS question_timestamp,
@@ -610,6 +668,13 @@ def process_accepted_answer_data(
                                       NULL AS first_answer_timestamp,
                                       NULL AS first_answer_score,
                                       NULL AS first_answer_vote_count,
+                                      NULL AS first_answer_id,
+                                      NULL AS first_answer_body_len_chars,
+                                      NULL AS view_count,
+                                      NULL AS body_len_chars,
+                                      NULL AS title_len_chars,
+                                      NULL AS n_code_blocks,
+                                      NULL AS owner_reputation,
                                       NULL AS accepted_answer_timestamp,
                                       NULL AS accepted_answer_vote_timestamp,
                                       NULL AS question_timestamp,
@@ -643,6 +708,13 @@ def process_accepted_answer_data(
                                   NULL AS first_answer_timestamp,
                                   NULL AS first_answer_score,
                                   NULL AS first_answer_vote_count,
+                                  NULL AS first_answer_id,
+                                  NULL AS first_answer_body_len_chars,
+                                  NULL AS view_count,
+                                  NULL AS body_len_chars,
+                                  NULL AS title_len_chars,
+                                  NULL AS n_code_blocks,
+                                  NULL AS owner_reputation,
                                   NULL AS accepted_answer_timestamp,
                                   NULL AS accepted_answer_vote_timestamp,
                                   NULL AS question_timestamp,
@@ -676,6 +748,13 @@ def process_accepted_answer_data(
                                              NULL AS first_answer_timestamp,
                                              NULL AS first_answer_score,
                                              NULL AS first_answer_vote_count,
+                                             NULL AS first_answer_id,
+                                             NULL AS first_answer_body_len_chars,
+                                             NULL AS view_count,
+                                             NULL AS body_len_chars,
+                                             NULL AS title_len_chars,
+                                             NULL AS n_code_blocks,
+                                             NULL AS owner_reputation,
                                              NULL AS accepted_answer_timestamp,
                                              NULL AS accepted_answer_vote_timestamp,
                                              NULL AS question_timestamp,
@@ -724,6 +803,13 @@ def process_accepted_answer_data(
             first_answer_timestamp,
             first_answer_score,
             first_answer_vote_count,
+            first_answer_id,
+            first_answer_body_len_chars,
+            view_count,
+            body_len_chars,
+            title_len_chars,
+            n_code_blocks,
+            owner_reputation,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
@@ -753,6 +839,13 @@ def process_accepted_answer_data(
             first_answer_timestamp,
             first_answer_score,
             first_answer_vote_count,
+            first_answer_id,
+            first_answer_body_len_chars,
+            view_count,
+            body_len_chars,
+            title_len_chars,
+            n_code_blocks,
+            owner_reputation,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
@@ -782,6 +875,13 @@ def process_accepted_answer_data(
             first_answer_timestamp,
             first_answer_score,
             first_answer_vote_count,
+            first_answer_id,
+            first_answer_body_len_chars,
+            view_count,
+            body_len_chars,
+            title_len_chars,
+            n_code_blocks,
+            owner_reputation,
             accepted_answer_timestamp,
             accepted_answer_vote_timestamp,
             question_timestamp,
@@ -811,6 +911,13 @@ def process_accepted_answer_data(
             p.first_answer_timestamp,
             p.first_answer_score,
             p.first_answer_vote_count,
+            p.first_answer_id,
+            p.first_answer_body_len_chars,
+            p.view_count,
+            p.body_len_chars,
+            p.title_len_chars,
+            p.n_code_blocks,
+            p.owner_reputation,
             p.accepted_answer_timestamp,
             p.accepted_answer_vote_timestamp,
             p.question_timestamp,
@@ -876,6 +983,13 @@ def process_accepted_answer_data(
                 first_answer_timestamp,
                 first_answer_score,
                 first_answer_vote_count,
+                first_answer_id,
+                first_answer_body_len_chars,
+                view_count,
+                body_len_chars,
+                title_len_chars,
+                n_code_blocks,
+                owner_reputation,
                 accepted_answer_timestamp,
                 accepted_answer_vote_timestamp,
                 question_timestamp,

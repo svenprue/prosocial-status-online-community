@@ -94,7 +94,12 @@ def _compute_descriptives(timelines: pd.DataFrame, events: pd.DataFrame) -> dict
 def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.DataFrame:
     """Merge intervals with timelines and add phase/response-time covariates."""
     timeline_cols = ["match_id", "question_id", "hasAnswer", "t_question", "t_answer"]
-    for optional_col in ["user_id", "question_year"]:
+    optional_cols = [
+        "user_id", "question_year",
+        "hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars", "viewCount",
+        "postHour", "postDayOfWeek", "numTags", "bodyLenChars", "titleLenChars", "ownerReputation",
+    ]
+    for optional_col in optional_cols:
         if optional_col in timelines.columns:
             timeline_cols.append(optional_col)
     full_df = intervals.merge(
@@ -117,7 +122,7 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
 
     full_df["log_response_time"] = np.where(
         full_df["hasAnswer"] == 1,
-        np.log1p(full_df["t_answer"]),
+        np.log1p(np.maximum(full_df["t_answer"] - full_df["t_question"], 0)),
         0.0,
     )
     full_df["hasAnswer_response_time_interaction"] = np.where(
@@ -159,20 +164,24 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
         "tenure_bucket",
         "response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3",
     ]
-    for optional_col in ["user_id", "question_year"]:
+    for optional_col in ["user_id", "question_year",
+                         "hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars", "viewCount",
+                         "postHour", "postDayOfWeek", "numTags", "bodyLenChars", "titleLenChars", "ownerReputation"]:
         if optional_col in full_df.columns:
             cols.append(optional_col)
     return full_df[cols].replace([np.inf, -np.inf], np.nan).dropna()
 
 
-def load_and_prepare(input_folder: str, sample_size: int = None):
-    """Load parquet, optionally subsample, build intervals and model_df. Returns (model_df, descriptives)."""
+def load_and_prepare(input_folder: str, sample_size: int = None, event_help_types: list = None):
+    """Load parquet, optionally subsample, build intervals and model_df."""
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
+    help_tag = "" if not event_help_types else "_" + "_".join(event_help_types)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
+    cache_tag = f"{cache_tag}{help_tag}"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}.pkl")
 
-    if os.path.exists(interval_cache):
+    if os.path.exists(interval_cache) and not event_help_types:
         print(f"✓ Loading cached intervals from {interval_cache}")
         model_df = pd.read_parquet(interval_cache)
         print("Recomputing descriptives from timelines …")
@@ -197,6 +206,9 @@ def load_and_prepare(input_folder: str, sample_size: int = None):
     print("=== Loading raw data ===")
     timelines = pd.read_parquet(f"{input_folder}/study_timelines.parquet")
     events = pd.read_parquet(f"{input_folder}/study_events.parquet")
+    if event_help_types and "help_type" in events.columns:
+        events = events[events["help_type"].isin(event_help_types)].copy()
+        print(f"Filtered events to help_type in {event_help_types}: {len(events):,} rows")
     print(f"Loaded {len(timelines):,} timelines, {len(events):,} events")
     for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days", "question_year"]:
         if col in timelines.columns:

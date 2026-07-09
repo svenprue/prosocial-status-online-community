@@ -5,11 +5,28 @@ data/input/
 data/raw/
 data/study_datasets/
 data/event_history/
+data/processed/
+
+# Revision-data parquet drops (canonical copies live under data/input/)
+*_revision.parquet
+
+# Pipeline run logs
+logs/
+
+# Legacy/root analysis cache (analysis/data_cache/ is the active path)
+data_cache/
 
 # DuckDB temporary files
 **/duckdb_tmp/
 *.duckdb
 *.duckdb.wal
+
+# NFS / filesystem temp artifacts
+.nfsc*
+**/.nfsc*
+
+# Jupyter checkpoints under data dirs
+data/**/.ipynb_checkpoints/
 
 # ---------------------------------------------------------------------------
 # Model and analysis caches

@@ -271,7 +271,12 @@ def generate_regression_all_table(
     # HR [95% CI] row
     row = rf"\hspace{{1em}} Hazard Ratio [95\% CI] & [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]"
     if has_speed:
-        row += r" & —"
+        if pd.notna(s.get("treat_ci_lo")) and pd.notna(s.get("treat_ci_hi")):
+            row += rf" & [{s['treat_ci_lo']:.2f}, {s['treat_ci_hi']:.2f}]"
+        elif pd.notna(s.get("treat_hr")):
+            row += rf" & [{s['treat_hr']:.2f}, {s['treat_hr']:.2f}]"
+        else:
+            row += r" & —"
     lines.append(row + r" \\[4pt]")
 
     lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Waiting Period}}}} \\")
@@ -314,6 +319,81 @@ def generate_regression_all_table(
         r"\end{tabular}",
         r"\end{table}",
     ]
+    return "\n".join(lines)
+
+
+def generate_revision_robustness_table(
+    df: pd.DataFrame,
+    caption: str,
+    label: str,
+    spec_col: str = "spec",
+) -> str:
+    """Generic HR table for revision_robustness.py CSV outputs."""
+    if df.empty or "HR" not in df.columns:
+        return ""
+    spec_name = spec_col if spec_col in df.columns else ("model" if "model" in df.columns else None)
+    lines = [
+        r"\begin{table}[H]",
+        rf"\caption{{{caption}}}",
+        rf"\label{{{label}}}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Specification} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        label_txt = str(r[spec_name]) if spec_name else str(r.get("model", ""))
+        if "tenure_bucket" in r and pd.notna(r["tenure_bucket"]):
+            label_txt = f"{label_txt} ({r['tenure_bucket']})"
+        if "outcome" in r and pd.notna(r["outcome"]):
+            label_txt = str(r["outcome"])
+        label_tex = label_txt.replace("_", r"\_")
+        n_col = "N_questions" if "N_questions" in r else "N"
+        n_val = int(r.get(n_col, 0))
+        lines.append(
+            rf"{label_tex} & {r['HR']:.3f} "
+            rf"& [{r['CI_low']:.3f}, {r['CI_high']:.3f}] "
+            rf"& {n_val:,} & {int(r.get('events', 0)):,} \\"
+        )
+    lines += [
+        r"\bottomrule",
+        _standard_error_note(5),
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
+def generate_viewcount_placebo_table(df: pd.DataFrame) -> str:
+    if df.empty:
+        return ""
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{ViewCount Placebo: No-Answer Questions (High vs Low Views)}",
+        r"\label{tab:viewcount_placebo}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrr@{}}",
+        r"\toprule",
+        r"\textbf{Term} & \textbf{HR} & \textbf{95\% CI} & \textbf{$p$} \\",
+        r"\midrule",
+    ]
+    for _, r in df.iterrows():
+        term_tex = str(r["term"]).replace("_", r"\_")
+        lines.append(
+            rf"{term_tex} & {r['HR']:.3f} "
+            rf"& [{r['CI_low']:.3f}, {r['CI_high']:.3f}] & {r['p']:.3f} \\"
+        )
+    if "median_viewCount" in df.columns and df["median_viewCount"].notna().any():
+        med = df["median_viewCount"].iloc[0]
+        nq = int(df["n_questions"].iloc[0]) if "n_questions" in df.columns else 0
+        lines += [
+            r"\midrule",
+            rf"\multicolumn{{4}}{{@{{}}l}}{{\footnotesize Split at median ViewCount = {med:.0f}; n = {nq:,} no-answer questions.}} \\",
+        ]
+    lines += [r"\bottomrule", r"\end{tabular}", r"\end{table}"]
     return "\n".join(lines)
 
 
@@ -955,6 +1035,37 @@ def main():
         tex = generate_pair_bootstrap_table(df_pair_bootstrap)
         if tex:
             out = os.path.join(TABLE_DIR, "pair_bootstrap.tex")
+            with open(out, "w") as f:
+                f.write(tex)
+            print(f"✓ {out}")
+
+    # Revision robustness tables (from revision_robustness.py)
+    revision_tables = [
+        ("results_observable_controls.csv", "Observable Selection Controls (ISS-02)", "tab:observable_controls", "observable_controls.tex", "spec"),
+        ("results_answer_quality.csv", "Answer-Quality Robustness (ISS-06)", "tab:answer_quality_robustness", "answer_quality_robustness.tex", "spec"),
+        ("results_composite_outcome.csv", "Composite vs Answers-Only Outcome (ISS-04)", "tab:composite_outcome", "composite_outcome.tex", "outcome"),
+        ("results_newcomer_robustness.csv", "Newcomer Bucket Robustness ($<$ 1 Week)", "tab:newcomer_robustness", "newcomer_robustness.tex", "model"),
+        ("results_cohort_robustness.csv", "Cohort Heterogeneity Robustness (ISS-10)", "tab:cohort_robustness", "cohort_robustness.tex", "model"),
+    ]
+    for csv_name, caption, label, out_name, spec_col in revision_tables:
+        path = os.path.join(CACHE_DIR, csv_name)
+        if os.path.exists(path) and os.path.getsize(path) > 1:
+            df_rev = pd.read_csv(path)
+            if df_rev.empty:
+                continue
+            tex = generate_revision_robustness_table(df_rev, caption, label, spec_col=spec_col)
+            if tex:
+                out = os.path.join(TABLE_DIR, out_name)
+                with open(out, "w") as f:
+                    f.write(tex)
+                print(f"✓ {out}")
+
+    placebo_path = os.path.join(CACHE_DIR, "results_viewcount_placebo.csv")
+    if os.path.exists(placebo_path):
+        df_placebo = pd.read_csv(placebo_path)
+        tex = generate_viewcount_placebo_table(df_placebo)
+        if tex:
+            out = os.path.join(TABLE_DIR, "viewcount_placebo.tex")
             with open(out, "w") as f:
                 f.write(tex)
             print(f"✓ {out}")

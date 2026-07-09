@@ -167,7 +167,6 @@ def parse_generic_row_comments(elem):
             'CreationDate': attrib.get('CreationDate', None),
             'Score': int(score) if score is not None else None,
         }
-
     except Exception as e:
         print(f"Error parsing comment row (ID: {attrib.get('Id', 'N/A')}): {e}")
         return None
@@ -297,6 +296,11 @@ def process_users(users_file_path, output_folder):
     users_parquet_path = os.path.join(output_folder, 'Users.parquet')
     convert_xml_to_parquet(users_file_path, users_parquet_path, parse_generic_row_users,
                            dtypes={'Reputation': 'float64', 'UpVotes': 'float64', 'DownVotes': 'float64'})
+
+
+def process_comments(comments_file_path, output_folder):
+    comments_parquet_path = os.path.join(output_folder, 'Comments.parquet')
+    convert_xml_to_parquet(comments_file_path, comments_parquet_path, parse_generic_row_comments)
 
 
 def process_badges(badges_file_path, output_folder):

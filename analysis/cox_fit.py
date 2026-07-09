@@ -14,6 +14,7 @@ from cox_config import (
     BUCKET_ORDER,
     ROUND_TO_HOURS,
     CONTINUOUS_COVARIATES,
+    CONTINUOUS_COVARIATES_EXTENDED,
     MAX_FIT_ROWS,
     SUBSAMPLE_SEED,
     COVARIATES_MAIN,
@@ -110,7 +111,7 @@ def fit_cox_cached(
         subsampled = True
 
     for col in covariates:
-        if col not in fit_df.columns or col not in CONTINUOUS_COVARIATES:
+        if col not in fit_df.columns or col not in CONTINUOUS_COVARIATES_EXTENDED:
             continue
         q05, q95 = fit_df[col].quantile([0.05, 0.95])
         fit_df[col] = fit_df[col].clip(lower=q05, upper=q95)
@@ -147,7 +148,7 @@ def fit_cox_cached(
         if len(init_arr) != len(covariates):
             init_arr = None
 
-    has_continuous = any(c in covariates for c in CONTINUOUS_COVARIATES)
+    has_continuous = any(c in covariates for c in CONTINUOUS_COVARIATES_EXTENDED)
     effective_penalizer = 1e-2 if has_continuous else (5e-3 if round_to_hours and round_to_hours >= 1 else 1e-6)
     if penalizer > 0:
         effective_penalizer = penalizer
@@ -402,6 +403,8 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "treat_coef": s_b.loc["is_treated_active", "coef"],
         "treat_hr": np.exp(s_b.loc["is_treated_active", "coef"]),
         "treat_se": s_b.loc["is_treated_active", "se(coef)"],
+        "treat_ci_lo": np.exp(s_b.loc["is_treated_active", "coef lower 95%"]),
+        "treat_ci_hi": np.exp(s_b.loc["is_treated_active", "coef upper 95%"]),
         "treat_p": s_b.loc["is_treated_active", "p"],
         "gap_coef": s_b.loc["treated_post_question", "coef"],
         "gap_p": s_b.loc["treated_post_question", "p"],

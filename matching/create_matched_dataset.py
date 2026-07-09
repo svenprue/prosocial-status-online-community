@@ -46,6 +46,9 @@ REQUIRED_COLUMNS = [
     'numQuestionsAskedAT', 'responseTimeHours', 'hasSelfAnswer', 'hasAcceptedAnswer',
     'numQuestionsAsked30D', 'numHelpProvided30D', 'numQuestionsAsked7D',
     'numHelpProvided7D', 'questionId', 'tag_ids',
+    'postHour', 'postDayOfWeek', 'numTags',
+    'viewCount', 'bodyLenChars', 'titleLenChars', 'ownerReputation',
+    'firstAnswerScore', 'firstAnswerBodyLenChars',
 ]
 
 # Columns added by the revision preprocessing (observable-selection covariates,
@@ -63,7 +66,9 @@ OPTIONAL_COLUMNS = [
 CONTINUOUS_COVS = [
     'timeSinceFirstActivityDays', 'numQuestionsAskedAT', 'numHelpProvidedAT',
     'numQuestionsAsked30D', 'numHelpProvided30D', 'numQuestionsAsked7D',
-    'numHelpProvided7D'
+    'numHelpProvided7D',
+    'postHour', 'postDayOfWeek', 'numTags',
+    'viewCount', 'bodyLenChars', 'titleLenChars', 'ownerReputation',
 ]
 
 BUCKET_LABELS = [
@@ -330,9 +335,9 @@ def plot_psm_diagnostics_phase1(original_df, matched_df, treatment_col, continuo
         )[:, 1]
 
     plt.figure(figsize=(10, 5))
-    sns.kdeplot(orig_p1[orig_p1[treatment_col]==0]['ps'], label='Control (Orig)', color='grey', fill=True)
-    sns.kdeplot(orig_p1[orig_p1[treatment_col]==1]['ps'], label='Treated (Orig)', color='blue', fill=True)
-    sns.kdeplot(matched_p1[matched_p1[treatment_col]==0]['ps'], label='Control (Matched)', color='red', linestyle='--')
+    sns.kdeplot(orig_p1.loc[orig_p1[treatment_col] == 0, 'ps'].to_numpy(), label='Control (Orig)', color='grey', fill=True)
+    sns.kdeplot(orig_p1.loc[orig_p1[treatment_col] == 1, 'ps'].to_numpy(), label='Treated (Orig)', color='blue', fill=True)
+    sns.kdeplot(matched_p1.loc[matched_p1[treatment_col] == 0, 'ps'].to_numpy(), label='Control (Matched)', color='red', linestyle='--')
     plt.title('Propensity Score Support')
     plt.legend(); plt.savefig(PLOT_COMMON_SUPPORT); plt.close()
 
@@ -597,11 +602,23 @@ def main():
     # Request columns that exist (parquet may use mainTagId or main_tag_id)
     import pyarrow.parquet as pq
     parquet_names = set(pq.read_schema(data_path).names)
-    available_optional = [c for c in OPTIONAL_COLUMNS if c in parquet_names]
+    available_optional = [c for c in OPTIONAL_COLUMNS if c in parquet_names and c not in REQUIRED_COLUMNS]
     missing_optional = [c for c in OPTIONAL_COLUMNS if c not in parquet_names]
     if missing_optional:
         print(f"  Note: optional covariate columns absent from parquet (older preprocessing run?): {missing_optional}")
-    df = pd.read_parquet(data_path, columns=REQUIRED_COLUMNS + available_optional)
+    load_cols = list(dict.fromkeys([c for c in REQUIRED_COLUMNS if c in parquet_names] + available_optional))
+    missing_required = [c for c in REQUIRED_COLUMNS if c not in parquet_names]
+    df = pd.read_parquet(data_path, columns=load_cols)
+    for col in missing_required:
+        df[col] = np.nan
+    if missing_required:
+        print(f"  Note: filled missing revision columns with NaN: {missing_required}")
+    for col in ['viewCount', 'bodyLenChars', 'titleLenChars', 'ownerReputation', 'postHour', 'postDayOfWeek', 'numTags']:
+        if col in df.columns and df[col].isna().any():
+            fill = df[col].median()
+            n_miss = df[col].isna().sum()
+            df[col] = df[col].fillna(fill)
+            print(f"  Imputed {n_miss:,} missing {col} with median={fill:.3f}")
     def _first_tag_id(x):
         s = _safe_tag_list(x)
         return next(iter(s), pd.NA) if s else pd.NA

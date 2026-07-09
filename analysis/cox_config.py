@@ -36,6 +36,21 @@ COVARIATES_SPEED = COVARIATES_MAIN + [
     "treated_post_question_response_time_interaction",
 ]
 
+# ISS-02: observable selection controls (robustness spec)
+OBSERVABLE_CONTROL_COVARIATES = [
+    "postHour", "postDayOfWeek", "numTags",
+    "viewCount", "bodyLenChars", "titleLenChars", "ownerReputation",
+]
+COVARIATES_MAIN_OBSERVABLE = COVARIATES_MAIN + OBSERVABLE_CONTROL_COVARIATES
+
+# ISS-06: answer-quality robustness (speed spec extension)
+QUALITY_COVARIATES = ["hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars"]
+COVARIATES_SPEED_QUALITY = COVARIATES_SPEED + QUALITY_COVARIATES
+
+CONTINUOUS_COVARIATES_EXTENDED = CONTINUOUS_COVARIATES + OBSERVABLE_CONTROL_COVARIATES + [
+    "firstAnswerScore", "firstAnswerBodyLenChars",
+]
+
 RT_BIN_EDGES_HOURS = [0, 0.25, 0.5, 1, 2, 4, 8, 12, 24, 72, float("inf")]
 RT_BIN_LABELS = [
     "0-15 min", "15-30 min", "30-60 min", "1-2 hr", "2-4 hr", "4-8 hr", "8-12 hr",
