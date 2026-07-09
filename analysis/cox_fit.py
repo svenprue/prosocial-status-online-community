@@ -25,6 +25,68 @@ from cox_config import (
     CLUSTER_COL,
 )
 
+# The two treated indicators are nested: `treated_post_question` switches on when
+# the question is posted and STAYS on through the post-answer phase; `is_treated_active`
+# adds on only after the answer arrives. So the coefficient on `is_treated_active`
+# alone is the post-answer *increment over the waiting period*, not the treatment
+# effect. The treatment effect (post-answer vs. the pre-question baseline, treated vs.
+# control) is the SUM of the two coefficients — see _linear_combo / DID_TERMS.
+DID_TERMS = ["treated_post_question", "is_treated_active"]
+# Speed spec: response-time moderation of that DiD is the sum of the two RT interactions.
+DID_SPEED_TERMS = [
+    "treated_post_question_response_time_interaction",
+    "treated_response_time_interaction",
+]
+
+
+def _linear_combo(res, terms):
+    """Point estimate, SE, HR, and 95% CI for a linear combination (sum) of fitted
+    coefficients.
+
+    Uses the fitted parameter vector and its covariance matrix, so the SE correctly
+    accounts for the covariance between the terms — essential here because the two
+    nested treated indicators are strongly (negatively) correlated, which is exactly
+    why their sum is the well-identified quantity even when each term alone is not.
+
+    Returns a dict with keys coef/se/z/p/hr/ci_lo/ci_hi, or None if no term is present.
+    """
+    from scipy.stats import norm
+
+    params = getattr(res, "params_", None)
+    vcov = getattr(res, "variance_matrix_", None)
+    if params is None or vcov is None:
+        return None
+    present = [t for t in terms if t in params.index]
+    if not present:
+        return None
+    coef = float(params.loc[present].sum())
+    try:
+        var = float(np.asarray(vcov.loc[present, present].values).sum())
+    except Exception:
+        return None
+    se = float(np.sqrt(var)) if var and var > 0 else float("nan")
+    z = coef / se if se and np.isfinite(se) and se > 0 else float("nan")
+    p = float(2.0 * norm.sf(abs(z))) if np.isfinite(z) else float("nan")
+    return {
+        "coef": coef,
+        "se": se,
+        "z": z,
+        "p": p,
+        "hr": float(np.exp(coef)),
+        "ci_lo": float(np.exp(coef - 1.96 * se)) if np.isfinite(se) else float("nan"),
+        "ci_hi": float(np.exp(coef + 1.96 * se)) if np.isfinite(se) else float("nan"),
+    }
+
+
+def _did_fields(res, terms=DID_TERMS, prefix="did"):
+    """Return a dict of {prefix}_coef/se/p/hr/ci_lo/ci_hi for the summed DiD contrast,
+    or all-NaN fields (so downstream CSV columns stay consistent) if unavailable."""
+    combo = _linear_combo(res, terms)
+    keys = ["coef", "se", "p", "hr", "ci_lo", "ci_hi"]
+    if combo is None:
+        return {f"{prefix}_{k}": float("nan") for k in keys}
+    return {f"{prefix}_{k}": combo[k] for k in keys}
+
 
 class CachedCoxResult:
     """Lightweight proxy for a fitted CoxTimeVaryingFitter."""
@@ -223,7 +285,7 @@ def _fit_one_rt_bin(args):
     if res is None:
         return (label, None)
     s = res.summary_df
-    return (label, {
+    row = {
         "bucket": label,
         "treat_coef": s.loc["is_treated_active", "coef"],
         "treat_se": s.loc["is_treated_active", "se(coef)"],
@@ -231,10 +293,17 @@ def _fit_one_rt_bin(args):
         "treat_hr": np.exp(s.loc["is_treated_active", "coef"]),
         "treat_ci_lo": np.exp(s.loc["is_treated_active", "coef lower 95%"]),
         "treat_ci_hi": np.exp(s.loc["is_treated_active", "coef upper 95%"]),
+        "gap_coef": s.loc["treated_post_question", "coef"],
+        "gap_p": s.loc["treated_post_question", "p"],
         "n_rows": res.meta.get("n_rows", len(subset)),
         "n_questions": n_questions,
         "n_events": res.meta.get("n_events", n_events),
-    })
+    }
+    # Summed DiD (post- vs pre-question baseline, treated vs control): the quantity that
+    # is comparable across bins. `treat_*` alone is only the post-answer increment and is
+    # not comparable across response-time bins (the waiting-period term varies with RT).
+    row.update(_did_fields(res))
+    return (label, row)
 
 
 def fit_response_time_bin_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None):
@@ -316,6 +385,8 @@ def _fit_one_tenure_bucket(args):
         "phase_post_coef": s_a.loc["phase_post", "coef"],
         "hasAnswer_coef": s_a.loc["hasAnswer", "coef"],
     }
+    # Summed DiD treatment effect (post- vs pre-question baseline, treated vs control).
+    main_row.update(_did_fields(res_a))
 
     res_b = fit_cox_cached(subset, f"ModelB_{bucket}", COVARIATES_SPEED, use_cache=use_cache, round_to_hours=round_to_hours, initial_point=None)
     if res_b is None:
@@ -336,6 +407,12 @@ def _fit_one_tenure_bucket(args):
         "gap_speed_coef": s_b.loc["treated_post_question_response_time_interaction", "coef"],
         "gap_speed_p": s_b.loc["treated_post_question_response_time_interaction", "p"],
     }
+    # DiD at mean response time (covariates are mean-centred, so the RT interactions are
+    # zero at their mean): the summed base contrast is still treated_post_question +
+    # is_treated_active. And the net RT moderation of the DiD is the sum of the two RT
+    # interaction terms (`did_speed_*`), not `speed_coef` alone.
+    speed_row.update(_did_fields(res_b, prefix="did"))
+    speed_row.update(_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"))
     return (bucket, main_row, speed_row)
 
 
@@ -394,6 +471,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "gap_coef": s_a.loc["treated_post_question", "coef"],
         "gap_hr": np.exp(s_a.loc["treated_post_question", "coef"]),
         "gap_p": s_a.loc["treated_post_question", "p"],
+        **_did_fields(res_a),
     }]
     results_speed_all = [{
         "model": "AllData_Speed",
@@ -411,6 +489,8 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "speed_coef": s_b.loc["treated_response_time_interaction", "coef"],
         "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],
         "speed_p": s_b.loc["treated_response_time_interaction", "p"],
+        **_did_fields(res_b),
+        **_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"),
     }]
     df_main_all = pd.DataFrame(results_main_all)
     df_speed_all = pd.DataFrame(results_speed_all)

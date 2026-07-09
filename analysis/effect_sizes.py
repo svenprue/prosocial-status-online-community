@@ -93,14 +93,25 @@ def _baseline_event_rate(row: pd.Series, descriptives: dict) -> float:
 
 def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict:
     baseline = _baseline_event_rate(row, descriptives)
-    hr = row.get("treat_hr")
-    if pd.isna(hr) and pd.notna(row.get("treat_coef")):
-        hr = float(np.exp(float(row["treat_coef"])))
+    # Prefer the summed DiD contrast (treated_post_question + is_treated_active). The raw
+    # is_treated_active HR is only the post-answer increment over the waiting-period term,
+    # not the treatment effect, so ARD/NNT built on it would carry the wrong sign.
+    if pd.notna(row.get("did_hr")) or pd.notna(row.get("did_coef")):
+        hr = float(row["did_hr"]) if pd.notna(row.get("did_hr")) else float(np.exp(float(row["did_coef"])))
+        hr_ci_lo = row.get("did_ci_lo")
+        hr_ci_hi = row.get("did_ci_hi")
+        coef_used = row.get("did_coef")
+        hr_source = "did_sum"
+    else:
+        hr = row.get("treat_hr")
+        if pd.isna(hr) and pd.notna(row.get("treat_coef")):
+            hr = float(np.exp(float(row["treat_coef"])))
+        hr_ci_lo = row.get("treat_ci_lo")
+        hr_ci_hi = row.get("treat_ci_hi")
+        coef_used = row.get("treat_coef")
+        hr_source = "is_treated_active"
 
     ard = baseline * (float(hr) - 1.0) if pd.notna(baseline) and pd.notna(hr) else np.nan
-
-    hr_ci_lo = row.get("treat_ci_lo")
-    hr_ci_hi = row.get("treat_ci_hi")
     ard_ci_lo = baseline * (float(hr_ci_lo) - 1.0) if pd.notna(baseline) and pd.notna(hr_ci_lo) else np.nan
     ard_ci_hi = baseline * (float(hr_ci_hi) - 1.0) if pd.notna(baseline) and pd.notna(hr_ci_hi) else np.nan
 
@@ -126,7 +137,8 @@ def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict
         "n_questions": row.get("n_questions", descriptives.get("n_questions", np.nan)),
         "n_events": row.get("n_events"),
         "baseline_event_rate_proxy": baseline,
-        "treat_coef": row.get("treat_coef"),
+        "hr_source": hr_source,
+        "treat_coef": coef_used,
         "treat_hr": hr,
         "treat_ci_lo": hr_ci_lo,
         "treat_ci_hi": hr_ci_hi,

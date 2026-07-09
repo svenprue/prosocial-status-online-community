@@ -256,44 +256,58 @@ def generate_regression_all_table(
         r"\toprule",
         " & " + header,
         r"\midrule",
-        rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DID)}}}} \\",
     ]
-    # Treatment coef row
-    row = rf"\hspace{{1em}} Received Answer $\times$ Post-Answer Received & {_fmt_coef(r['treat_coef'], r['treat_p'])}"
-    if has_speed:
-        row += rf" & {_fmt_coef(s['treat_coef'], s['treat_p'])}"
-    lines.append(row + r" \\")
-    # SE row
-    row = rf" & {_fmt_se(r['treat_se'])}"
-    if has_speed:
-        row += rf" & {_fmt_se(s['treat_se'])}"
-    lines.append(row + r" \\")
-    # HR [95% CI] row
-    row = rf"\hspace{{1em}} Hazard Ratio [95\% CI] & [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]"
-    if has_speed:
-        if pd.notna(s.get("treat_ci_lo")) and pd.notna(s.get("treat_ci_hi")):
-            row += rf" & [{s['treat_ci_lo']:.2f}, {s['treat_ci_hi']:.2f}]"
-        elif pd.notna(s.get("treat_hr")):
-            row += rf" & [{s['treat_hr']:.2f}, {s['treat_hr']:.2f}]"
-        else:
-            row += r" & —"
-    lines.append(row + r" \\[4pt]")
 
-    lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Waiting Period}}}} \\")
-    gap_coef = r.get("gap_coef", np.nan)
-    gap_p = r.get("gap_p", np.nan)
-    waiting_cell = _fmt_coef(gap_coef, gap_p) if pd.notna(gap_coef) else "—"
-    row = rf"\hspace{{1em}} Received Answer $\times$ Post-Question & {waiting_cell}"
-    if has_speed:
-        gap_coef_b = s.get("gap_coef", np.nan)
-        gap_p_b = s.get("gap_p", np.nan)
-        waiting_cell_b = _fmt_coef(gap_coef_b, gap_p_b) if pd.notna(gap_coef_b) else "—"
-        row += rf" & {waiting_cell_b}"
-    lines.append(row + r" \\[4pt]")
+    # --- Row helpers for the two-column (Main / Main+Speed) layout ------------
+    def _cell_coef(rr, kc, kp):
+        return _fmt_coef(rr[kc], rr.get(kp, np.nan)) if pd.notna(rr.get(kc)) else "—"
+
+    def _coef_row(label, kc, kp, kse=None):
+        cells = [_cell_coef(r, kc, kp)] + ([_cell_coef(s, kc, kp)] if has_speed else [])
+        lines.append(rf"{label} & " + " & ".join(cells) + r" \\")
+        if kse is not None:
+            se_cells = [_fmt_se(r[kse]) if pd.notna(r.get(kse)) else ""]
+            if has_speed:
+                se_cells.append(_fmt_se(s[kse]) if pd.notna(s.get(kse)) else "")
+            lines.append(r" & " + " & ".join(se_cells) + r" \\")
+
+    def _ci_cell(rr, klo, khi):
+        if pd.notna(rr.get(klo)) and pd.notna(rr.get(khi)):
+            return rf"[{rr[klo]:.2f}, {rr[khi]:.2f}]"
+        return "—"
+
+    def _hr_row(label, klo, khi):
+        cells = [_ci_cell(r, klo, khi)] + ([_ci_cell(s, klo, khi)] if has_speed else [])
+        lines.append(rf"{label} & " + " & ".join(cells) + r" \\[4pt]")
+
+    have_did = pd.notna(r.get("did_coef", np.nan))
+    if have_did:
+        # Headline: the DiD treatment effect is the SUM of the two nested treated
+        # indicators (post-answer vs. pre-question baseline, treated vs. control),
+        # not the is_treated_active coefficient alone.
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DiD): post-answer vs.\ pre-question}}}} \\")
+        _coef_row(r"\hspace{1em} Received Answer (net post-answer effect)", "did_coef", "did_p", "did_se")
+        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "did_ci_lo", "did_ci_hi")
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{\quad Decomposition (nested time-varying terms)}}}} \\")
+        _coef_row(r"\hspace{2em} Waiting period: Received Answer $\times$ Post-Question", "gap_coef", "gap_p")
+        _coef_row(r"\hspace{2em} Answer arrival: $\times$ Post-Answer Received", "treat_coef", "treat_p", "treat_se")
+    else:
+        # Legacy fallback (CSVs without did_* columns): report is_treated_active alone.
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DID)}}}} \\")
+        _coef_row(r"\hspace{1em} Received Answer $\times$ Post-Answer Received", "treat_coef", "treat_p", "treat_se")
+        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "treat_ci_lo", "treat_ci_hi")
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Waiting Period}}}} \\")
+        _coef_row(r"\hspace{1em} Received Answer $\times$ Post-Question", "gap_coef", "gap_p")
 
     if has_speed:
         lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Response Time Interaction}}}} \\")
-        row = r"\hspace{1em} Treatment $\times$ log(Response Time) & —"
+        # Net RT moderation of the DiD (sum of the two RT interactions), then component.
+        if pd.notna(s.get("did_speed_coef", np.nan)):
+            net_cell = _fmt_coef(s["did_speed_coef"], s.get("did_speed_p", np.nan))
+            lines.append(rf"\hspace{{1em}} Net: Treatment $\times$ log(RT), summed & — & {net_cell} \\")
+            if pd.notna(s.get("did_speed_se", np.nan)):
+                lines.append(rf" & — & {_fmt_se(s['did_speed_se'])} \\[2pt]")
+        row = r"\hspace{1em} Component: Post-Answer $\times$ log(RT) & —"
         row += rf" & {_fmt_coef(s['speed_coef'], s['speed_p'])}"
         lines.append(row + r" \\")
         row = r" & —"
@@ -448,43 +462,54 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
         line2 = rf" & " + " & ".join(se_cells) + r" \\"
         return line1 + "\n" + line2
 
-    # Rows for key coefficients
-    # isTreatedActive (main DID treatment)
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Treatment Effect (DID)}} \\")
+    have_did = "did_coef" in df.columns and df["did_coef"].notna().any()
 
-    # is_treated_active
-    cells_coef = []
-    cells_se = []
-    cells_hr = []
-    for _, r in df.iterrows():
-        c = r["treat_coef"]
-        se = r["treat_se"]
-        p = r["treat_p"]
-        hr = r["treat_hr"]
-        cells_coef.append(_fmt_coef(c, p))
-        cells_se.append(_fmt_se(se))
-        cells_hr.append(f"[{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]")
+    if have_did:
+        # Headline: the DiD treatment effect is the SUM of the two nested treated terms
+        # (post-answer vs. pre-question baseline, treated vs. control). The raw
+        # is_treated_active coefficient alone is only the post-answer increment over the
+        # (now large) waiting-period term, so it is not the treatment effect.
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Treatment Effect (DiD): post-answer vs.\ pre-question}} \\")
+        did_coef_cells, did_se_cells, did_hr_cells = [], [], []
+        for _, r in df.iterrows():
+            did_coef_cells.append(_fmt_coef(r["did_coef"], r.get("did_p", np.nan)) if pd.notna(r.get("did_coef")) else "—")
+            did_se_cells.append(_fmt_se(r["did_se"]) if pd.notna(r.get("did_se")) else "")
+            if pd.notna(r.get("did_ci_lo")) and pd.notna(r.get("did_ci_hi")):
+                did_hr_cells.append(f"[{r['did_ci_lo']:.2f}, {r['did_ci_hi']:.2f}]")
+            else:
+                did_hr_cells.append("—")
+        lines.append(rf"\hspace{{1em}}Received Answer (net post-answer) & " + " & ".join(did_coef_cells) + r" \\")
+        lines.append(rf" & " + " & ".join(did_se_cells) + r" \\")
+        lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(did_hr_cells) + r" \\[4pt]")
 
-    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Answer Received & " + " & ".join(cells_coef) + r" \\")
-    lines.append(rf" & " + " & ".join(cells_se) + r" \\")
-    lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(cells_hr) + r" \\[4pt]")
-
-    # Waiting period
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period}} \\")
-    gap_cells = []
-    gap_se_cells = []
-    for _, r in df.iterrows():
-        gc = r.get("gap_coef", np.nan)
-        gp = r.get("gap_p", np.nan)
-        if pd.notna(gc):
-            gap_cells.append(_fmt_coef(gc, gp))
-            # Approximate SE from coef and HR
-            gap_se_cells.append("")
-        else:
-            gap_cells.append("—")
-            gap_se_cells.append("")
-
-    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Question & " + " & ".join(gap_cells) + r" \\[4pt]")
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\")
+        gap_cells = [
+            _fmt_coef(r["gap_coef"], r.get("gap_p", np.nan)) if pd.notna(r.get("gap_coef")) else "—"
+            for _, r in df.iterrows()
+        ]
+        lines.append(rf"\hspace{{2em}}Waiting period ($\times$ Post-Question) & " + " & ".join(gap_cells) + r" \\")
+        inc_cells = [
+            _fmt_coef(r["treat_coef"], r.get("treat_p", np.nan)) if pd.notna(r.get("treat_coef")) else "—"
+            for _, r in df.iterrows()
+        ]
+        lines.append(rf"\hspace{{2em}}Answer arrival ($\times$ Post-Answer Received) & " + " & ".join(inc_cells) + r" \\[4pt]")
+    else:
+        # Legacy fallback (old CSVs without did_* columns): report is_treated_active alone.
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Treatment Effect (DID)}} \\")
+        cells_coef, cells_se, cells_hr = [], [], []
+        for _, r in df.iterrows():
+            cells_coef.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
+            cells_se.append(_fmt_se(r["treat_se"]))
+            cells_hr.append(f"[{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}]")
+        lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Answer Received & " + " & ".join(cells_coef) + r" \\")
+        lines.append(rf" & " + " & ".join(cells_se) + r" \\")
+        lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(cells_hr) + r" \\[4pt]")
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period}} \\")
+        gap_cells = [
+            _fmt_coef(r["gap_coef"], r.get("gap_p", np.nan)) if pd.notna(r.get("gap_coef")) else "—"
+            for _, r in df.iterrows()
+        ]
+        lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Question & " + " & ".join(gap_cells) + r" \\[4pt]")
 
     # N = unique questions; Events = helping events
     lines.append(r"\midrule")
@@ -528,32 +553,44 @@ def generate_speed_table(df: pd.DataFrame) -> str:
         r"\midrule",
     ]
 
-    # Base treatment effect
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Base Treatment Effect}} \\")
-    cells = []
-    se_cells = []
+    have_did = "did_coef" in df.columns and df["did_coef"].notna().any()
+    have_did_speed = "did_speed_coef" in df.columns and df["did_speed_coef"].notna().any()
+
+    # Base treatment effect (at mean response time; covariates are mean-centred).
+    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Base Treatment Effect (DiD, at mean response time)}} \\")
+    cells, se_cells = [], []
     for _, r in df.iterrows():
-        cells.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
-        se_cells.append(_fmt_se(r["treat_se"]))
-    lines.append(rf"\hspace{{1em}}Received Answer $\times$ Post-Answer Received & " + " & ".join(cells) + r" \\")
+        if have_did and pd.notna(r.get("did_coef")):
+            cells.append(_fmt_coef(r["did_coef"], r.get("did_p", np.nan)))
+            se_cells.append(_fmt_se(r["did_se"]) if pd.notna(r.get("did_se")) else "")
+        else:
+            cells.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
+            se_cells.append(_fmt_se(r["treat_se"]))
+    lines.append(rf"\hspace{{1em}}Received Answer (net post-answer) & " + " & ".join(cells) + r" \\")
     lines.append(rf" & " + " & ".join(se_cells) + r" \\[4pt]")
 
-    # Speed interaction
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Response Time Interaction}} \\")
-    speed_cells = []
-    speed_se_cells = []
+    # Net response-time moderation of the DiD = sum of the two RT interactions.
+    if have_did_speed:
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Net Response-Time Moderation of DiD (summed)}} \\")
+        net_cells, net_se_cells = [], []
+        for _, r in df.iterrows():
+            net_cells.append(_fmt_coef(r["did_speed_coef"], r.get("did_speed_p", np.nan)) if pd.notna(r.get("did_speed_coef")) else "—")
+            net_se_cells.append(_fmt_se(r["did_speed_se"]) if pd.notna(r.get("did_speed_se")) else "")
+        lines.append(rf"\hspace{{1em}}Treatment $\times$ log(RT), summed & " + " & ".join(net_cells) + r" \\")
+        lines.append(rf" & " + " & ".join(net_se_cells) + r" \\[4pt]")
+
+    # Components of the RT interaction (each attaches to one nested base term).
+    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{\quad Components}} \\")
+    speed_cells, speed_se_cells = [], []
     for _, r in df.iterrows():
         speed_cells.append(_fmt_coef(r["speed_coef"], r["speed_p"]))
         speed_se_cells.append(_fmt_se(r["speed_se"]))
-    lines.append(rf"\hspace{{1em}}Treatment $\times$ log(Response Time) & " + " & ".join(speed_cells) + r" \\")
-    lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[4pt]")
-
-    # Waiting period × speed
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Waiting Period $\times$ Response Time}} \\")
+    lines.append(rf"\hspace{{2em}}Answer arrival $\times$ log(RT) & " + " & ".join(speed_cells) + r" \\")
+    lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[2pt]")
     gs_cells = []
     for _, r in df.iterrows():
         gs_cells.append(_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]))
-    lines.append(rf"\hspace{{1em}}Post-Question $\times$ log(Response Time) & " + " & ".join(gs_cells) + r" \\[4pt]")
+    lines.append(rf"\hspace{{2em}}Waiting period $\times$ log(RT) & " + " & ".join(gs_cells) + r" \\[4pt]")
 
     # N = unique questions; Events = helping events
     lines.append(r"\midrule")
@@ -592,20 +629,35 @@ def generate_response_time_bins_table(df: pd.DataFrame) -> str:
         r"\textbf{Response time} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\",
         r"\midrule",
     ]
+    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    hr_key, lo_key, hi_key, p_key = (
+        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
+        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    )
     for _, r in df.iterrows():
-        p = r.get("treat_p", np.nan)
+        p = r.get(p_key, np.nan)
         stars = _sig_stars(p) if pd.notna(p) else ""
         n = int(r.get("n_questions", r.get("n_rows", 0)))
         events = int(r.get("n_events", 0))
+        hr = r.get(hr_key, np.nan)
+        lo, hi = r.get(lo_key, np.nan), r.get(hi_key, np.nan)
+        hr_txt = f"{hr:.2f}{stars}" if pd.notna(hr) else "—"
+        ci_txt = f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else "—"
         lines.append(
-            rf"{_latex_bucket(str(r['bucket']))} & {r['treat_hr']:.2f}{stars} "
-            rf"& [{r['treat_ci_lo']:.2f}, {r['treat_ci_hi']:.2f}] "
+            rf"{_latex_bucket(str(r['bucket']))} & {hr_txt} "
+            rf"& {ci_txt} "
             rf"& {n:,} & {events:,} \\"
         )
+    detail_note = (
+        r"\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD contrast (post-answer vs.\ pre-question, treated vs.\ control); comparable across bins.} \\"
+        if use_did
+        else r"\multicolumn{5}{@{}l}{\footnotesize HR is the post-answer increment only (is\_treated\_active); not comparable across bins when the waiting-period term is nonzero.} \\"
+    )
     lines += [
         r"\bottomrule",
         _standard_error_note(5),
         r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
+        detail_note,
         r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
         r"\end{tabular}",
         r"\end{table}",
@@ -695,16 +747,23 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     with 95% CI error bars.
     """
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
-    df = df.dropna(subset=["treat_hr"])
+    # Prefer the summed DiD hazard ratio (post-answer vs pre-question, treated vs
+    # control); fall back to the legacy is_treated_active HR only if did_* is absent.
+    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    hr_col, lo_col, hi_col, p_col = (
+        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
+        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    )
+    df = df.dropna(subset=[hr_col])
 
     fig, ax = plt.subplots(figsize=(8, 5))
     fig.patch.set_facecolor("white")
     ax.set_facecolor("#fafafa")
 
     x = np.arange(len(df))
-    hrs = df["treat_hr"].values
-    ci_lo = df["treat_ci_lo"].values
-    ci_hi = df["treat_ci_hi"].values
+    hrs = df[hr_col].values
+    ci_lo = df[lo_col].values
+    ci_hi = df[hi_col].values
 
     err_lo = hrs - ci_lo
     err_hi = ci_hi - hrs
@@ -752,7 +811,7 @@ def generate_reciprocity_figure(df: pd.DataFrame):
 
     # Significance stars above value labels
     for i, (_, r) in enumerate(df.iterrows()):
-        p = r["treat_p"]
+        p = r[p_col]
         stars = _sig_stars(p).replace("\\textdagger", "†")
         if stars:
             ax.text(i, ci_hi[i] + 0.055, stars, ha="center", va="bottom", fontsize=10, fontweight="bold", color="#1a1a1a")
@@ -893,10 +952,17 @@ def generate_interaction_effect_figure(
 
 def _plot_interaction_effect_bins(df: pd.DataFrame):
     """Connected dots and line for treatment effect (HR) by response time bin."""
+    # Prefer the summed DiD contrast so bins are comparable (the is_treated_active
+    # increment alone is not, because the waiting-period term varies with response time).
+    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    hr_col, lo_col, hi_col, p_col = (
+        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
+        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    )
     labels = df["bucket"].tolist()
-    hrs = df["treat_hr"].values
-    ci_lo = df["treat_ci_lo"].values
-    ci_hi = df["treat_ci_hi"].values
+    hrs = df[hr_col].values
+    ci_lo = df[lo_col].values
+    ci_hi = df[hi_col].values
     err_lo = hrs - ci_lo
     err_hi = ci_hi - hrs
 
@@ -935,7 +1001,7 @@ def _plot_interaction_effect_bins(df: pd.DataFrame):
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", labelsize=9)
     for i, (_, r) in enumerate(df.iterrows()):
-        stars = _sig_stars(r["treat_p"]).replace("\\textdagger", "†")
+        stars = _sig_stars(r[p_col]).replace("\\textdagger", "†")
         if stars:
             ax.text(i, ci_hi[i] + 0.015, stars, ha="center", va="bottom", fontsize=10, fontweight="bold", color="#1a1a1a")
     plt.tight_layout()

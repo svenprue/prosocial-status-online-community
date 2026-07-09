@@ -14,6 +14,7 @@ def generate_event_history_dataset(
         days_before_question: int = 2,
         days_after_answer: int = 2,
         include_composite_help: bool = True,
+        include_accept_help: bool = False,
 ) -> None:
     """
     Creates an event-history dataset for survival analysis (Cox/Poisson).
@@ -21,7 +22,16 @@ def generate_event_history_dataset(
     Unit of analysis: question_id. Matching and timelines are defined per matched
     question (one row per question; match_id pairs treatment/control questions).
     user_id is the asker of that question, used for tenure and for finding that
-    asker's help events (answers/comments/accepts to others) within the window.
+    asker's help events (answers/comments to others) within the window.
+
+    The prosocial-help outcome is the asker's answers and (optionally) comments to
+    *other* users. `include_accept_help` is OFF by default: "accept" events are the
+    asker accepting an answer on their OWN study question — they are self-directed
+    (not help to others), can occur only for treated questions (a control never
+    receives an answer to accept), and are timestamped at the accepted answer's
+    creation (~the treatment moment). Including them mechanically injects a
+    treated-only, at-answer-time event that corrupts the treatment contrast, so it
+    is excluded from the composite outcome (ISS-04) by default.
     """
     print(f"\n=== Generating Event History Dataset ===")
     print(f"Parameters: Pre-Window={days_before_question} days, Post-Window={days_after_answer} days")
@@ -184,33 +194,44 @@ def generate_event_history_dataset(
             WHERE 1=0
         """)
 
-    print("Finding accept help events (asker accepted an answer on own question)...")
-    con.execute(f"""
-        CREATE VIEW raw_questions_accept AS
-        SELECT Id, OwnerUserId, AcceptedAnswerId, CreationDate::TIMESTAMP AS ts
-        FROM '{questions_path}'
-        WHERE AcceptedAnswerId IS NOT NULL
-    """)
-    con.execute(f"""
-        CREATE VIEW raw_answers_accept AS
-        SELECT Id, ParentId, CreationDate::TIMESTAMP AS ts
-        FROM '{answers_path}'
-    """)
-    con.execute("""
-        CREATE TEMPORARY TABLE accept_help_events AS
-        SELECT
-            sw.match_id,
-            sw.question_id,
-            sw.user_id,
-            a.ts AS help_ts,
-            date_diff('second', sw.question_ts, a.ts) / 3600.0 AS relative_help_time_hours,
-            'accept' AS help_type
-        FROM study_windows sw
-        JOIN raw_questions_accept q ON sw.question_id = q.Id AND sw.user_id = q.OwnerUserId
-        JOIN raw_answers_accept a ON q.AcceptedAnswerId = a.Id
-        WHERE a.ts >= sw.window_start_ts
-          AND a.ts <= sw.window_end_ts
-    """)
+    if include_accept_help:
+        # NOTE: contaminating by construction — see the function docstring. Kept only
+        # for explicit sensitivity checks; never part of the default outcome.
+        print("Finding accept help events (asker accepted an answer on own question)...")
+        con.execute(f"""
+            CREATE VIEW raw_questions_accept AS
+            SELECT Id, OwnerUserId, AcceptedAnswerId, CreationDate::TIMESTAMP AS ts
+            FROM '{questions_path}'
+            WHERE AcceptedAnswerId IS NOT NULL
+        """)
+        con.execute(f"""
+            CREATE VIEW raw_answers_accept AS
+            SELECT Id, ParentId, CreationDate::TIMESTAMP AS ts
+            FROM '{answers_path}'
+        """)
+        con.execute("""
+            CREATE TEMPORARY TABLE accept_help_events AS
+            SELECT
+                sw.match_id,
+                sw.question_id,
+                sw.user_id,
+                a.ts AS help_ts,
+                date_diff('second', sw.question_ts, a.ts) / 3600.0 AS relative_help_time_hours,
+                'accept' AS help_type
+            FROM study_windows sw
+            JOIN raw_questions_accept q ON sw.question_id = q.Id AND sw.user_id = q.OwnerUserId
+            JOIN raw_answers_accept a ON q.AcceptedAnswerId = a.Id
+            WHERE a.ts >= sw.window_start_ts
+              AND a.ts <= sw.window_end_ts
+        """)
+    else:
+        print("Skipping accept help events (self-directed, treated-only; excluded from composite by default).")
+        con.execute("""
+            CREATE TEMPORARY TABLE accept_help_events AS
+            SELECT NULL::VARCHAR AS match_id, NULL::BIGINT AS question_id, NULL::BIGINT AS user_id,
+                   NULL::DOUBLE AS relative_help_time_hours, NULL::VARCHAR AS help_type
+            WHERE 1=0
+        """)
 
     con.execute("""
         CREATE TEMPORARY TABLE all_help_events AS
@@ -295,4 +316,6 @@ if __name__ == "__main__":
         output_folder=str(output_folder),
         days_before_question=2,
         days_after_answer=2,
+        include_composite_help=True,   # answers + comments to others (ISS-04)
+        include_accept_help=False,     # exclude self-directed, treated-only accept events
     )
