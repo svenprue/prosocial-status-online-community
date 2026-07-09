@@ -304,18 +304,28 @@ def generate_event_history_dataset(
 
 
 if __name__ == "__main__":
+    import argparse
     _script_dir = Path(__file__).resolve().parent
     _project_root = _script_dir.parent
-    calculate_for_path = _project_root / "data" / "input" / "matched_questions.parquet"
-    input_folder = _project_root / "data" / "input"
-    output_folder = _project_root / "data" / "event_history"
+    p = argparse.ArgumentParser(description="Build the matched event-history dataset for the Cox pipeline")
+    p.add_argument("--matched", default=str(_project_root / "data" / "input" / "matched_questions.parquet"),
+                   help="matched_questions parquet (treated/control pairs)")
+    p.add_argument("--input", default=str(_project_root / "data" / "input"), help="folder with raw posts/answers/users/comments")
+    p.add_argument("--output", default=str(_project_root / "data" / "event_history"), help="output folder for study_timelines/study_events")
+    p.add_argument("--pre-days", type=int, default=2)
+    p.add_argument("--post-days", type=int, default=2)
+    p.add_argument("--no-composite", action="store_true", help="answers-only outcome (exclude comments)")
+    p.add_argument("--include-accepts", action="store_true",
+                   help="include self-directed accept events; for the ISS-04 by-type decomposition ONLY, "
+                        "not the default outcome — write these to a SEPARATE --output folder")
+    args = p.parse_args()
 
     generate_event_history_dataset(
-        matched_questions_path=str(calculate_for_path),
-        input_folder=str(input_folder),
-        output_folder=str(output_folder),
-        days_before_question=2,
-        days_after_answer=2,
-        include_composite_help=True,   # answers + comments to others (ISS-04)
-        include_accept_help=False,     # exclude self-directed, treated-only accept events
+        matched_questions_path=args.matched,
+        input_folder=args.input,
+        output_folder=args.output,
+        days_before_question=args.pre_days,
+        days_after_answer=args.post_days,
+        include_composite_help=not args.no_composite,   # answers + comments to others (ISS-04)
+        include_accept_help=args.include_accepts,        # off by default: self-directed, treated-only
     )
