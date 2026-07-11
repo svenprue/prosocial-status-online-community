@@ -154,7 +154,23 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
     full_df["treated_bin3"] = ((full_df["response_time_bin"] == 3) & (full_df["is_treated_active"] == 1)).astype(int)
     full_df["response_time_hours"] = full_df["response_time_hours"].fillna(0.0)
 
-    cols = [
+    # Answer-derived quality covariates (ISS-06) are undefined for control (unanswered)
+    # questions: a control has no answer, hence no accepted answer and zero answer
+    # score/length. Set them to 0 for control rows so those rows survive the
+    # answer-quality spec's per-model dropna in fit_cox_cached. Otherwise every control
+    # would be dropped from that spec, silently reducing it to a treated-only fit and
+    # destroying the treated-vs-control DiD contrast.
+    for acol in ["hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars"]:
+        if acol in full_df.columns:
+            control_mask = full_df["hasAnswer"] == 0
+            full_df.loc[control_mask, acol] = full_df.loc[control_mask, acol].fillna(0.0)
+
+    # Columns that must be present on every retained row. The optional selection/quality
+    # covariates below are deliberately NOT part of this list: each Cox spec drops its own
+    # covariate-specific NaNs in fit_cox_cached (dropna(subset=keep)). Dropping on them
+    # here would remove control rows (which lack answer-level covariates by construction)
+    # from the shared baseline model_df and break every spec, not just the ones using them.
+    required_cols = [
         "match_id", "question_id", "unique_id", "start", "stop", "event_occurred",
         "hasAnswer", "phase_post_question", "treated_post_question",
         "phase_post", "is_treated_active",
@@ -164,12 +180,13 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
         "tenure_bucket",
         "response_time_hours", "response_time_bin", "treated_bin2", "treated_bin3",
     ]
+    cols = list(required_cols)
     for optional_col in ["user_id", "question_year",
                          "hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars", "viewCount",
                          "postHour", "postDayOfWeek", "numTags", "bodyLenChars", "titleLenChars", "ownerReputation"]:
         if optional_col in full_df.columns:
             cols.append(optional_col)
-    return full_df[cols].replace([np.inf, -np.inf], np.nan).dropna()
+    return full_df[cols].replace([np.inf, -np.inf], np.nan).dropna(subset=required_cols)
 
 
 def load_and_prepare(input_folder: str, sample_size: int = None, event_help_types: list = None):

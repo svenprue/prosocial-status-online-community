@@ -229,7 +229,8 @@ def generate_event_history_dataset(
         con.execute("""
             CREATE TEMPORARY TABLE accept_help_events AS
             SELECT NULL::VARCHAR AS match_id, NULL::BIGINT AS question_id, NULL::BIGINT AS user_id,
-                   NULL::DOUBLE AS relative_help_time_hours, NULL::VARCHAR AS help_type
+                   NULL::TIMESTAMP AS help_ts, NULL::DOUBLE AS relative_help_time_hours,
+                   NULL::VARCHAR AS help_type
             WHERE 1=0
         """)
 
