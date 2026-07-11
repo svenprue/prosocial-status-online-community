@@ -34,7 +34,7 @@ def process_accepted_answer_data(
     users_path = resolve_input_file("users")
 
     con.execute(f"""
-        CREATE TEMPORARY VIEW questions AS
+        CREATE TEMPORARY TABLE questions AS
         SELECT
             Id AS question_id,
             OwnerUserId AS owner_user_id,
@@ -51,7 +51,7 @@ def process_accepted_answer_data(
     """)
 
     con.execute(f"""
-        CREATE TEMPORARY VIEW answers AS
+        CREATE TEMPORARY TABLE answers AS
         SELECT
             Id AS answer_id,
             OwnerUserId AS owner_user_id,
@@ -63,7 +63,7 @@ def process_accepted_answer_data(
     """)
 
     con.execute(f"""
-        CREATE TEMPORARY VIEW votes AS
+        CREATE TEMPORARY TABLE votes AS
         SELECT
             PostId AS post_id,
             CAST(CreationDate AS TIMESTAMP) AS vote_date
@@ -82,7 +82,7 @@ def process_accepted_answer_data(
     # """)
 
     con.execute(f"""
-        CREATE TEMPORARY VIEW users AS
+        CREATE TEMPORARY TABLE users AS
         SELECT
             Id AS user_id,
             CAST(CreationDate AS TIMESTAMP) AS registration_date,
@@ -108,7 +108,7 @@ def process_accepted_answer_data(
     # Define eligible questions - INCLUDING ALL QUESTIONS from ALL users (registration data optional)
     if include_all_questions:
         con.execute(f"""
-            CREATE OR REPLACE TEMPORARY VIEW eligible_questions AS
+            CREATE OR REPLACE TEMPORARY TABLE eligible_questions AS
             WITH answers_with_votes AS (
                 SELECT
                     a.parent_question_id AS question_id,
@@ -236,7 +236,7 @@ def process_accepted_answer_data(
         """)
     else:
         con.execute(f"""
-            CREATE OR REPLACE TEMPORARY VIEW eligible_questions AS
+            CREATE OR REPLACE TEMPORARY TABLE eligible_questions AS
             WITH answers_with_votes AS (
                 SELECT
                     a.parent_question_id AS question_id,
@@ -391,6 +391,15 @@ def process_accepted_answer_data(
             WHERE rn = 1;
         """)
 
+    # Materialize the distinct eligible users once. This set is referenced many
+    # times downstream (user batching + every historical-event query); computing
+    # it once avoids re-deriving DISTINCT owner_user_id from the large
+    # eligible_questions table on each reference.
+    con.execute("""
+        CREATE OR REPLACE TEMPORARY TABLE eligible_users AS
+        SELECT DISTINCT owner_user_id FROM eligible_questions;
+    """)
+
     # Add the summary print statements here
     question_count = con.execute("SELECT COUNT(*) FROM eligible_questions").fetchone()[0]
     user_count = con.execute("SELECT COUNT(DISTINCT owner_user_id) FROM eligible_questions").fetchone()[0]
@@ -475,7 +484,7 @@ def process_accepted_answer_data(
         SELECT
             owner_user_id,
             CAST(FLOOR((ROW_NUMBER() OVER (ORDER BY owner_user_id) - 1) / %d) AS INTEGER) AS batch_id
-        FROM (SELECT DISTINCT owner_user_id FROM eligible_questions) t;
+        FROM eligible_users t;
     """ % HELPS_GIVEN_BATCH_SIZE)
     max_batch_id = con.execute("SELECT COALESCE(MAX(batch_id), 0) FROM user_batches").fetchone()[0]
 
@@ -570,218 +579,199 @@ def process_accepted_answer_data(
         FROM phase_definitions;
     """)
 
-    # Historical events: Question Asked
-    questions_asked_df = con.execute("""
-                                     SELECT NULL            AS event_id,
-                                            q.owner_user_id AS user_id,
-                                            q.creation_date AS timestamp,
-                                            'Question' AS event,
-                                            NULL AS question_id,
-                                            NULL AS phase_one_start,
-                                            NULL AS phase_two_end,
-                                            'Question' AS event_history,
-                                            1 AS is_history,
-                                            NULL AS has_answer,
-                                            NULL AS has_unhelpful_answer,
-                                            NULL AS has_accepted_answer,
-                                            NULL AS has_self_answer,
-                                            NULL AS first_answer_timestamp,
-                                            NULL AS first_answer_score,
-                                            NULL AS first_answer_vote_count,
-                                            NULL AS first_answer_id,
-                                            NULL AS first_answer_body_len_chars,
-                                            NULL AS view_count,
-                                            NULL AS body_len_chars,
-                                            NULL AS title_len_chars,
-                                            NULL AS n_code_blocks,
-                                            NULL AS owner_reputation,
-                                            NULL AS accepted_answer_timestamp,
-                                            NULL AS accepted_answer_vote_timestamp,
-                                            NULL AS question_timestamp,
-                                            NULL AS helps_given_between_question_and_answer,
-                                            NULL AS registration_date,
-                                            NULL AS days_since_registration_at_phase_one_start,
-                                            NULL AS tag_ids
-                                     FROM questions q
-                                     WHERE q.owner_user_id IN (
-                                         SELECT DISTINCT owner_user_id FROM eligible_questions
-                                         );
-                                     """).fetchdf()
+    # Historical events: build all five event types entirely in DuckDB and union
+    # them server-side. Previously each was pulled into a pandas DataFrame via
+    # fetchdf(), concatenated, and re-registered — a round-trip of tens of
+    # millions of rows through Python. The constant NULL columns are CAST to the
+    # exact types the previous pandas round-trip produced after the later
+    # UNION ALL with current_events, so the output schema is unchanged.
+    con.execute("""
+        CREATE TEMPORARY TABLE historical_events AS
+        -- Question asked
+        SELECT
+            CAST(NULL AS BIGINT) AS event_id,
+            q.owner_user_id AS user_id,
+            q.creation_date AS timestamp,
+            'Question' AS event,
+            CAST(NULL AS BIGINT) AS question_id,
+            CAST(NULL AS TIMESTAMP) AS phase_one_start,
+            CAST(NULL AS TIMESTAMP) AS phase_two_end,
+            'Question' AS event_history,
+            1 AS is_history,
+            CAST(NULL AS INTEGER) AS has_answer,
+            CAST(NULL AS INTEGER) AS has_unhelpful_answer,
+            CAST(NULL AS INTEGER) AS has_accepted_answer,
+            CAST(NULL AS INTEGER) AS has_self_answer,
+            CAST(NULL AS TIMESTAMP) AS first_answer_timestamp,
+            CAST(NULL AS INTEGER) AS first_answer_score,
+            CAST(NULL AS BIGINT) AS first_answer_vote_count,
+            CAST(NULL AS BIGINT) AS first_answer_id,
+            CAST(NULL AS INTEGER) AS first_answer_body_len_chars,
+            CAST(NULL AS DOUBLE) AS view_count,
+            CAST(NULL AS INTEGER) AS body_len_chars,
+            CAST(NULL AS INTEGER) AS title_len_chars,
+            CAST(NULL AS INTEGER) AS n_code_blocks,
+            CAST(NULL AS INTEGER) AS owner_reputation,
+            CAST(NULL AS TIMESTAMP) AS accepted_answer_timestamp,
+            CAST(NULL AS TIMESTAMP) AS accepted_answer_vote_timestamp,
+            CAST(NULL AS TIMESTAMP) AS question_timestamp,
+            CAST(NULL AS INTEGER) AS helps_given_between_question_and_answer,
+            CAST(NULL AS TIMESTAMP) AS registration_date,
+            CAST(NULL AS INTEGER) AS days_since_registration_at_phase_one_start,
+            CAST(NULL AS BIGINT[]) AS tag_ids
+        FROM questions q
+        WHERE q.owner_user_id IN (SELECT owner_user_id FROM eligible_users)
 
-    # Historical events: Answers provided
-    answers_provided_df = con.execute("""
-                                      SELECT NULL            AS event_id,
-                                             a.owner_user_id AS user_id,
-                                             a.creation_date AS timestamp,
-                                             'Answer' AS event,
-                                             NULL AS question_id,
-                                             NULL AS phase_one_start,
-                                             NULL AS phase_two_end,
-                                             'Answer' AS event_history,
-                                             1 AS is_history,
-                                             NULL AS has_answer,
-                                             NULL AS has_unhelpful_answer,
-                                             NULL AS has_accepted_answer,
-                                             NULL AS has_self_answer,
-                                             NULL AS first_answer_timestamp,
-                                             NULL AS first_answer_score,
-                                             NULL AS first_answer_vote_count,
-                                             NULL AS first_answer_id,
-                                             NULL AS first_answer_body_len_chars,
-                                             NULL AS view_count,
-                                             NULL AS body_len_chars,
-                                             NULL AS title_len_chars,
-                                             NULL AS n_code_blocks,
-                                             NULL AS owner_reputation,
-                                             NULL AS accepted_answer_timestamp,
-                                             NULL AS accepted_answer_vote_timestamp,
-                                             NULL AS question_timestamp,
-                                             NULL AS helps_given_between_question_and_answer,
-                                             NULL AS registration_date,
-                                             NULL AS days_since_registration_at_phase_one_start,
-                                             NULL AS tag_ids
-                                      FROM answers a
-                                          JOIN questions q
-                                      ON a.parent_question_id = q.question_id
-                                      WHERE a.owner_user_id IN (
-                                          SELECT DISTINCT owner_user_id FROM eligible_questions
-                                          )
-                                        AND (a.owner_user_id <> q.owner_user_id
-                                         OR q.owner_user_id IS NULL)
-                                      """).fetchdf()
+        UNION ALL
+        -- Answers provided (non-self)
+        SELECT
+            CAST(NULL AS BIGINT),
+            a.owner_user_id,
+            a.creation_date,
+            'Answer',
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            'Answer',
+            1,
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS DOUBLE),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT[])
+        FROM answers a
+        JOIN questions q ON a.parent_question_id = q.question_id
+        WHERE a.owner_user_id IN (SELECT owner_user_id FROM eligible_users)
+          AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
 
-    # Historical events: AcceptedAnswers received
-    accepted_answers_df = con.execute("""
-                                      SELECT NULL            AS event_id,
-                                             q.owner_user_id AS user_id,
-                                             a.creation_date AS timestamp,
-                                      'AcceptedAnswer' AS event,
-                                      NULL AS question_id,
-                                      NULL AS phase_one_start,
-                                      NULL AS phase_two_end,
-                                      'AcceptedAnswer' AS event_history,
-                                      1 AS is_history,
-                                      NULL AS has_answer,
-                                      NULL AS has_unhelpful_answer,
-                                      NULL AS has_accepted_answer,
-                                      NULL AS has_self_answer,
-                                      NULL AS first_answer_timestamp,
-                                      NULL AS first_answer_score,
-                                      NULL AS first_answer_vote_count,
-                                      NULL AS first_answer_id,
-                                      NULL AS first_answer_body_len_chars,
-                                      NULL AS view_count,
-                                      NULL AS body_len_chars,
-                                      NULL AS title_len_chars,
-                                      NULL AS n_code_blocks,
-                                      NULL AS owner_reputation,
-                                      NULL AS accepted_answer_timestamp,
-                                      NULL AS accepted_answer_vote_timestamp,
-                                      NULL AS question_timestamp,
-                                      NULL AS helps_given_between_question_and_answer,
-                                      NULL AS registration_date,
-                                      NULL AS days_since_registration_at_phase_one_start,
-                                      NULL AS tag_ids
-                                      FROM questions q
-                                          JOIN answers a
-                                      ON q.accepted_answer_id = a.answer_id
-                                      WHERE q.owner_user_id IN (
-                                          SELECT DISTINCT owner_user_id FROM eligible_questions
-                                          )
-                                      """).fetchdf()
+        UNION ALL
+        -- Accepted answers received (by the asker)
+        SELECT
+            CAST(NULL AS BIGINT),
+            q.owner_user_id,
+            a.creation_date,
+            'AcceptedAnswer',
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            'AcceptedAnswer',
+            1,
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS DOUBLE),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT[])
+        FROM questions q
+        JOIN answers a ON q.accepted_answer_id = a.answer_id
+        WHERE q.owner_user_id IN (SELECT owner_user_id FROM eligible_users)
 
-    # Historical events: Accepted Answer Vote received
-    answer_votes_df = con.execute("""
-                                  SELECT NULL            AS event_id,
-                                         a.owner_user_id AS user_id,
-                                         v.vote_date AS timestamp,
-                                  'AcceptedAnswerVote' AS event,
-                                  NULL AS question_id,
-                                  NULL AS phase_one_start,
-                                  NULL AS phase_two_end,
-                                  'AcceptedAnswerVote' AS event_history,
-                                  1 AS is_history,
-                                  NULL AS has_answer,
-                                  NULL AS has_unhelpful_answer,
-                                  NULL AS has_accepted_answer,
-                                  NULL AS has_self_answer,
-                                  NULL AS first_answer_timestamp,
-                                  NULL AS first_answer_score,
-                                  NULL AS first_answer_vote_count,
-                                  NULL AS first_answer_id,
-                                  NULL AS first_answer_body_len_chars,
-                                  NULL AS view_count,
-                                  NULL AS body_len_chars,
-                                  NULL AS title_len_chars,
-                                  NULL AS n_code_blocks,
-                                  NULL AS owner_reputation,
-                                  NULL AS accepted_answer_timestamp,
-                                  NULL AS accepted_answer_vote_timestamp,
-                                  NULL AS question_timestamp,
-                                  NULL AS helps_given_between_question_and_answer,
-                                  NULL AS registration_date,
-                                  NULL AS days_since_registration_at_phase_one_start,
-                                  NULL AS tag_ids
-                                  FROM answers a
-                                      JOIN votes v
-                                  ON a.answer_id = v.post_id
-                                  WHERE a.owner_user_id IN (
-                                      SELECT DISTINCT owner_user_id FROM eligible_questions
-                                      )
-                                  """).fetchdf()
+        UNION ALL
+        -- Accepted-answer votes received
+        SELECT
+            CAST(NULL AS BIGINT),
+            a.owner_user_id,
+            v.vote_date,
+            'AcceptedAnswerVote',
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            'AcceptedAnswerVote',
+            1,
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS DOUBLE),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT[])
+        FROM answers a
+        JOIN votes v ON a.answer_id = v.post_id
+        WHERE a.owner_user_id IN (SELECT owner_user_id FROM eligible_users)
 
-    # Historical events: Accepted Answers posted by the user
-    accepted_answers_posted_df = con.execute("""
-                                             SELECT NULL            AS event_id,
-                                                    a.owner_user_id AS user_id,
-                                                    a.creation_date AS timestamp,
-                                             'AcceptedAnswerPosted' AS event,
-                                             NULL AS question_id,
-                                             NULL AS phase_one_start,
-                                             NULL AS phase_two_end,
-                                             'AcceptedAnswerPosted' AS event_history,
-                                             1 AS is_history,
-                                             NULL AS has_answer,
-                                             NULL AS has_unhelpful_answer,
-                                             NULL AS has_accepted_answer,
-                                             NULL AS has_self_answer,
-                                             NULL AS first_answer_timestamp,
-                                             NULL AS first_answer_score,
-                                             NULL AS first_answer_vote_count,
-                                             NULL AS first_answer_id,
-                                             NULL AS first_answer_body_len_chars,
-                                             NULL AS view_count,
-                                             NULL AS body_len_chars,
-                                             NULL AS title_len_chars,
-                                             NULL AS n_code_blocks,
-                                             NULL AS owner_reputation,
-                                             NULL AS accepted_answer_timestamp,
-                                             NULL AS accepted_answer_vote_timestamp,
-                                             NULL AS question_timestamp,
-                                             NULL AS helps_given_between_question_and_answer,
-                                             NULL AS registration_date,
-                                             NULL AS days_since_registration_at_phase_one_start,
-                                             NULL AS tag_ids
-                                             FROM answers a
-                                                 JOIN questions q
-                                             ON q.accepted_answer_id = a.answer_id
-                                             WHERE a.owner_user_id IN (
-                                                 SELECT DISTINCT owner_user_id FROM eligible_questions
-                                                 )
-                                               AND (a.owner_user_id <> q.owner_user_id
-                                                OR q.owner_user_id IS NULL)
-                                             """).fetchdf()
-
-    historical_events_df = pd.concat([
-        questions_asked_df,
-        answers_provided_df,
-        accepted_answers_df,
-        answer_votes_df,
-        accepted_answers_posted_df
-    ], ignore_index=True)
-
-    con.register("historical_events_df", historical_events_df)
-    con.execute("CREATE TEMPORARY TABLE historical_events AS SELECT * FROM historical_events_df;")
+        UNION ALL
+        -- Accepted answers posted (by the answerer, non-self)
+        SELECT
+            CAST(NULL AS BIGINT),
+            a.owner_user_id,
+            a.creation_date,
+            'AcceptedAnswerPosted',
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            'AcceptedAnswerPosted',
+            1,
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS BIGINT),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS DOUBLE),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS TIMESTAMP),
+            CAST(NULL AS INTEGER),
+            CAST(NULL AS BIGINT[])
+        FROM answers a
+        JOIN questions q ON q.accepted_answer_id = a.answer_id
+        WHERE a.owner_user_id IN (SELECT owner_user_id FROM eligible_users)
+          AND (a.owner_user_id <> q.owner_user_id OR q.owner_user_id IS NULL)
+    """)
 
     # Current events
     con.execute("""

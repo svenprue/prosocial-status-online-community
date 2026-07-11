@@ -199,27 +199,40 @@ def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
     controls["high_view"] = (controls["viewCount"] >= median_vc).astype(int)
     print(f"  No-answer questions: {len(controls):,}; viewCount median split = {median_vc:.0f}")
 
-    # Build minimal placebo intervals: post-pseudo phase only
-    records = []
-    for _, row in controls.iterrows():
-        mid, qid = row["match_id"], row["question_id"]
-        q_events = events[(events["match_id"] == mid) & (events["question_id"] == qid)]
-        t_q, t_a, t_end = row["t_question"], row["t_answer"], row["t_end"]
-        # pre pseudo-answer
-        records.append({
-            "match_id": mid, "question_id": qid, "unique_id": f"{mid}_{qid}",
-            "start": row["t_start"], "stop": t_a, "event_occurred": 0,
-            "high_view": row["high_view"], "phase_post": 0,
-        })
-        # post pseudo-answer
-        n_ev = len(q_events[(q_events["t_event"] >= t_a) & (q_events["t_event"] <= t_end)])
-        records.append({
-            "match_id": mid, "question_id": qid, "unique_id": f"{mid}_{qid}",
-            "start": t_a, "stop": t_end, "event_occurred": int(n_ev > 0),
-            "high_view": row["high_view"], "phase_post": 1,
-        })
+    # Build minimal placebo intervals: pre + post pseudo-answer phase per control.
+    # Post-window event counts are computed with a single merge+groupby instead
+    # of an O(controls x events) per-row scan of the full events frame.
+    ctrl_keys = controls[["match_id", "question_id", "t_answer", "t_end"]]
+    ev = events.merge(ctrl_keys, on=["match_id", "question_id"], how="inner")
+    ev = ev[(ev["t_event"] >= ev["t_answer"]) & (ev["t_event"] <= ev["t_end"])]
+    post_counts = (
+        ev.groupby(["match_id", "question_id"]).size().rename("n_ev").reset_index()
+    )
+    controls = controls.merge(post_counts, on=["match_id", "question_id"], how="left")
+    controls["n_ev"] = controls["n_ev"].fillna(0)
 
-    placebo_df = pd.DataFrame(records)
+    uid = controls["match_id"].astype(str) + "_" + controls["question_id"].astype(str)
+    pre = pd.DataFrame({
+        "match_id": controls["match_id"].to_numpy(),
+        "question_id": controls["question_id"].to_numpy(),
+        "unique_id": uid.to_numpy(),
+        "start": controls["t_start"].to_numpy(),
+        "stop": controls["t_answer"].to_numpy(),
+        "event_occurred": 0,
+        "high_view": controls["high_view"].to_numpy(),
+        "phase_post": 0,
+    })
+    post = pd.DataFrame({
+        "match_id": controls["match_id"].to_numpy(),
+        "question_id": controls["question_id"].to_numpy(),
+        "unique_id": uid.to_numpy(),
+        "start": controls["t_answer"].to_numpy(),
+        "stop": controls["t_end"].to_numpy(),
+        "event_occurred": (controls["n_ev"] > 0).astype(int).to_numpy(),
+        "high_view": controls["high_view"].to_numpy(),
+        "phase_post": 1,
+    })
+    placebo_df = pd.concat([pre, post], ignore_index=True)
     placebo_df["high_view_post"] = placebo_df["high_view"] * placebo_df["phase_post"]
     covariates = ["phase_post", "high_view", "high_view_post"]
     res = fit_cox_cached(

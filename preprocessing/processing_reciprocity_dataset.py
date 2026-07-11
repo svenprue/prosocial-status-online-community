@@ -7,6 +7,7 @@ import gc
 from numba import njit
 import duckdb
 import glob
+import shutil
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Set display options for better debugging output
@@ -220,30 +221,33 @@ def calculate_reciprocity_activation(user_histories):
     return reciprocity_status
 
 
-def process_single_chunk(chunk_user_ids, chunk_idx, chunk_size, input_file, temp_dir, cutoff_date):
+def process_single_chunk(partition_glob, chunk_idx, temp_dir, cutoff_date):
     """
-    Worker function: Processes a single chunk of users and saves a temporary file.
+    Worker function: process one user-partition file (all rows for a disjoint
+    set of users, produced by a single partitioning pass in the driver) and save
+    a temporary file.
     """
     try:
         # Re-establish context inside the worker
         cutoff = pd.to_datetime(cutoff_date)
-        start_idx = chunk_idx * chunk_size
-        end_idx = start_idx + len(chunk_user_ids)
-        
-        print(f"\nProcessing users {start_idx:,} to {end_idx:,} ({len(chunk_user_ids):,} users)")
 
-        # Use DuckDB for efficient filtering by user_id
-        user_ids_str = ", ".join(str(id) for id in chunk_user_ids)
-        
-        # Create a fresh DuckDB connection for this process
+        print(f"\nProcessing partition {chunk_idx} ({partition_glob})")
+
+        # Read only this partition's parquet. Each user's full row history lives
+        # in exactly one partition, so no cross-partition data is needed. This
+        # replaces the previous full re-scan of the whole input parquet with a
+        # giant `user_id IN (...)` list (one scan per chunk).
         con = duckdb.connect()
         df = con.query(f"""
-           SELECT * FROM read_parquet('{input_file}')
-           WHERE user_id IN ({user_ids_str})
+           SELECT * FROM read_parquet('{partition_glob}')
         """).to_df()
         con.close()
+        # The hive partition key column is not written into the files, but drop
+        # it defensively in case of a DuckDB version that includes it.
+        if "part" in df.columns:
+            df = df.drop(columns=["part"])
 
-        print(f"Loaded {len(df):,} total rows for this chunk of users")
+        print(f"Loaded {len(df):,} total rows for this partition")
 
         # Convert timestamps to datetime
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
@@ -556,13 +560,10 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
     """
     print(f"\n=== Processing {input_file} (Parallel with {num_workers} workers) ===")
     
-    # Get unique user IDs and shuffle for better parallelization
+    # Get unique user IDs (used only to size the number of partitions)
     print("Reading unique user IDs...")
     all_user_ids = pd.read_parquet(input_file, columns=["user_id"])["user_id"].unique()
     print(f"Found {len(all_user_ids):,} unique users")
-
-    user_ids = np.copy(all_user_ids)
-    np.random.shuffle(user_ids)
 
     # Get total count of non-history rows
     total_rows = pd.read_parquet(input_file, columns=["is_history"])
@@ -574,7 +575,7 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     temp_dir = os.path.join(os.path.dirname(output_file), "temp_chunks")
     os.makedirs(temp_dir, exist_ok=True)
-    
+
     # Clean up old chunks if any
     for f in glob.glob(os.path.join(temp_dir, "*.parquet")):
         os.remove(f)
@@ -582,28 +583,47 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
     if os.path.exists(output_file):
         os.remove(output_file)
 
-    # Prepare chunks
-    num_chunks = (len(user_ids) + chunk_size - 1) // chunk_size
+    num_chunks = max(1, (len(all_user_ids) + chunk_size - 1) // chunk_size)
     all_result_count = 0
-    
+
+    # Partition the input ONCE by hash(user_id) so every user's full row history
+    # lands in exactly one partition file. Previously each of the num_chunks
+    # workers re-scanned the entire input parquet with a giant `user_id IN (...)`
+    # list (N full scans of a large GZIP parquet); this replaces that with a
+    # single partitioning pass + N cheap per-partition reads.
+    part_dir = os.path.join(os.path.dirname(output_file), "user_partitions")
+    shutil.rmtree(part_dir, ignore_errors=True)
+    duckdb_tmp = os.path.join(os.path.dirname(output_file), "duckdb_tmp")
+    os.makedirs(duckdb_tmp, exist_ok=True)
+    print(f"Partitioning input into {num_chunks} user-partition(s) ...")
+    pcon = duckdb.connect()
+    pcon.execute("PRAGMA threads=%d;" % max(1, num_workers))
+    pcon.execute(f"SET temp_directory='{Path(duckdb_tmp).as_posix()}'")
+    pcon.execute(f"""
+        COPY (
+            SELECT *, CAST(hash(user_id) % {num_chunks} AS INTEGER) AS part
+            FROM read_parquet('{input_file}')
+        ) TO '{part_dir}' (FORMAT PARQUET, PARTITION_BY (part));
+    """)
+    pcon.close()
+
     chunk_tasks = []
     for chunk_idx in range(num_chunks):
-        start_idx = chunk_idx * chunk_size
-        end_idx = min(start_idx + chunk_size, len(user_ids))
-        chunk_user_ids = user_ids[start_idx:end_idx]
-        chunk_tasks.append((chunk_user_ids, chunk_idx))
+        pglob = os.path.join(part_dir, f"part={chunk_idx}", "*.parquet")
+        if glob.glob(pglob):
+            chunk_tasks.append((pglob, chunk_idx))
 
-    print(f"Starting parallel processing of {num_chunks} chunks...")
+    print(f"Starting parallel processing of {len(chunk_tasks)} partition(s)...")
 
-    # Process chunks in parallel
+    # Process partitions in parallel
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         futures = [
-            executor.submit(process_single_chunk, c_ids, c_idx, chunk_size, input_file, temp_dir, cutoff_date)
-            for c_ids, c_idx in chunk_tasks
+            executor.submit(process_single_chunk, pglob, c_idx, temp_dir, cutoff_date)
+            for pglob, c_idx in chunk_tasks
         ]
         
         # Use tqdm to track completed chunks
-        with tqdm(total=len(user_ids), desc="Overall progress", unit="users", position=0) as pbar:
+        with tqdm(total=len(all_user_ids), desc="Overall progress", unit="users", position=0) as pbar:
             for future in as_completed(futures):
                 result_count = future.result()
                 all_result_count += result_count
@@ -639,11 +659,12 @@ def process_question_centered_dataset(input_file: str, output_file: str, chunk_s
     posts_questions_file = os.path.join(os.path.dirname(str(input_file)), "posts_questions.parquet")
     attach_question_covariates(str(output_file), posts_questions_file)
 
-    # Cleanup temp dir
+    # Cleanup temp dir + partition dir
     try:
         os.rmdir(temp_dir)
     except:
         pass
+    shutil.rmtree(part_dir, ignore_errors=True)
 
     print(f"\nCompleted processing {all_result_count:,} total rows")
     print(f"Final output saved to {output_file}")
