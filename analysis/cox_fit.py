@@ -63,7 +63,13 @@ def _linear_combo(res, terms):
     try:
         var = float(np.asarray(vcov.loc[present, present].values).sum())
     except Exception:
-        return None
+        # lifelines sometimes stores variance_matrix with integer column labels
+        try:
+            idx = [params.index.get_loc(t) for t in present]
+            sub = np.asarray(vcov.values)[np.ix_(idx, idx)]
+            var = float(sub.sum())
+        except Exception:
+            return None
     se = float(np.sqrt(var)) if var and var > 0 else float("nan")
     z = coef / se if se and np.isfinite(se) and se > 0 else float("nan")
     p = float(2.0 * norm.sf(abs(z))) if np.isfinite(z) else float("nan")
@@ -95,7 +101,10 @@ class CachedCoxResult:
         self.summary_df = ctv.summary.copy()
         self.params_ = ctv.params_.copy()
         self.confidence_intervals_ = ctv.confidence_intervals_.copy()
-        self.variance_matrix_ = ctv.variance_matrix_.copy()
+        vcov = ctv.variance_matrix_.copy()
+        if not vcov.index.equals(vcov.columns):
+            vcov.columns = vcov.index
+        self.variance_matrix_ = vcov
         self.log_likelihood_ = ctv.log_likelihood_
         self.meta = meta or {}
 

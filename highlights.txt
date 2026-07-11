@@ -1,4 +1,4 @@
-Help received increases later helping on Stack Overflow, but mainly for newcomers
+Receiving help is weakly associated with later helping on Stack Overflow
 Matched diff-in-differences on 21M questions addresses reciprocity confounding
-Reciprocity peaks when answers arrive 30-60 minutes after the question is posted
-Reciprocity recruits contributors before platform status incentives take hold
+Effect is concentrated among newcomers and absent among long-tenured users
+Pooled association is null once self-directed accept events are excluded

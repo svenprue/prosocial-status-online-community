@@ -9,15 +9,16 @@
 \toprule
  & \shortstack[c]{$<$ 1\\Week} & \shortstack[c]{1 Wk--\\1 Mo} & \shortstack[c]{1--6\\Mo} & \shortstack[c]{6--12\\Mo} & \shortstack[c]{1--3\\Yr} & \shortstack[c]{3--6\\Yr} & \shortstack[c]{$>$ 6\\Yrs} \\
 \midrule
-\multicolumn{8}{@{}l}{\textit{Treatment Effect (DID)}} \\
-\hspace{1em}Received Answer $\times$ Post-Answer Received & -1.3580*** & -1.2676*** & -1.2291*** & -1.2112*** & -1.2064*** & -1.2406*** & -1.2402*** \\
- & (0.0055) & (0.0085) & (0.0051) & (0.0058) & (0.0049) & (0.0056) & (0.0089) \\
-\hspace{1em}\textit{Hazard Ratio [95\% CI]} & [0.25, 0.26] & [0.28, 0.29] & [0.29, 0.30] & [0.29, 0.30] & [0.30, 0.30] & [0.29, 0.29] & [0.28, 0.29] \\[4pt]
-\multicolumn{8}{@{}l}{\textit{Waiting Period}} \\
-\hspace{1em}Received Answer $\times$ Post-Question & 1.7195*** & 1.4097*** & 1.3756*** & 1.3500*** & 1.3313*** & 1.3101*** & 1.2777*** \\[4pt]
+\multicolumn{8}{@{}l}{\textit{Treatment Effect (DiD): post-answer vs.\ pre-question}} \\
+\hspace{1em}Received Answer (net post-answer) & 0.1021*** & -0.0302*** & -0.0134** & -0.0055 & -0.0057 & -0.0317*** & -0.0050 \\
+ & (0.0067) & (0.0085) & (0.0049) & (0.0055) & (0.0048) & (0.0062) & (0.0109) \\
+\hspace{1em}\textit{Hazard Ratio [95\% CI]} & [1.09, 1.12] & [0.95, 0.99] & [0.98, 1.00] & [0.98, 1.01] & [0.98, 1.00] & [0.96, 0.98] & [0.97, 1.02] \\[4pt]
+\multicolumn{8}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\
+\hspace{2em}Waiting period ($\times$ Post-Question) & 0.0410*** & -0.0420*** & -0.0482*** & -0.0177* & -0.0165** & -0.0131\textdagger & -0.0013 \\
+\hspace{2em}Answer arrival ($\times$ Post-Answer Received) & 0.0611*** & 0.0119 & 0.0348*** & 0.0122\textdagger & 0.0108\textdagger & -0.0186** & -0.0037 \\[4pt]
 \midrule
 N & 2,667,533 & 1,054,458 & 2,788,155 & 2,055,064 & 4,312,164 & 2,311,821 & 1,063,329 \\
-Events & 663,553 & 392,234 & 1,180,633 & 953,753 & 1,381,280 & 1,049,629 & 448,191 \\
+Events & 288,974 & 231,097 & 732,719 & 601,239 & 840,925 & 540,767 & 177,398 \\
 \bottomrule
 \multicolumn{8}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\
 \multicolumn{8}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\

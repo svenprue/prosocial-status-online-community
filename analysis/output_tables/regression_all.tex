@@ -7,18 +7,22 @@
 \toprule
  & \textbf{Main} & \textbf{Main + Speed} \\
 \midrule
-\multicolumn{3}{@{}l}{\textit{Treatment Effect (DID)}} \\
-\hspace{1em} Received Answer $\times$ Post-Answer Received & -1.2409*** & -1.6342*** \\
- & (0.0049) & (0.0045) \\
-\hspace{1em} Hazard Ratio [95\% CI] & [0.29, 0.29] & [0.19, 0.20] \\[4pt]
-\multicolumn{3}{@{}l}{\textit{Waiting Period}} \\
-\hspace{1em} Received Answer $\times$ Post-Question & 1.3861*** & 1.5576*** \\[4pt]
+\multicolumn{3}{@{}l}{\textit{Treatment Effect (DiD): post-answer vs.\ pre-question}} \\
+\hspace{1em} Received Answer (net post-answer effect) & -0.0017 & 0.0291*** \\
+ & (0.0050) & (0.0049) \\
+\hspace{1em} Hazard Ratio [95\% CI] & [0.99, 1.01] & [1.02, 1.04] \\[4pt]
+\multicolumn{3}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\
+\hspace{2em} Waiting period: Received Answer $\times$ Post-Question & -0.0206** & 0.0019 \\
+\hspace{2em} Answer arrival: $\times$ Post-Answer Received & 0.0189** & 0.0272*** \\
+ & (0.0062) & (0.0054) \\
 \multicolumn{3}{@{}l}{\textit{Response Time Interaction}} \\
-\hspace{1em} Treatment $\times$ log(Response Time) & — & 0.1650*** \\
- & — & (0.0015) \\[4pt]
+\hspace{1em} Net: Treatment $\times$ log(RT), summed & — & -0.0145*** \\
+ & — & (0.0021) \\[2pt]
+\hspace{1em} Component: Post-Answer $\times$ log(RT) & — & -0.0512*** \\
+ & — & (0.0019) \\[4pt]
 \midrule
 N & 16,252,524 & 16,252,524 \\
-Events & 1,233,170 & 1,233,170 \\
+Events & 707,284 & 707,284 \\
 \bottomrule
 \multicolumn{3}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
 \multicolumn{3}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\

@@ -181,7 +181,7 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}.pkl")
 
-    if os.path.exists(interval_cache) and not event_help_types:
+    if os.path.exists(interval_cache):
         print(f"✓ Loading cached intervals from {interval_cache}")
         model_df = pd.read_parquet(interval_cache)
         print("Recomputing descriptives from timelines …")

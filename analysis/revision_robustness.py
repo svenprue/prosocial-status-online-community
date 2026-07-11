@@ -82,7 +82,8 @@ def _fit_subset(model_df: pd.DataFrame, model_name: str, covariates: list, use_c
         print(f"⚠ {model_name}: skipping — missing covariates {missing}")
         return None
     n_q = int(fit_df["unique_id"].nunique())
-    res = fit_cox_cached(fit_df, model_name, covariates, use_cache=use_cache, robust=True)
+    # Point estimates use model-based SEs; pair_bootstrap_se.py supplies clustered uncertainty (ISS-01).
+    res = fit_cox_cached(fit_df, model_name, covariates, use_cache=use_cache, robust=False)
     return _extract_treatment_row(res, model_name, n_q)
 
 
