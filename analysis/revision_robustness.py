@@ -112,6 +112,13 @@ def run_answer_quality(input_folder: str, use_cache: bool) -> pd.DataFrame:
     base = _fit_subset(model_df, "ModelB_AllData_Baseline", COVARIATES_SPEED, use_cache)
     if base:
         rows.append({**base, "spec": "speed_baseline"})
+    # Length-only control: the least-endogenous of the quality signals (fixed by the
+    # answerer at composition, unlike acceptance/score) and the reviewer's exact concern
+    # (terse vs. detailed). Isolates how much of the flip is length vs. acceptance+score.
+    length = _fit_subset(model_df, "ModelB_AllData_LengthOnly",
+                         COVARIATES_SPEED + ["firstAnswerBodyLenChars"], use_cache)
+    if length:
+        rows.append({**length, "spec": "speed_length_only"})
     qual = _fit_subset(model_df, "ModelB_AllData_QualityControls", COVARIATES_SPEED_QUALITY, use_cache)
     if qual:
         rows.append({**qual, "spec": "speed_quality_controls"})
