@@ -13,8 +13,16 @@ BUCKET_ORDER = [
 ROUND_TO_HOURS = 1
 MAX_FIT_ROWS = 8_000_000
 SUBSAMPLE_SEED = 42
+# Cap concurrent lifelines fits (each can hold up to MAX_FIT_ROWS). Override via
+# --n-jobs / COX_MAX_FIT_WORKERS; default keeps Stage-6 RT-bin and bootstrap pools
+# from OOM'ing when cpu_count is large.
+MAX_FIT_WORKERS = int(os.environ.get("COX_MAX_FIT_WORKERS", "4"))
 VARIANCE_ESTIMATOR = "robust_sandwich"
 CLUSTER_COL = "match_id"
+
+# Primary Cox outcome: generalized helping to others, excluding self-directed accepts
+# and (separately tabulated) edits. Matches the prior AllData / answers_comments estimand.
+PRIMARY_HELP_TYPES = ["answer", "comment"]
 
 CONTINUOUS_COVARIATES = [
     "hasAnswer_response_time_interaction",

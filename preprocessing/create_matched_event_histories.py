@@ -36,8 +36,13 @@ def generate_event_history_dataset(
     print(f"\n=== Generating Event History Dataset ===")
     print(f"Parameters: Pre-Window={days_before_question} days, Post-Window={days_after_answer} days")
 
+    # Spill large PostHistory/answers joins to disk instead of hard-OOM'ing.
+    duckdb_tmp_dir = Path(output_folder) / "duckdb_tmp"
+    duckdb_tmp_dir.mkdir(parents=True, exist_ok=True)
     con = duckdb.connect(database=':memory:')
     con.execute("PRAGMA memory_limit='20GB';")
+    con.execute(f"PRAGMA temp_directory='{duckdb_tmp_dir.as_posix()}';")
+    con.execute("PRAGMA max_temp_directory_size='200GiB';")
     con.execute("PRAGMA threads=8;")
 
     print(f"Loading matched questions from {matched_questions_path}...")

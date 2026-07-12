@@ -10,10 +10,11 @@ The bootstrapped statistic (base_coef / base_hr and the CIs) is the SUMMED DiD
 contrast, treated_post_question + is_treated_active — the treatment effect, not
 the is_treated_active increment over the waiting-period term.
 
+Replicates run in a process pool with independent RNGs via SeedSequence.spawn
+(not byte-identical to a serial Generator stream; statistically equivalent).
 After each replicate the coef is flushed to a checkpoint under
 ``analysis/model_cache/``. Re-running the same (scope, seed, n-bootstrap, …)
-config resumes from the last finished replicate so an OOM/kill only loses the
-in-progress draw.
+config resumes from finished replicates so an OOM/kill only loses in-progress draws.
 
 Outputs:
   analysis/model_cache/results_pair_bootstrap.csv
@@ -22,12 +23,16 @@ Outputs:
 Usage examples:
   python pair_bootstrap_se.py --scope all --n-bootstrap 200
   python pair_bootstrap_se.py --scope all --sample 10000 --max-pairs 5000 --n-bootstrap 20
+  python pair_bootstrap_se.py --scope all --n-bootstrap 200 --n-jobs 4
   python pair_bootstrap_se.py --scope all --n-bootstrap 200 --no-resume  # ignore checkpoint
 """
 import argparse
+import gc
 import json
 import os
 import sys
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from multiprocessing import cpu_count
 
 import numpy as np
 import pandas as pd
@@ -36,7 +41,14 @@ _ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ANALYSIS_DIR not in sys.path:
     sys.path.insert(0, _ANALYSIS_DIR)
 
-from cox_config import BUCKET_ORDER, CACHE_DIR, COVARIATES_MAIN
+from cox_config import (
+    BUCKET_ORDER,
+    CACHE_DIR,
+    COVARIATES_MAIN,
+    MAX_FIT_ROWS,
+    MAX_FIT_WORKERS,
+    PRIMARY_HELP_TYPES,
+)
 from cox_data import load_and_prepare
 
 
@@ -47,6 +59,14 @@ DROP_FOR_MODEL_A = [
     "treated_bin2",
     "treated_bin3",
 ]
+
+# Sampler id in checkpoint meta — bump if draw logic changes incompatibly.
+_SAMPLER_ID = "seed_sequence_parallel_v1"
+
+# Worker globals (set in _init_boot_worker; avoid pickling the full frame per task).
+_BOOT_SCOPED: pd.DataFrame | None = None
+_BOOT_UNIQUE_IDS: np.ndarray | None = None
+_BOOT_MAX_PAIRS: int | None = None
 
 
 def _scope_slug(scope: str) -> str:
@@ -78,6 +98,7 @@ def _checkpoint_meta(
         "n_bootstrap": int(n_bootstrap),
         "max_pairs": None if max_pairs is None else int(max_pairs),
         "sample_size": None if sample_size is None else int(sample_size),
+        "sampler": _SAMPLER_ID,
     }
 
 
@@ -135,7 +156,7 @@ def _load_checkpoint(
     last = max(completed)
     print(
         f"  ✓ Resuming from checkpoint: {len(completed)} replicate(s) done "
-        f"(next = {last + 1}/{n_bootstrap})"
+        f"(next pending among 1..{n_bootstrap}; last finished = {last})"
     )
     return completed
 
@@ -165,15 +186,6 @@ def _save_checkpoint(
     )
 
 
-def _advance_rng_one_replicate(
-    df: pd.DataFrame,
-    rng: np.random.Generator,
-    max_pairs: int | None,
-) -> None:
-    """Consume one bootstrap RNG draw without building the resampled frame."""
-    _draw_match_ids(df, rng, max_pairs=max_pairs)
-
-
 def _scope_subset(model_df: pd.DataFrame, scope: str) -> pd.DataFrame:
     if scope == "all":
         return model_df.copy()
@@ -187,28 +199,31 @@ def _model_a_frame(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _draw_match_ids(
-    df: pd.DataFrame,
+    unique_ids: np.ndarray,
     rng: np.random.Generator,
     max_pairs: int | None = None,
 ) -> np.ndarray:
-    """One RNG draw of match_ids (shared by sampling and resume fast-forward)."""
-    # pd.unique preserves order of appearance (same as the pre-checkpoint sampler).
-    unique_ids = pd.unique(df["match_id"].to_numpy())
+    """Resample match_ids with replacement from a precomputed unique-id pool."""
     n_pairs = len(unique_ids) if max_pairs is None else min(int(max_pairs), len(unique_ids))
     return rng.choice(unique_ids, size=n_pairs, replace=True)
 
 
 def _bootstrap_sample_by_match(
     df: pd.DataFrame,
+    unique_ids: np.ndarray,
     rng: np.random.Generator,
     max_pairs: int | None = None,
 ) -> pd.DataFrame:
-    sampled = _draw_match_ids(df, rng, max_pairs=max_pairs)
+    """Resample whole pairs; prefix unique_id so with-replacement draws stay distinct.
+
+    match_id is left unchanged: fit_cox_cached(robust=False) drops it before the
+    MAX_FIT_ROWS downsample (which uses unique_id), so rebuilding match_id is pure waste.
+    """
+    sampled = _draw_match_ids(unique_ids, rng, max_pairs=max_pairs)
     n_pairs = len(sampled)
     draws = pd.DataFrame({"match_id": sampled, "_boot_draw": np.arange(n_pairs, dtype=np.int64)})
     boot = draws.merge(df, on="match_id", how="left", sort=False)
     draw_prefix = boot["_boot_draw"].astype(str)
-    boot["match_id"] = draw_prefix + "_" + boot["match_id"].astype(str)
     boot["unique_id"] = draw_prefix + "_" + boot["unique_id"].astype(str)
     return boot.drop(columns=["_boot_draw"])
 
@@ -231,6 +246,46 @@ def _coef_from_result(result) -> float | None:
     return float(s.loc[terms, "coef"].sum())
 
 
+def _init_boot_worker(
+    scoped: pd.DataFrame,
+    unique_ids: np.ndarray,
+    max_pairs: int | None,
+) -> None:
+    global _BOOT_SCOPED, _BOOT_UNIQUE_IDS, _BOOT_MAX_PAIRS
+    _BOOT_SCOPED = scoped
+    _BOOT_UNIQUE_IDS = unique_ids
+    _BOOT_MAX_PAIRS = max_pairs
+
+
+def _run_one_replicate(payload: tuple[int, object, str]) -> tuple[int, float | None]:
+    """Worker: one bootstrap replicate. payload = (rep, child_seed, scope)."""
+    rep, child_seed, scope = payload
+    from cox_fit import fit_cox_cached
+
+    rng = np.random.default_rng(child_seed)
+    boot_df = _bootstrap_sample_by_match(
+        _BOOT_SCOPED, _BOOT_UNIQUE_IDS, rng, max_pairs=_BOOT_MAX_PAIRS
+    )
+    result = fit_cox_cached(
+        boot_df,
+        f"ModelA_Bootstrap_{scope}_{rep}",
+        COVARIATES_MAIN,
+        use_cache=False,
+        save_cache=False,
+    )
+    coef = _coef_from_result(result)
+    del boot_df, result
+    if coef is not None and np.isfinite(coef):
+        return rep, float(coef)
+    return rep, None
+
+
+def _default_n_jobs(n_pending: int) -> int:
+    """Bound workers by CPU, pending work, and RAM (each fit ≤ MAX_FIT_ROWS)."""
+    cpus = cpu_count() or 4
+    return max(1, min(cpus, n_pending, MAX_FIT_WORKERS))
+
+
 def run_pair_bootstrap(
     input_folder: str,
     scope: str,
@@ -240,6 +295,7 @@ def run_pair_bootstrap(
     seed: int = 42,
     use_cache: bool = True,
     resume: bool = True,
+    n_jobs: int | None = None,
 ) -> pd.DataFrame:
     try:
         from cox_fit import fit_cox_cached
@@ -249,12 +305,19 @@ def run_pair_bootstrap(
             "install the project requirements, including lifelines, before running pair bootstrap fits."
         ) from exc
 
-    model_df, _ = load_and_prepare(input_folder, sample_size=sample_size)
+    model_df, _ = load_and_prepare(
+        input_folder, sample_size=sample_size, event_help_types=PRIMARY_HELP_TYPES
+    )
     scoped = _model_a_frame(_scope_subset(model_df, scope))
+    del model_df
+    gc.collect()
+
     n_questions = int(scoped["unique_id"].nunique())
     n_events = int(scoped["event_occurred"].sum())
     if len(scoped) < 100 or n_events < 10:
         raise ValueError(f"Scope '{scope}' has too few rows/events for bootstrap fitting")
+
+    unique_ids = pd.unique(scoped["match_id"].to_numpy())
 
     base = fit_cox_cached(
         scoped,
@@ -277,31 +340,48 @@ def run_pair_bootstrap(
                 os.remove(path)
                 print(f"  Removed old checkpoint {path}")
 
-    rng = np.random.default_rng(seed)
-    # Fast-forward RNG so resumed draws match a fresh run with the same seed.
-    for rep in range(1, int(n_bootstrap) + 1):
-        if rep in completed:
-            _advance_rng_one_replicate(scoped, rng, max_pairs)
-            continue
-
-        boot_df = _bootstrap_sample_by_match(scoped, rng, max_pairs=max_pairs)
-        result = fit_cox_cached(
-            boot_df,
-            f"ModelA_Bootstrap_{scope}_{rep}",
-            COVARIATES_MAIN,
-            use_cache=False,
-            save_cache=False,
+    pending = [rep for rep in range(1, int(n_bootstrap) + 1) if rep not in completed]
+    if not pending:
+        print(f"  ✓ All {n_bootstrap} replicates already checkpointed")
+    else:
+        ss = np.random.SeedSequence(seed)
+        child_seeds = ss.spawn(int(n_bootstrap))
+        workers = n_jobs if n_jobs is not None else _default_n_jobs(len(pending))
+        # Rough RAM guard: each concurrent fit holds up to MAX_FIT_ROWS.
+        print(
+            f"  Running {len(pending)} remaining replicate(s) with n_jobs={workers} "
+            f"(MAX_FIT_ROWS={MAX_FIT_ROWS:,}, MAX_FIT_WORKERS={MAX_FIT_WORKERS})"
         )
-        coef = _coef_from_result(result)
-        if coef is not None and np.isfinite(coef):
-            completed[rep] = float(coef)
-            status = "ok"
+        tasks = [(rep, child_seeds[rep - 1], scope) for rep in pending]
+
+        if workers <= 1:
+            _init_boot_worker(scoped, unique_ids, max_pairs)
+            for task in tasks:
+                rep, coef = _run_one_replicate(task)
+                completed[rep] = coef
+                status = "ok" if coef is not None else "skipped"
+                _save_checkpoint(scope, seed, n_bootstrap, max_pairs, sample_size, completed)
+                print(f"  Bootstrap {rep}/{n_bootstrap}: {status} (checkpointed)", flush=True)
         else:
-            completed[rep] = None
-            status = "skipped"
-        _save_checkpoint(scope, seed, n_bootstrap, max_pairs, sample_size, completed)
-        print(f"  Bootstrap {rep}/{n_bootstrap}: {status} (checkpointed)", flush=True)
-        del boot_df, result
+            with ProcessPoolExecutor(
+                max_workers=workers,
+                initializer=_init_boot_worker,
+                initargs=(scoped, unique_ids, max_pairs),
+            ) as pool:
+                futures = {pool.submit(_run_one_replicate, t): t[0] for t in tasks}
+                for fut in as_completed(futures):
+                    rep, coef = fut.result()
+                    completed[rep] = coef
+                    status = "ok" if coef is not None else "skipped"
+                    _save_checkpoint(
+                        scope, seed, n_bootstrap, max_pairs, sample_size, completed
+                    )
+                    n_done = sum(1 for r in pending if r in completed)
+                    print(
+                        f"  Bootstrap {rep}/{n_bootstrap}: {status} "
+                        f"(checkpointed; {n_done}/{len(pending)} this batch)",
+                        flush=True,
+                    )
 
     boot_coefs = [
         c for _, c in sorted(completed.items())
@@ -338,6 +418,12 @@ def main():
     parser.add_argument("--max-pairs", type=int, default=None, help="Cap pairs resampled per bootstrap replicate")
     parser.add_argument("--n-bootstrap", type=int, default=200, help="Number of bootstrap replicates")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=None,
+        help=f"Parallel workers (default: min(cpu, pending, MAX_FIT_WORKERS={MAX_FIT_WORKERS}))",
+    )
     parser.add_argument("--no-cache", action="store_true", help="Ignore cached base model")
     parser.add_argument(
         "--no-resume",
@@ -355,6 +441,7 @@ def main():
         seed=args.seed,
         use_cache=not args.no_cache,
         resume=not args.no_resume,
+        n_jobs=args.n_jobs,
     )
     os.makedirs(CACHE_DIR, exist_ok=True)
     out = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")

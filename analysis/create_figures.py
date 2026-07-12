@@ -119,11 +119,71 @@ def _latex_bucket(label: str) -> str:
     return label.replace("<", r"$<$").replace(">", r"$>$")
 
 
-def _standard_error_note(n_cols: int) -> str:
+def _standard_error_note(n_cols: int, bootstrap_available: bool = False) -> str:
+    if bootstrap_available:
+        return (
+            rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Cox-table standard errors are "
+            r"model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in "
+            r"Table~\ref{tab:pair_bootstrap}.} \\"
+        )
     return (
         rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Cox-table standard errors are "
         r"model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\"
     )
+
+
+def _events_note(n_cols: int) -> str:
+    return (
+        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Events = helping events in the "
+        r"full analysis sample (after time rounding); when interval rows exceed the fit cap, "
+        r"estimation uses a matched-pair subsample but Events still refer to the full sample.} \\"
+    )
+
+
+def _reconcile_pooled_events(df_main: pd.DataFrame, *pooled_dfs: pd.DataFrame) -> bool:
+    """Patch pooled n_events when CSVs still store fit-subsample counts.
+
+    Tenure buckets partition the analysis sample, so sum(bucket Events) is the
+    analysis-sample event count. Pooled fits that hit MAX_FIT_ROWS previously
+    wrote the subsample count (~6× too small). Mutates pooled frames in place.
+    Returns True if any frame was patched.
+    """
+    if df_main is None or df_main.empty or "n_events" not in df_main.columns:
+        return False
+    bucket_events = int(df_main["n_events"].sum())
+    if bucket_events <= 0:
+        return False
+    patched = False
+    for df in pooled_dfs:
+        if df is None or df.empty or "n_events" not in df.columns:
+            continue
+        pooled = int(df["n_events"].iloc[0])
+        # Clear discrepancy only (subsample ≪ analysis sample).
+        if pooled > 0 and bucket_events >= pooled * 2:
+            print(
+                f"  ⚠ Reconciling pooled Events {pooled:,} → {bucket_events:,} "
+                "(analysis-sample; prior CSV stored fit-subsample count)"
+            )
+            df["n_events"] = bucket_events
+            patched = True
+    return patched
+
+
+def _persist_reconciled_pooled_events(
+    df_main_all: pd.DataFrame,
+    df_speed_all: pd.DataFrame,
+) -> None:
+    """Write reconciled pooled event counts back to model_cache CSVs."""
+    for name, df in (
+        ("results_main_all.csv", df_main_all),
+        ("results_speed_all.csv", df_speed_all),
+    ):
+        if df is None or df.empty:
+            continue
+        path = os.path.join(CACHE_DIR, name)
+        if os.path.exists(path):
+            df.to_csv(path, index=False)
+            print(f"  ✓ Updated {path} with reconciled n_events")
 
 
 # =====================================================================
@@ -224,6 +284,8 @@ def generate_desc_stats_table(desc: dict, df_main: pd.DataFrame = None) -> str:
 def generate_regression_all_table(
     df_main_all: pd.DataFrame,
     df_speed_all: pd.DataFrame = None,
+    bootstrap_available: bool = False,
+    df_pair_bootstrap: pd.DataFrame = None,
 ) -> str:
     """
     Generate LaTeX table for pooled Cox regressions (all experience levels).
@@ -288,6 +350,24 @@ def generate_regression_all_table(
         lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DiD): post-answer vs.\ pre-question}}}} \\")
         _coef_row(r"\hspace{1em} Received Answer (net post-answer effect)", "did_coef", "did_p", "did_se")
         _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "did_ci_lo", "did_ci_hi")
+        # Overlay matched-pair bootstrap CI for Model A (Main column) when available.
+        if (
+            df_pair_bootstrap is not None
+            and not df_pair_bootstrap.empty
+            and "bootstrap_hr_ci_lo" in df_pair_bootstrap.columns
+        ):
+            boot = df_pair_bootstrap[df_pair_bootstrap["scope"].astype(str) == "all"]
+            if boot.empty:
+                boot = df_pair_bootstrap
+            if not boot.empty:
+                br = boot.iloc[0]
+                boot_ci = rf"[{br['bootstrap_hr_ci_lo']:.2f}, {br['bootstrap_hr_ci_hi']:.2f}]"
+                cells = [boot_ci] + (["—"] if has_speed else [])
+                lines.append(
+                    r"\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & "
+                    + " & ".join(cells)
+                    + r" \\[4pt]"
+                )
         lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{\quad Decomposition (nested time-varying terms)}}}} \\")
         _coef_row(r"\hspace{2em} Waiting period: Received Answer $\times$ Post-Question", "gap_coef", "gap_p")
         _coef_row(r"\hspace{2em} Answer arrival: $\times$ Post-Answer Received", "treat_coef", "treat_p", "treat_se")
@@ -328,7 +408,8 @@ def generate_regression_all_table(
 
     lines += [
         r"\bottomrule",
-        _standard_error_note(n_cols + 1),
+        _standard_error_note(n_cols + 1, bootstrap_available=bootstrap_available),
+        _events_note(n_cols + 1),
         rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\footnotesize $^{{***}}p<0.001$; $^{{**}}p<0.01$; $^{{*}}p<0.05$; $^{{\dagger}}p<0.1$}} \\",
         r"\end{tabular}",
         r"\end{table}",
@@ -374,6 +455,7 @@ def generate_revision_robustness_table(
     lines += [
         r"\bottomrule",
         _standard_error_note(5),
+        _events_note(5),
         r"\end{tabular}",
         r"\end{table}",
     ]
@@ -430,6 +512,7 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
         r"\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\",
         r"\multicolumn{5}{@{}l}{\footnotesize $^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.} \\",
         _standard_error_note(5),
+        _events_note(5),
         r"\end{tabular}",
         r"\end{table}",
     ]
@@ -471,7 +554,7 @@ def generate_viewcount_placebo_table(df: pd.DataFrame) -> str:
 # Table 3: Main effect (by tenure bucket)
 # =====================================================================
 
-def generate_main_results_table(df: pd.DataFrame) -> str:
+def generate_main_results_table(df: pd.DataFrame, bootstrap_available: bool = False) -> str:
     """
     Generate LaTeX table for the main effect (Model A) by tenure bucket.
     Each column is one tenure bucket. N = number of unique questions (question_id).
@@ -577,7 +660,8 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
     lines += [
         r"\bottomrule",
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\",
-        _standard_error_note(n_buckets + 1),
+        _standard_error_note(n_buckets + 1, bootstrap_available=bootstrap_available),
+        _events_note(n_buckets + 1),
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
     ]
     lines += _tenure_table_postamble()
@@ -588,7 +672,7 @@ def generate_main_results_table(df: pd.DataFrame) -> str:
 # Table 4: Speed interaction (by tenure bucket)
 # =====================================================================
 
-def generate_speed_table(df: pd.DataFrame) -> str:
+def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) -> str:
     """
     Generate LaTeX table for Model B (speed interaction) by tenure bucket.
     """
@@ -657,14 +741,15 @@ def generate_speed_table(df: pd.DataFrame) -> str:
 
     lines += [
         r"\bottomrule",
-        _standard_error_note(n_buckets + 1),
+        _standard_error_note(n_buckets + 1, bootstrap_available=bootstrap_available),
+        _events_note(n_buckets + 1),
         r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
     ]
     lines += _tenure_table_postamble()
     return "\n".join(lines)
 
 
-def generate_response_time_bins_table(df: pd.DataFrame) -> str:
+def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: bool = False) -> str:
     """Generate LaTeX table for non-parametric response-time-bin treatment effects."""
     if df.empty or "treat_hr" not in df.columns:
         return ""
@@ -711,7 +796,8 @@ def generate_response_time_bins_table(df: pd.DataFrame) -> str:
     )
     lines += [
         r"\bottomrule",
-        _standard_error_note(5),
+        _standard_error_note(5, bootstrap_available=bootstrap_available),
+        _events_note(5),
         r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
         detail_note,
         r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
@@ -1104,12 +1190,25 @@ def main():
     else:
         print(f"WARNING: {os.path.abspath(desc_path)} not found; desc_stats table will have missing values.")
 
+    # Fix pooled Events when CSVs still store MAX_FIT_ROWS subsample counts.
+    if _reconcile_pooled_events(df_main, df_main_all, df_speed_all):
+        _persist_reconciled_pooled_events(df_main_all, df_speed_all)
+
+    bootstrap_available = (
+        not df_pair_bootstrap.empty and "bootstrap_hr_ci_lo" in df_pair_bootstrap.columns
+    )
+
     # --- Generate Tables ---
     print("\n=== Generating LaTeX Tables ===")
 
     # Pooled regressions table (Main, Main+Speed)
     if not df_main_all.empty:
-        tex = generate_regression_all_table(df_main_all, df_speed_all)
+        tex = generate_regression_all_table(
+            df_main_all,
+            df_speed_all,
+            bootstrap_available=bootstrap_available,
+            df_pair_bootstrap=df_pair_bootstrap if bootstrap_available else None,
+        )
         out = os.path.join(TABLE_DIR, "regression_all.tex")
         with open(out, "w") as f:
             f.write(tex)
@@ -1123,7 +1222,7 @@ def main():
     print(f"✓ Wrote {os.path.abspath(out)}")
 
     # Table 3: Main effect (by tenure bucket)
-    tex = generate_main_results_table(df_main)
+    tex = generate_main_results_table(df_main, bootstrap_available=bootstrap_available)
     out = os.path.join(TABLE_DIR, "main_results.tex")
     with open(out, "w") as f:
         f.write(tex)
@@ -1131,7 +1230,7 @@ def main():
 
     # Table 4: Speed interaction (by tenure bucket)
     if not df_speed.empty:
-        tex = generate_speed_table(df_speed)
+        tex = generate_speed_table(df_speed, bootstrap_available=bootstrap_available)
         out = os.path.join(TABLE_DIR, "speed_results.tex")
         with open(out, "w") as f:
             f.write(tex)
@@ -1139,7 +1238,9 @@ def main():
 
     # Non-parametric response-time-bin treatment effects
     if not df_rt_bins.empty:
-        tex = generate_response_time_bins_table(df_rt_bins)
+        tex = generate_response_time_bins_table(
+            df_rt_bins, bootstrap_available=bootstrap_available
+        )
         out = os.path.join(TABLE_DIR, "response_time_bins.tex")
         with open(out, "w") as f:
             f.write(tex)

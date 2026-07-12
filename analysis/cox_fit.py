@@ -16,6 +16,7 @@ from cox_config import (
     CONTINUOUS_COVARIATES,
     CONTINUOUS_COVARIATES_EXTENDED,
     MAX_FIT_ROWS,
+    MAX_FIT_WORKERS,
     SUBSAMPLE_SEED,
     COVARIATES_MAIN,
     COVARIATES_SPEED,
@@ -24,6 +25,13 @@ from cox_config import (
     VARIANCE_ESTIMATOR,
     CLUSTER_COL,
 )
+
+
+def _parallel_workers(n_units: int, n_jobs: int | None) -> int:
+    """Bound Pool size by CPU, unit count, and memory-aware MAX_FIT_WORKERS."""
+    if n_jobs is not None:
+        return max(1, min(int(n_jobs), n_units))
+    return max(1, min(cpu_count() or 4, n_units, MAX_FIT_WORKERS))
 
 # The two treated indicators are nested: `treated_post_question` switches on when
 # the question is posted and STAYS on through the post-answer phase; `is_treated_active`
@@ -162,8 +170,12 @@ def fit_cox_cached(
     fit_df = fit_df[fit_df["start"] < fit_df["stop"]]
     fit_df = fit_df.replace([np.inf, -np.inf], np.nan).dropna(subset=keep)
 
+    # Analysis-sample sizes (post time-rounding, pre MAX_FIT_ROWS subsample). Tables must
+    # report these so pooled Events match the sum of tenure-bucket Events / full N.
+    n_rows_analysis = len(fit_df)
+    n_events_analysis = int(fit_df["event_occurred"].sum())
+
     subsampled = False
-    n_rows_original = len(fit_df)
     if len(fit_df) > MAX_FIT_ROWS:
         rng = np.random.default_rng(SUBSAMPLE_SEED)
         if "match_id" in fit_df.columns:
@@ -178,7 +190,10 @@ def fit_cox_cached(
             target_n = min(target_n, len(unique_ids))
             sampled = rng.choice(unique_ids, size=target_n, replace=False)
             fit_df = fit_df[fit_df["unique_id"].isin(sampled)].copy()
-        print(f"  (subsampled to {len(fit_df):,} rows for numerical stability)")
+        print(
+            f"  (subsampled to {len(fit_df):,} rows for numerical stability; "
+            f"analysis sample had {n_rows_analysis:,} rows / {n_events_analysis:,} events)"
+        )
         subsampled = True
 
     for col in covariates:
@@ -197,7 +212,7 @@ def fit_cox_cached(
         if col in fit_df.columns and fit_df[col].std() < 1e-10:
             fit_df[col] = fit_df[col] + rng.standard_normal(len(fit_df)) * 1e-8
 
-    n_events = int(fit_df["event_occurred"].sum())
+    n_events_fit = int(fit_df["event_occurred"].sum())
     cluster_for_fit = cluster_col if robust and cluster_col and cluster_col in fit_df.columns else None
     if robust and cluster_col and cluster_for_fit is None:
         raise ValueError(
@@ -205,8 +220,11 @@ def fit_cox_cached(
             "Regenerate the model dataframe or call fit_cox_cached(..., robust=False)."
         )
     variance_label = f"clustered by {cluster_for_fit}" if cluster_for_fit else "model-based"
-    print(f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events:,} events, SEs {variance_label} …")
-    if n_events < 10:
+    print(
+        f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events_fit:,} fit events"
+        f" ({n_events_analysis:,} analysis-sample events), SEs {variance_label} …"
+    )
+    if n_events_fit < 10:
         print("  ⚠ Too few events, skipping.")
         return None
 
@@ -265,13 +283,15 @@ def fit_cox_cached(
         return None
     print(f"  ✓ Fit in {timer.time() - t0:.1f}s")
     meta = {
-        "n_events": n_events,
-        "n_rows": len(fit_df),
+        # n_events / n_rows = analysis sample (for tables); *_fit = estimation subsample.
+        "n_events": n_events_analysis,
+        "n_rows": n_rows_analysis,
+        "n_events_fit": n_events_fit,
+        "n_rows_fit": len(fit_df),
+        "subsampled": subsampled,
         "variance_estimator": VARIANCE_ESTIMATOR if cluster_for_fit else "model_based",
         "cluster_col": cluster_for_fit,
     }
-    if subsampled:
-        meta["n_rows_original"] = n_rows_original
     result = CachedCoxResult(ctv, meta=meta)
     if not save_cache:
         return result
@@ -342,9 +362,9 @@ def fit_response_time_bin_models(model_df: pd.DataFrame, use_cache: bool = True,
         print("  ⚠ response_time_hours not in model_df; skipping response-time bin models.")
         return pd.DataFrame()
     n_bins = len(RT_BIN_EDGES_HOURS) - 1
-    n_workers = n_jobs if n_jobs is not None else min(cpu_count() or 4, n_bins)
+    n_workers = _parallel_workers(n_bins, n_jobs)
     print("\n" + "=" * 60 + "\n  Response time bin models (Model A per bin)\n" + "=" * 60)
-    print(f"  (n_jobs={n_workers})")
+    print(f"  (n_jobs={n_workers}, MAX_FIT_WORKERS={MAX_FIT_WORKERS})")
     if n_workers > 1:
         tasks = [_rt_bin_task(model_df, i, use_cache) for i in range(n_bins)]
         with Pool(n_workers) as pool:
@@ -439,9 +459,12 @@ def _fit_one_tenure_bucket(args):
 
 def fit_all_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None):
     """Fit Model A and B per tenure bucket."""
-    n_workers = n_jobs if n_jobs is not None else min(cpu_count() or 4, len(BUCKET_ORDER))
+    n_workers = _parallel_workers(len(BUCKET_ORDER), n_jobs)
     tasks = [(b, model_df[model_df["tenure_bucket"] == b].copy(), use_cache, ROUND_TO_HOURS) for b in BUCKET_ORDER]
-    print(f"\nFitting tenure-bucket models in parallel (n_jobs={n_workers}, {ROUND_TO_HOURS}h windows) …")
+    print(
+        f"\nFitting tenure-bucket models in parallel "
+        f"(n_jobs={n_workers}, MAX_FIT_WORKERS={MAX_FIT_WORKERS}, {ROUND_TO_HOURS}h windows) …"
+    )
     if n_workers > 1:
         with Pool(n_workers) as pool:
             results = pool.map(_fit_one_tenure_bucket, tasks)

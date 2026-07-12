@@ -199,7 +199,11 @@ def _fit_main_model(subset: pd.DataFrame, model_name: str, use_cache: bool) -> d
 
 
 def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use_cache: bool = True) -> pd.DataFrame:
-    model_df, _ = load_and_prepare(input_folder, sample_size=sample_size)
+    from cox_config import PRIMARY_HELP_TYPES
+
+    model_df, _ = load_and_prepare(
+        input_folder, sample_size=sample_size, event_help_types=PRIMARY_HELP_TYPES
+    )
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     rows = []

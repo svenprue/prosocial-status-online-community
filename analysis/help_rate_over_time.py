@@ -67,8 +67,14 @@ def load_timelines_and_events(input_folder: str, sample_size: int = None):
             "Run preprocessing/create_matched_event_histories.py first."
         )
 
-    timelines = pd.read_parquet(timelines_path)
-    events = pd.read_parquet(events_path)
+    # Project only columns used below (full timelines ~20 cols; events ~5).
+    timeline_cols = [
+        "match_id", "question_id", "hasAnswer", "user_tenure_days",
+        "t_start", "t_question", "t_answer", "t_end",
+    ]
+    event_cols = ["match_id", "question_id", "t_event"]
+    timelines = pd.read_parquet(timelines_path, columns=timeline_cols)
+    events = pd.read_parquet(events_path, columns=event_cols)
 
     for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days"]:
         if col in timelines.columns:

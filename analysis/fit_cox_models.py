@@ -18,7 +18,7 @@ _ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ANALYSIS_DIR not in sys.path:
     sys.path.insert(0, _ANALYSIS_DIR)
 
-from cox_config import CACHE_DIR
+from cox_config import CACHE_DIR, PRIMARY_HELP_TYPES
 from cox_data import load_and_prepare
 from cox_fit import fit_all_models, fit_all_data_models, fit_response_time_bin_models
 
@@ -30,9 +30,19 @@ def main():
     parser.add_argument("--sample", type=int, default=None, help="Subsample N matched pairs")
     parser.add_argument("--no-cache", action="store_true", help="Ignore cached models")
     parser.add_argument("--n-jobs", type=int, default=None, help="Parallel jobs for tenure-bucket fits")
+    parser.add_argument(
+        "--all-help-types",
+        action="store_true",
+        help="Use every help_type in study_events (default: PRIMARY_HELP_TYPES = answer+comment)",
+    )
     args = parser.parse_args()
 
-    model_df, descriptives = load_and_prepare(args.input, sample_size=args.sample)
+    help_types = None if args.all_help_types else PRIMARY_HELP_TYPES
+    if help_types:
+        print(f"Primary outcome help_types={help_types}")
+    model_df, descriptives = load_and_prepare(
+        args.input, sample_size=args.sample, event_help_types=help_types
+    )
 
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(os.path.join(CACHE_DIR, "descriptives.pkl"), "wb") as f:

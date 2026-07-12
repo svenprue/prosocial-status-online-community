@@ -7,8 +7,8 @@ PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
 export PYTHONUNBUFFERED=1
 cd "$ROOT/analysis"
 
-echo "=== $(date -Is) Pair bootstrap (200x, checkpointed) ==="
-"$PYTHON" pair_bootstrap_se.py --scope all --n-bootstrap 200
+echo "=== $(date -Is) Pair bootstrap (100x, checkpointed) ==="
+"$PYTHON" pair_bootstrap_se.py --scope all --n-bootstrap 100
 
 echo "=== $(date -Is) ISS-04 all-types decomposition ==="
 cd "$ROOT"

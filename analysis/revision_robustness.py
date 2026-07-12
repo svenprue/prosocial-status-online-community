@@ -22,6 +22,7 @@ from cox_config import (
     COVARIATES_SPEED,
     COVARIATES_SPEED_QUALITY,
     BUCKET_ORDER,
+    PRIMARY_HELP_TYPES,
 )
 from cox_data import load_and_prepare, create_tenure_buckets
 from cox_fit import fit_cox_cached, _linear_combo, DID_TERMS
@@ -107,7 +108,7 @@ def run_observable_controls(input_folder: str, use_cache: bool) -> pd.DataFrame:
 
 def run_answer_quality(input_folder: str, use_cache: bool) -> pd.DataFrame:
     print("\n=== ISS-06: Answer-quality robustness (speed spec) ===")
-    model_df, _ = load_and_prepare(input_folder)
+    model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
     rows = []
     base = _fit_subset(model_df, "ModelB_AllData_Baseline", COVARIATES_SPEED, use_cache)
     if base:
@@ -301,13 +302,15 @@ def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
 def run_newcomer_bucket_checks(input_folder: str, use_cache: bool) -> pd.DataFrame:
     """ISS-02/06: <1 Week bucket HR under extended specs."""
     print("\n=== Newcomer bucket robustness (< 1 Week) ===")
-    model_df, _ = load_and_prepare(input_folder)
+    model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
     bucket = "< 1 Week"
     sub = model_df[model_df["tenure_bucket"] == bucket].copy()
     rows = []
     for name, covs in [
         ("ModelA_Newcomer_Baseline", COVARIATES_MAIN),
         ("ModelA_Newcomer_Observable", COVARIATES_MAIN_OBSERVABLE),
+        ("ModelB_Newcomer_Baseline", COVARIATES_SPEED),
+        ("ModelB_Newcomer_LengthOnly", COVARIATES_SPEED + ["firstAnswerBodyLenChars"]),
         ("ModelB_Newcomer_Quality", COVARIATES_SPEED_QUALITY),
     ]:
         row = _fit_subset(sub, name, covs, use_cache)
