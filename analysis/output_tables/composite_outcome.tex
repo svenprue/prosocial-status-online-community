@@ -1,0 +1,19 @@
+\begin{table}[H]
+\caption{Reciprocity Effect Decomposed by Help Type (ISS-04)}
+\label{tab:outcome_decomposition}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccr@{}}
+\toprule
+\textbf{Outcome} & \textbf{Treatment HR [95\% CI]} & \textbf{Waiting $\beta_2$} & \textbf{Arrival $\beta_4$} & \textbf{Events} \\
+\midrule
+Answers only & 1.06\,[1.05, 1.07] & +0.01 & +0.05 & 447,732 \\
+Comments only & 1.01\,[1.00, 1.03] & +0.01 & +0.00 & 291,458 \\
+Answers $+$ comments & 1.03\,[1.02, 1.04] & +0.01 & +0.02 & 640,237 \\
+All types$^{a}$ & 1.03\,[1.02, 1.04] & +0.01 & +0.02 & 640,237 \\
+\bottomrule
+\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\
+\multicolumn{5}{@{}l}{\footnotesize $^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.} \\
+\multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\end{tabular}
+\end{table}

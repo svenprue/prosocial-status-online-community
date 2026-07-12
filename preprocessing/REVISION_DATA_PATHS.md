@@ -35,7 +35,7 @@ mv Comments_revision.parquet Comments.parquet
 | `Comments.parquet` | `Comments_revision.parquet` | **new** `parse_generic_row_comments` | `Id, PostId, UserId, CreationDate, Score` |
 | `Votes.parquet` | `Votes_revision.parquet` | `parse_generic_row_votes` | Unchanged schema; type-2 rows still lack `UserId` |
 | `Badges.parquet` | *(unchanged)* | existing | Rep reconstruction / badges |
-| `PostHistory.parquet` | **not delivered** | **not implemented** | Required only for edit-based composite |
+| `PostHistory.parquet` | `PostHistory_revision.parquet` | **new** `parse_generic_row_posthistory` | Edit rows only: types 4/5/6 + `UserId`; no `Text` |
 
 ### Column aliases (apply at ingest or in SQL views)
 
@@ -126,8 +126,9 @@ mv Comments_revision.parquet Comments.parquet
 | `question_year` | `EXTRACT(year FROM question_ts)` | ISS-10 |
 | `hasAcceptedAnswer`, `first_answer_score` | matched / raw | ISS-06 |
 | `ViewCount` | questions | ISS-16 placebo |
-| `help_type` | UNION answers + comments + accept | ISS-04 |
+| `help_type` | UNION answers + comments + edits + accept | ISS-04 |
 | `Comments.parquet` | join asker comments on others' posts | ISS-04 |
+| `PostHistory.parquet` | join asker edits (types 4/5/6) on others' posts | ISS-04 |
 
 ---
 
@@ -149,7 +150,7 @@ No direct reads of `*_revision` files — everything must be propagated through 
 | Issue | New raw data needed? | Primary sources |
 |-------|---------------------|-----------------|
 | ISS-02 (#8) observable controls | Promoted revision + `Badges` | questions revision, Users revision, Tags, Votes (rep reconstruction) |
-| ISS-04 (#9) composite outcome | `Comments.parquet` + plumbing | Comments revision, accept from questions/Votes; **not** upvotes-given or edits |
+| ISS-04 (#9) composite outcome | `Comments` + `PostHistory` + plumbing | Comments revision, edit events (types 4/5/6); accept from questions/Votes; **not** upvotes-given |
 | ISS-06 (#11) answer quality | Promoted answers revision | `first_answer_score` (pipeline), `BodyLenChars` on first answer |
 | ISS-10 (#15) cohort | None (plumbing) | `year` / `question_year` from timestamps |
 | ISS-16 (#16) ViewCount placebo | Promoted questions revision | `ViewCount` |
@@ -182,11 +183,10 @@ python revision_robustness.py --input ../data/event_history --no-cache
 Outputs:
 - `analysis/model_cache/results_observable_controls.csv` (ISS-02)
 - `analysis/model_cache/results_answer_quality.csv` (ISS-06)
-- `analysis/model_cache/results_composite_outcome.csv` (ISS-04 partial)
+- `analysis/model_cache/results_composite_outcome.csv` (ISS-04)
 - `analysis/model_cache/results_viewcount_placebo.csv` (ISS-16)
 - `analysis/model_cache/results_newcomer_robustness.csv`
 - `analysis/model_cache/results_cohort_robustness.csv` (ISS-10)
 
-
-- `PostHistory.parquet` — edit events (ISS-04)
+Blocked / not in dump:
 - Upvote **voter** identity on `VoteTypeId=2` — not in SO dump (ISS-04)

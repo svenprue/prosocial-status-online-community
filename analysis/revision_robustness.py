@@ -4,6 +4,7 @@ Run after regenerating the pipeline with revision inputs:
   python revision_robustness.py --input ../data/event_history
 """
 import argparse
+import gc
 import os
 import sys
 
@@ -136,8 +137,8 @@ def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
     create_matched_event_histories.py: include_accept_help=False), so the
     ``accepts_only`` and ``composite_all`` rows will be skipped unless ``input_folder``
     points to an event history generated with ``include_accept_help=True``. Comments
-    are counted only on *other users'* questions (own-question comments are excluded),
-    and ``accepts`` (accepting an answer on one's own question) measure direct
+    and edits are counted only on *other users'* posts (self-comments/edits excluded).
+    ``accepts`` (accepting an answer on one's own question) measure direct
     reciprocity to the helper, not the generalized reciprocity this study models --- we
     report them separately and labeled, never blended into the primary outcome.
     """
@@ -145,9 +146,11 @@ def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
     outcomes = [
         ("answers_only", ["answer"]),
         ("comments_only", ["comment"]),
+        ("edits_only", ["edit"]),
         ("accepts_only", ["accept"]),                       # direct (dyadic) reciprocity; treated-only by construction
-        ("answers_comments", ["answer", "comment"]),        # generalized-reciprocity composite, no accepts
-        ("composite_all", ["answer", "comment", "accept"]),  # matches the earlier with-accepts run
+        ("answers_comments", ["answer", "comment"]),        # generalized-reciprocity composite, no accepts/edits
+        ("answers_comments_edits", ["answer", "comment", "edit"]),
+        ("composite_all", ["answer", "comment", "edit", "accept"]),
     ]
     rows = []
     for label, types in outcomes:
@@ -164,6 +167,8 @@ def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
                 "reference only, flagged via control_events=0."
             )
         row = _fit_subset(model_df, f"ModelA_AllData_{label}", COVARIATES_MAIN, use_cache)
+        del model_df
+        gc.collect()
         if row:
             rows.append({
                 **row,
@@ -235,6 +240,8 @@ def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
     placebo_df = pd.concat([pre, post], ignore_index=True)
     placebo_df["high_view_post"] = placebo_df["high_view"] * placebo_df["phase_post"]
     covariates = ["phase_post", "high_view", "high_view_post"]
+    # Prefer robust SEs; fall back to model-based if this lifelines build lacks
+    # CoxTimeVarying robust variance (common: NotImplementedError → fit returns None).
     res = fit_cox_cached(
         placebo_df,
         "ViewCountPlacebo_NoAnswer",
@@ -242,6 +249,20 @@ def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
         use_cache=use_cache,
         robust=True,
     )
+    se_note = "robust"
+    if res is None:
+        print(
+            "  ⚠ Robust placebo fit unavailable; retrying with model-based SEs "
+            "(pair_bootstrap_se.py remains the clustered-uncertainty source)."
+        )
+        res = fit_cox_cached(
+            placebo_df,
+            "ViewCountPlacebo_NoAnswer",
+            covariates,
+            use_cache=False,
+            robust=False,
+        )
+        se_note = "model_based"
     rows = []
     if res is not None:
         for term in ["high_view_post", "phase_post"]:
@@ -255,11 +276,18 @@ def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
                     "p": float(r["p"]),
                     "median_viewCount": median_vc,
                     "n_questions": len(controls),
+                    "se_type": se_note,
                 })
     out = pd.DataFrame(rows)
     path = os.path.join(CACHE_DIR, "results_viewcount_placebo.csv")
-    out.to_csv(path, index=False)
-    print(f"✓ Saved {path}")
+    if out.empty:
+        # Avoid writing a 0-byte/headerless file that breaks create_figures.
+        if os.path.exists(path):
+            os.remove(path)
+        print(f"⚠ Placebo produced no rows; removed {path} if present.")
+    else:
+        out.to_csv(path, index=False)
+        print(f"✓ Saved {path} ({len(out)} rows, SEs={se_note})")
     return out
 
 

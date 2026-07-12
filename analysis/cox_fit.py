@@ -315,36 +315,48 @@ def _fit_one_rt_bin(args):
     return (label, row)
 
 
+def _rt_bin_task(model_df: pd.DataFrame, bin_idx: int, use_cache: bool):
+    lo, hi = RT_BIN_EDGES_HOURS[bin_idx], RT_BIN_EDGES_HOURS[bin_idx + 1]
+    label = RT_BIN_LABELS[bin_idx]
+    drop_cols = [
+        c for c in ["tenure_bucket", "response_time_bin", "treated_bin2", "treated_bin3"]
+        if c in model_df.columns
+    ]
+    mask = (
+        (model_df["hasAnswer"] == 0)
+        | (
+            (model_df["hasAnswer"] == 1)
+            & (model_df["response_time_hours"].notna())
+            & (model_df["response_time_hours"] >= lo)
+            & (model_df["response_time_hours"] < hi)
+        )
+    )
+    subset = model_df.loc[mask].drop(columns=drop_cols + ["response_time_hours"], errors="ignore").copy()
+    cache_name = f"ModelA_AllData_RTbin_{lo}_{hi}".replace(".", "_")
+    return (label, subset, cache_name, use_cache)
+
+
 def fit_response_time_bin_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None):
     """Fit Model A per response-time bin (pooled)."""
     if "response_time_hours" not in model_df.columns:
         print("  ⚠ response_time_hours not in model_df; skipping response-time bin models.")
         return pd.DataFrame()
-    df_full = model_df.drop(columns=["tenure_bucket"], errors="ignore").copy()
-    drop_cols = [c for c in ["response_time_bin", "treated_bin2", "treated_bin3"] if c in df_full.columns]
     n_bins = len(RT_BIN_EDGES_HOURS) - 1
     n_workers = n_jobs if n_jobs is not None else min(cpu_count() or 4, n_bins)
-    tasks = []
-    for i in range(n_bins):
-        lo, hi = RT_BIN_EDGES_HOURS[i], RT_BIN_EDGES_HOURS[i + 1]
-        label = RT_BIN_LABELS[i]
-        mask = (
-            (df_full["hasAnswer"] == 0)
-            | ((df_full["hasAnswer"] == 1) & (df_full["response_time_hours"].notna())
-               & (df_full["response_time_hours"] >= lo) & (df_full["response_time_hours"] < hi))
-        )
-        subset = df_full.loc[mask].copy()
-        for c in drop_cols:
-            if c in subset.columns:
-                subset = subset.drop(columns=[c])
-        subset = subset.drop(columns=["response_time_hours"], errors="ignore")
-        tasks.append((label, subset, f"ModelA_AllData_RTbin_{lo}_{hi}".replace(".", "_"), use_cache))
     print("\n" + "=" * 60 + "\n  Response time bin models (Model A per bin)\n" + "=" * 60)
+    print(f"  (n_jobs={n_workers})")
     if n_workers > 1:
+        tasks = [_rt_bin_task(model_df, i, use_cache) for i in range(n_bins)]
         with Pool(n_workers) as pool:
             results = pool.map(_fit_one_rt_bin, tasks)
     else:
-        results = [_fit_one_rt_bin(t) for t in tasks]
+        import gc
+        results = []
+        for i in range(n_bins):
+            task = _rt_bin_task(model_df, i, use_cache)
+            results.append(_fit_one_rt_bin(task))
+            del task
+            gc.collect()
     results = [r[1] for r in results if r[1] is not None]
     results.sort(key=lambda x: RT_BIN_LABELS.index(x["bucket"]) if x["bucket"] in RT_BIN_LABELS else 999)
     if not results:

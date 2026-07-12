@@ -11,6 +11,7 @@ _INPUT_FILES = {
     "users": ("Users_revision.parquet", "Users.parquet"),
     "votes": ("Votes_revision.parquet", "Votes.parquet"),
     "comments": ("Comments_revision.parquet", "Comments.parquet"),
+    "posthistory": ("PostHistory_revision.parquet", "PostHistory.parquet"),
     "badges": ("Badges.parquet", "Badges.parquet"),
 }
 

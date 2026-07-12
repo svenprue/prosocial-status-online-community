@@ -390,12 +390,15 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
     label_map = {
         "answers_only": "Answers only",
         "comments_only": "Comments only",
+        "edits_only": "Edits only",
         "accepts_only": r"Accepts only$^{a}$",
         "answers_comments": "Answers $+$ comments",
+        "answers_comments_edits": "Answers $+$ comments $+$ edits",
         "composite_all": r"All types$^{a}$",
     }
     order = {k: i for i, k in enumerate(
-        ["answers_only", "comments_only", "accepts_only", "answers_comments", "composite_all"]
+        ["answers_only", "comments_only", "edits_only", "accepts_only",
+         "answers_comments", "answers_comments_edits", "composite_all"]
     )}
     df = df.copy()
     if "outcome" in df.columns:
@@ -1191,14 +1194,23 @@ def main():
                 print(f"✓ {out}")
 
     placebo_path = os.path.join(CACHE_DIR, "results_viewcount_placebo.csv")
-    if os.path.exists(placebo_path):
-        df_placebo = pd.read_csv(placebo_path)
-        tex = generate_viewcount_placebo_table(df_placebo)
-        if tex:
-            out = os.path.join(TABLE_DIR, "viewcount_placebo.tex")
-            with open(out, "w") as f:
-                f.write(tex)
-            print(f"✓ {out}")
+    if os.path.exists(placebo_path) and os.path.getsize(placebo_path) > 1:
+        try:
+            df_placebo = pd.read_csv(placebo_path)
+        except pd.errors.EmptyDataError:
+            print(f"⚠ Skipping viewcount placebo table — empty file: {placebo_path}")
+            df_placebo = pd.DataFrame()
+        if not df_placebo.empty:
+            tex = generate_viewcount_placebo_table(df_placebo)
+            if tex:
+                out = os.path.join(TABLE_DIR, "viewcount_placebo.tex")
+                with open(out, "w") as f:
+                    f.write(tex)
+                print(f"✓ {out}")
+        else:
+            print("⚠ Skipping viewcount placebo table — no rows in CSV.")
+    elif os.path.exists(placebo_path):
+        print(f"⚠ Skipping viewcount placebo table — empty file: {placebo_path}")
 
     # Conservative absolute-effect and NNT proxies
     df_absolute = build_absolute_effects()

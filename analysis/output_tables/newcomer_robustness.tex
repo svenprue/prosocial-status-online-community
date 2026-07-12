@@ -1,0 +1,16 @@
+\begin{table}[H]
+\caption{Newcomer Bucket Robustness ($<$ 1 Week)}
+\label{tab:newcomer_robustness}
+\centering
+\footnotesize
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+\textbf{Specification} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\
+\midrule
+ModelA\_Newcomer\_Baseline (< 1 Week) & 1.135 & [1.121, 1.148] & 4,049,574 & 374,439 \\
+ModelA\_Newcomer\_Observable (< 1 Week) & 1.226 & [1.213, 1.240] & 4,049,574 & 374,439 \\
+ModelB\_Newcomer\_Quality (< 1 Week) & 0.905 & [0.894, 0.915] & 4,049,574 & 374,439 \\
+\bottomrule
+\multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\end{tabular}
+\end{table}

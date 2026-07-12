@@ -10,14 +10,22 @@ The bootstrapped statistic (base_coef / base_hr and the CIs) is the SUMMED DiD
 contrast, treated_post_question + is_treated_active — the treatment effect, not
 the is_treated_active increment over the waiting-period term.
 
+After each replicate the coef is flushed to a checkpoint under
+``analysis/model_cache/``. Re-running the same (scope, seed, n-bootstrap, …)
+config resumes from the last finished replicate so an OOM/kill only loses the
+in-progress draw.
+
 Outputs:
   analysis/model_cache/results_pair_bootstrap.csv
+  analysis/model_cache/pair_bootstrap_checkpoint_<scope>.csv  (resume state)
 
 Usage examples:
   python pair_bootstrap_se.py --scope all --n-bootstrap 200
   python pair_bootstrap_se.py --scope all --sample 10000 --max-pairs 5000 --n-bootstrap 20
+  python pair_bootstrap_se.py --scope all --n-bootstrap 200 --no-resume  # ignore checkpoint
 """
 import argparse
+import json
 import os
 import sys
 
@@ -41,6 +49,131 @@ DROP_FOR_MODEL_A = [
 ]
 
 
+def _scope_slug(scope: str) -> str:
+    return (
+        str(scope)
+        .replace(" ", "_")
+        .replace("<", "lt")
+        .replace(">", "gt")
+        .replace("/", "-")
+    )
+
+
+def _checkpoint_paths(scope: str) -> tuple[str, str]:
+    slug = _scope_slug(scope)
+    base = os.path.join(CACHE_DIR, f"pair_bootstrap_checkpoint_{slug}")
+    return base + ".csv", base + ".meta.json"
+
+
+def _checkpoint_meta(
+    scope: str,
+    seed: int,
+    n_bootstrap: int,
+    max_pairs: int | None,
+    sample_size: int | None,
+) -> dict:
+    return {
+        "scope": scope,
+        "seed": int(seed),
+        "n_bootstrap": int(n_bootstrap),
+        "max_pairs": None if max_pairs is None else int(max_pairs),
+        "sample_size": None if sample_size is None else int(sample_size),
+    }
+
+
+def _atomic_write_json(path: str, payload: dict) -> None:
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+        f.write("\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _atomic_write_csv(path: str, df: pd.DataFrame) -> None:
+    tmp = path + ".tmp"
+    df.to_csv(tmp, index=False)
+    # Ensure bytes hit disk before rename (critical for kill/OOM safety).
+    with open(tmp, "rb+") as f:
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, path)
+
+
+def _load_checkpoint(
+    scope: str,
+    seed: int,
+    n_bootstrap: int,
+    max_pairs: int | None,
+    sample_size: int | None,
+) -> dict[int, float | None]:
+    """Return {1-based replicate: coef_or_None} for a compatible checkpoint."""
+    csv_path, meta_path = _checkpoint_paths(scope)
+    if not (os.path.exists(csv_path) and os.path.exists(meta_path)):
+        return {}
+    with open(meta_path, encoding="utf-8") as f:
+        meta = json.load(f)
+    expected = _checkpoint_meta(scope, seed, n_bootstrap, max_pairs, sample_size)
+    if meta != expected:
+        print(
+            "  ⚠ Checkpoint meta mismatch — starting fresh "
+            f"(found {meta}, expected {expected})."
+        )
+        return {}
+    df = pd.read_csv(csv_path)
+    if df.empty or "replicate" not in df.columns:
+        return {}
+    completed: dict[int, float | None] = {}
+    for _, row in df.iterrows():
+        rep = int(row["replicate"])
+        ok = bool(row.get("ok", True))
+        if ok and pd.notna(row.get("coef")):
+            completed[rep] = float(row["coef"])
+        else:
+            completed[rep] = None
+    last = max(completed)
+    print(
+        f"  ✓ Resuming from checkpoint: {len(completed)} replicate(s) done "
+        f"(next = {last + 1}/{n_bootstrap})"
+    )
+    return completed
+
+
+def _save_checkpoint(
+    scope: str,
+    seed: int,
+    n_bootstrap: int,
+    max_pairs: int | None,
+    sample_size: int | None,
+    completed: dict[int, float | None],
+) -> None:
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    csv_path, meta_path = _checkpoint_paths(scope)
+    rows = [
+        {
+            "replicate": rep,
+            "coef": coef if coef is not None else np.nan,
+            "ok": coef is not None and np.isfinite(coef),
+        }
+        for rep, coef in sorted(completed.items())
+    ]
+    _atomic_write_csv(csv_path, pd.DataFrame(rows))
+    _atomic_write_json(
+        meta_path,
+        _checkpoint_meta(scope, seed, n_bootstrap, max_pairs, sample_size),
+    )
+
+
+def _advance_rng_one_replicate(
+    df: pd.DataFrame,
+    rng: np.random.Generator,
+    max_pairs: int | None,
+) -> None:
+    """Consume one bootstrap RNG draw without building the resampled frame."""
+    _draw_match_ids(df, rng, max_pairs=max_pairs)
+
+
 def _scope_subset(model_df: pd.DataFrame, scope: str) -> pd.DataFrame:
     if scope == "all":
         return model_df.copy()
@@ -53,14 +186,25 @@ def _model_a_frame(df: pd.DataFrame) -> pd.DataFrame:
     return df.drop(columns=DROP_FOR_MODEL_A, errors="ignore").copy()
 
 
+def _draw_match_ids(
+    df: pd.DataFrame,
+    rng: np.random.Generator,
+    max_pairs: int | None = None,
+) -> np.ndarray:
+    """One RNG draw of match_ids (shared by sampling and resume fast-forward)."""
+    # pd.unique preserves order of appearance (same as the pre-checkpoint sampler).
+    unique_ids = pd.unique(df["match_id"].to_numpy())
+    n_pairs = len(unique_ids) if max_pairs is None else min(int(max_pairs), len(unique_ids))
+    return rng.choice(unique_ids, size=n_pairs, replace=True)
+
+
 def _bootstrap_sample_by_match(
     df: pd.DataFrame,
     rng: np.random.Generator,
     max_pairs: int | None = None,
 ) -> pd.DataFrame:
-    match_ids = pd.Series(df["match_id"].unique())
-    n_pairs = len(match_ids) if max_pairs is None else min(int(max_pairs), len(match_ids))
-    sampled = rng.choice(match_ids.to_numpy(), size=n_pairs, replace=True)
+    sampled = _draw_match_ids(df, rng, max_pairs=max_pairs)
+    n_pairs = len(sampled)
     draws = pd.DataFrame({"match_id": sampled, "_boot_draw": np.arange(n_pairs, dtype=np.int64)})
     boot = draws.merge(df, on="match_id", how="left", sort=False)
     draw_prefix = boot["_boot_draw"].astype(str)
@@ -95,6 +239,7 @@ def run_pair_bootstrap(
     max_pairs: int | None = None,
     seed: int = 42,
     use_cache: bool = True,
+    resume: bool = True,
 ) -> pd.DataFrame:
     try:
         from cox_fit import fit_cox_cached
@@ -122,22 +267,46 @@ def run_pair_bootstrap(
     if base_coef is None:
         raise RuntimeError(f"Base fit failed for scope '{scope}'")
 
+    completed: dict[int, float | None] = {}
+    if resume:
+        completed = _load_checkpoint(scope, seed, n_bootstrap, max_pairs, sample_size)
+    else:
+        csv_path, meta_path = _checkpoint_paths(scope)
+        for path in (csv_path, meta_path):
+            if os.path.exists(path):
+                os.remove(path)
+                print(f"  Removed old checkpoint {path}")
+
     rng = np.random.default_rng(seed)
-    boot_coefs = []
-    for i in range(int(n_bootstrap)):
+    # Fast-forward RNG so resumed draws match a fresh run with the same seed.
+    for rep in range(1, int(n_bootstrap) + 1):
+        if rep in completed:
+            _advance_rng_one_replicate(scoped, rng, max_pairs)
+            continue
+
         boot_df = _bootstrap_sample_by_match(scoped, rng, max_pairs=max_pairs)
         result = fit_cox_cached(
             boot_df,
-            f"ModelA_Bootstrap_{scope}_{i + 1}",
+            f"ModelA_Bootstrap_{scope}_{rep}",
             COVARIATES_MAIN,
             use_cache=False,
             save_cache=False,
         )
         coef = _coef_from_result(result)
         if coef is not None and np.isfinite(coef):
-            boot_coefs.append(coef)
-        print(f"  Bootstrap {i + 1}/{n_bootstrap}: {'ok' if coef is not None else 'skipped'}")
+            completed[rep] = float(coef)
+            status = "ok"
+        else:
+            completed[rep] = None
+            status = "skipped"
+        _save_checkpoint(scope, seed, n_bootstrap, max_pairs, sample_size, completed)
+        print(f"  Bootstrap {rep}/{n_bootstrap}: {status} (checkpointed)", flush=True)
+        del boot_df, result
 
+    boot_coefs = [
+        c for _, c in sorted(completed.items())
+        if c is not None and np.isfinite(c)
+    ]
     if not boot_coefs:
         raise RuntimeError(f"No successful bootstrap fits for scope '{scope}'")
 
@@ -170,6 +339,11 @@ def main():
     parser.add_argument("--n-bootstrap", type=int, default=200, help="Number of bootstrap replicates")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--no-cache", action="store_true", help="Ignore cached base model")
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Ignore/delete existing checkpoint and start from replicate 1",
+    )
     args = parser.parse_args()
 
     result = run_pair_bootstrap(
@@ -180,6 +354,7 @@ def main():
         max_pairs=args.max_pairs,
         seed=args.seed,
         use_cache=not args.no_cache,
+        resume=not args.no_resume,
     )
     os.makedirs(CACHE_DIR, exist_ok=True)
     out = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")

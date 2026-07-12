@@ -172,6 +172,33 @@ def parse_generic_row_comments(elem):
         return None
 
 
+def parse_generic_row_posthistory(elem):
+    """Slim edit rows for ISS-04: title/body/tags edits by a known user.
+
+    Keeps only PostHistoryTypeId in {4,5,6} with UserId present. Drops Text
+    (dominates dump size) and all other history types (initial revision,
+    close/reopen, etc.).
+    """
+    attrib = elem.attrib
+    try:
+        hist_type = attrib.get('PostHistoryTypeId', None)
+        if hist_type not in ("4", "5", "6"):
+            return None
+        user_id = attrib.get('UserId', None)
+        if user_id is None:
+            return None
+        return {
+            'Id': attrib.get('Id', None),
+            'PostHistoryTypeId': int(hist_type),
+            'PostId': attrib.get('PostId', None),
+            'UserId': user_id,
+            'CreationDate': attrib.get('CreationDate', None),
+        }
+    except Exception as e:
+        print(f"Error parsing posthistory row (ID: {attrib.get('Id', 'N/A')}): {e}")
+        return None
+
+
 def parse_generic_row_badges(elem):
     attrib = elem.attrib
     try:
@@ -298,11 +325,6 @@ def process_users(users_file_path, output_folder):
                            dtypes={'Reputation': 'float64', 'UpVotes': 'float64', 'DownVotes': 'float64'})
 
 
-def process_comments(comments_file_path, output_folder):
-    comments_parquet_path = os.path.join(output_folder, 'Comments.parquet')
-    convert_xml_to_parquet(comments_file_path, comments_parquet_path, parse_generic_row_comments)
-
-
 def process_badges(badges_file_path, output_folder):
     badges_parquet_path = os.path.join(output_folder, 'Badges.parquet')
     convert_xml_to_parquet(badges_file_path, badges_parquet_path, parse_generic_row_badges)
@@ -312,6 +334,19 @@ def process_comments(comments_file_path, output_folder):
     comments_parquet_path = os.path.join(output_folder, 'Comments.parquet')
     convert_xml_to_parquet(comments_file_path, comments_parquet_path, parse_generic_row_comments,
                            dtypes={'Score': 'float64'})
+
+
+def process_posthistory(posthistory_file_path, output_folder,
+                        output_name='PostHistory_revision.parquet'):
+    """Convert PostHistory.xml → slim edit-only parquet (types 4/5/6)."""
+    out_path = os.path.join(output_folder, output_name)
+    convert_xml_to_parquet(
+        posthistory_file_path,
+        out_path,
+        parse_generic_row_posthistory,
+        dtypes={'PostHistoryTypeId': 'int32'},
+    )
+    return out_path
 
 
 def fix_column_types(parquet_file_paths):
@@ -347,10 +382,48 @@ def fix_column_types(parquet_file_paths):
 
 
 def main():
-    # Resolve paths relative to this script's location so running from any CWD works
+    import argparse
     base_dir = Path(__file__).resolve().parent
-    input_folder = base_dir.parent / 'data' / 'input'
-    output_folder = input_folder
+    default_input = base_dir.parent / 'data' / 'input'
+
+    parser = argparse.ArgumentParser(description="Convert Stack Overflow XML dump tables to Parquet")
+    parser.add_argument(
+        "--posthistory-only",
+        action="store_true",
+        help="Only convert PostHistory.xml (edit rows 4/5/6) and exit",
+    )
+    parser.add_argument(
+        "--posthistory-xml",
+        type=str,
+        default=None,
+        help="Path to PostHistory.xml (default: data/input/PostHistory.xml)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory for output parquet (default: data/input)",
+    )
+    parser.add_argument(
+        "--posthistory-name",
+        type=str,
+        default="PostHistory_revision.parquet",
+        help="Output filename for PostHistory conversion",
+    )
+    args = parser.parse_args()
+
+    input_folder = default_input
+    output_folder = Path(args.output_dir) if args.output_dir else input_folder
+    output_folder.mkdir(parents=True, exist_ok=True)
+
+    if args.posthistory_only:
+        xml_path = Path(args.posthistory_xml) if args.posthistory_xml else input_folder / 'PostHistory.xml'
+        if not xml_path.exists():
+            raise FileNotFoundError(f"PostHistory XML not found: {xml_path}")
+        out = process_posthistory(str(xml_path), str(output_folder), output_name=args.posthistory_name)
+        fix_column_types([out])
+        print(f"Wrote {out}")
+        return
 
     posts_file_path = input_folder / 'Posts.xml'
     votes_file_path = input_folder / 'Votes.xml'
@@ -377,6 +450,13 @@ def main():
     else:
         process_comments(comments_file_path, output_folder)
 
+    posthistory_xml = Path(args.posthistory_xml) if args.posthistory_xml else input_folder / 'PostHistory.xml'
+    posthistory_out = output_folder / args.posthistory_name
+    if posthistory_xml.exists() and not posthistory_out.exists():
+        process_posthistory(str(posthistory_xml), str(output_folder), output_name=args.posthistory_name)
+    elif posthistory_out.exists():
+        print(f"{posthistory_out} exists; skipping PostHistory.xml parse")
+
     # Fix column types for all processed parquet files
     parquet_files = [
         os.path.join(output_folder, 'posts_answers.parquet'),
@@ -385,6 +465,8 @@ def main():
         os.path.join(output_folder, 'Users.parquet'),
         os.path.join(output_folder, 'Comments.parquet'),
     ]
+    if posthistory_out.exists():
+        parquet_files.append(str(posthistory_out))
     fix_column_types(parquet_files)
 
 

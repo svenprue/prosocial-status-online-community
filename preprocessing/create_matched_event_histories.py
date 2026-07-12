@@ -24,12 +24,12 @@ def generate_event_history_dataset(
     user_id is the asker of that question, used for tenure and for finding that
     asker's help events (answers/comments to others) within the window.
 
-    The prosocial-help outcome is the asker's answers and (optionally) comments to
-    *other* users. `include_accept_help` is OFF by default: "accept" events are the
-    asker accepting an answer on their OWN study question — they are self-directed
-    (not help to others), can occur only for treated questions (a control never
-    receives an answer to accept), and are timestamped at the accepted answer's
-    creation (~the treatment moment). Including them mechanically injects a
+    The prosocial-help outcome is the asker's answers and (optionally) comments and
+    edits to *other* users. `include_accept_help` is OFF by default: "accept" events
+    are the asker accepting an answer on their OWN study question — they are
+    self-directed (not help to others), can occur only for treated questions (a
+    control never receives an answer to accept), and are timestamped at the accepted
+    answer's creation (~the treatment moment). Including them mechanically injects a
     treated-only, at-answer-time event that corrupts the treatment contrast, so it
     is excluded from the composite outcome (ISS-04) by default.
     """
@@ -194,6 +194,55 @@ def generate_event_history_dataset(
             WHERE 1=0
         """)
 
+    if include_composite_help and input_file_exists("posthistory"):
+        posthistory_path = resolve_input_file("posthistory")
+        print("Finding edit help events (composite outcome; PostHistory types 4/5/6)...")
+        # Ownership for both questions and answers — editing either is help to others.
+        con.execute(f"""
+            CREATE VIEW raw_post_owners AS
+            SELECT Id, OwnerUserId FROM '{questions_path}'
+            UNION ALL
+            SELECT Id, OwnerUserId FROM '{answers_path}'
+        """)
+        con.execute(f"""
+            CREATE VIEW raw_posthistory AS
+            SELECT
+                Id,
+                PostId,
+                UserId,
+                CreationDate::TIMESTAMP AS ts
+            FROM '{posthistory_path}'
+            WHERE UserId IS NOT NULL
+              AND PostHistoryTypeId IN (4, 5, 6)
+        """)
+        con.execute("""
+            CREATE TEMPORARY TABLE edit_help_events AS
+            SELECT
+                sw.match_id,
+                sw.question_id,
+                sw.user_id,
+                ph.ts AS help_ts,
+                date_diff('second', sw.question_ts, ph.ts) / 3600.0 AS relative_help_time_hours,
+                'edit' AS help_type
+            FROM study_windows sw
+            JOIN raw_posthistory ph ON sw.user_id = ph.UserId
+            JOIN raw_post_owners p ON ph.PostId = p.Id
+            WHERE ph.ts >= sw.window_start_ts
+              AND ph.ts <= sw.window_end_ts
+              AND p.OwnerUserId IS NOT NULL
+              AND ph.UserId != p.OwnerUserId
+        """)
+    else:
+        if include_composite_help:
+            print("PostHistory not found; skipping edit help events.")
+        con.execute("""
+            CREATE TEMPORARY TABLE edit_help_events AS
+            SELECT NULL::VARCHAR AS match_id, NULL::BIGINT AS question_id, NULL::BIGINT AS user_id,
+                   NULL::TIMESTAMP AS help_ts, NULL::DOUBLE AS relative_help_time_hours,
+                   NULL::VARCHAR AS help_type
+            WHERE 1=0
+        """)
+
     if include_accept_help:
         # NOTE: contaminating by construction — see the function docstring. Kept only
         # for explicit sensitivity checks; never part of the default outcome.
@@ -241,6 +290,9 @@ def generate_event_history_dataset(
         UNION ALL
         SELECT match_id, question_id, user_id, relative_help_time_hours, help_type
         FROM comment_help_events
+        UNION ALL
+        SELECT match_id, question_id, user_id, relative_help_time_hours, help_type
+        FROM edit_help_events
         UNION ALL
         SELECT match_id, question_id, user_id, relative_help_time_hours, help_type
         FROM accept_help_events
@@ -292,13 +344,14 @@ def generate_event_history_dataset(
     n_events = con.execute("SELECT COUNT(*) FROM all_help_events").fetchone()[0]
     n_answers = con.execute("SELECT COUNT(*) FROM answer_help_events").fetchone()[0]
     n_comments = con.execute("SELECT COUNT(*) FROM comment_help_events").fetchone()[0]
+    n_edits = con.execute("SELECT COUNT(*) FROM edit_help_events").fetchone()[0]
     n_accepts = con.execute("SELECT COUNT(*) FROM accept_help_events").fetchone()[0]
     avg_tenure = con.execute("SELECT AVG(user_tenure_days) FROM study_windows").fetchone()[0]
 
     print(f"\nStats:")
     print(f" - Questions (timelines) analyzed: {n_questions:,}")
     print(f" - Help events (all types): {n_events:,}")
-    print(f"   - answers: {n_answers:,}, comments: {n_comments:,}, accepts: {n_accepts:,}")
+    print(f"   - answers: {n_answers:,}, comments: {n_comments:,}, edits: {n_edits:,}, accepts: {n_accepts:,}")
     print(f" - Average asker tenure: {avg_tenure:.1f} days" if avg_tenure else " - Average asker tenure: N/A")
 
     con.close()
@@ -315,7 +368,7 @@ if __name__ == "__main__":
     p.add_argument("--output", default=str(_project_root / "data" / "event_history"), help="output folder for study_timelines/study_events")
     p.add_argument("--pre-days", type=int, default=2)
     p.add_argument("--post-days", type=int, default=2)
-    p.add_argument("--no-composite", action="store_true", help="answers-only outcome (exclude comments)")
+    p.add_argument("--no-composite", action="store_true", help="answers-only outcome (exclude comments/edits)")
     p.add_argument("--include-accepts", action="store_true",
                    help="include self-directed accept events; for the ISS-04 by-type decomposition ONLY, "
                         "not the default outcome — write these to a SEPARATE --output folder")
@@ -327,6 +380,6 @@ if __name__ == "__main__":
         output_folder=args.output,
         days_before_question=args.pre_days,
         days_after_answer=args.post_days,
-        include_composite_help=not args.no_composite,   # answers + comments to others (ISS-04)
+        include_composite_help=not args.no_composite,   # answers + comments + edits to others (ISS-04)
         include_accept_help=args.include_accepts,        # off by default: self-directed, treated-only
     )
