@@ -158,7 +158,9 @@ def _reconcile_pooled_events(df_main: pd.DataFrame, *pooled_dfs: pd.DataFrame) -
         if df is None or df.empty or "n_events" not in df.columns:
             continue
         pooled = int(df["n_events"].iloc[0])
-        # Clear discrepancy only (subsample ≪ analysis sample).
+        # Clear discrepancy only when pooled looks like a MAX_FIT_ROWS fit-subsample
+        # count (≪ bucket sum). Never overwrite a larger analysis-sample count with
+        # the tenure-bucket sum (buckets can omit unbucketed rows).
         if pooled > 0 and bucket_events >= pooled * 2:
             print(
                 f"  ⚠ Reconciling pooled Events {pooled:,} → {bucket_events:,} "
@@ -166,6 +168,11 @@ def _reconcile_pooled_events(df_main: pd.DataFrame, *pooled_dfs: pd.DataFrame) -
             )
             df["n_events"] = bucket_events
             patched = True
+        elif pooled > 0 and pooled > bucket_events:
+            print(
+                f"  Keeping pooled Events {pooled:,} (> tenure-bucket sum "
+                f"{bucket_events:,}); buckets may omit unbucketed rows."
+            )
     return patched
 
 
