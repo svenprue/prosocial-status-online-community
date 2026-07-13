@@ -26,7 +26,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from cox_config import RT_BIN_LABELS
+from cox_config import RT_BIN_LABELS, HEADLINE_ESTIMAND
 from effect_sizes import (
     build_absolute_effects,
     generate_absolute_effects_latex_table,
@@ -350,14 +350,10 @@ def generate_regression_all_table(
         lines.append(rf"{label} & " + " & ".join(cells) + r" \\[4pt]")
 
     have_did = pd.notna(r.get("did_coef", np.nan))
-    if have_did:
-        # Headline: the DiD treatment effect is the SUM of the two nested treated
-        # indicators (post-answer vs. pre-question baseline, treated vs. control),
-        # not the is_treated_active coefficient alone.
-        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DiD): post-answer vs.\ pre-question}}}} \\")
-        _coef_row(r"\hspace{1em} Received Answer (net post-answer effect)", "did_coef", "did_p", "did_se")
-        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "did_ci_lo", "did_ci_hi")
-        # Overlay matched-pair bootstrap CI for Model A (Main column) when available.
+
+    def _bootstrap_overlay():
+        # Matched-pair bootstrap CI is for the SUMMED DiD (Model A, Main column); it always
+        # sits under the summed-DiD block regardless of which estimand is headlined.
         if (
             df_pair_bootstrap is not None
             and not df_pair_bootstrap.empty
@@ -375,6 +371,28 @@ def generate_regression_all_table(
                     + " & ".join(cells)
                     + r" \\[4pt]"
                 )
+
+    if have_did and HEADLINE_ESTIMAND == "arrival":
+        # ISS-24 re-headline: LEAD with the answer-arrival increment (beta_4); demote the
+        # summed DiD to a labeled secondary "Total elevation (upper bound)"; keep beta_2 as
+        # a pre-trend diagnostic. BOTH remain visible.
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment effect: increment at answer arrival ($\beta_4$)}}}} \\")
+        _coef_row(r"\hspace{1em} Answer arrival ($\times$ Post-Answer Received)", "treat_coef", "treat_p", "treat_se")
+        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "arrival_ci_lo", "arrival_ci_hi")
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Total elevation (summed DiD, upper bound)}}}} \\")
+        _coef_row(r"\hspace{1em} Received Answer (net post-answer effect)", "did_coef", "did_p", "did_se")
+        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "did_ci_lo", "did_ci_hi")
+        _bootstrap_overlay()
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{\quad Pre-trend diagnostic (nested time-varying terms)}}}} \\")
+        _coef_row(r"\hspace{2em} Waiting period ($\beta_2$): Received Answer $\times$ Post-Question", "gap_coef", "gap_p")
+    elif have_did:
+        # Summed-primary layout (HEADLINE_ESTIMAND == "summed"): the DiD treatment effect is
+        # the SUM of the two nested treated indicators (post-answer vs. pre-question baseline,
+        # treated vs. control), not the is_treated_active coefficient alone.
+        lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment Effect (DiD): post-answer vs.\ pre-question}}}} \\")
+        _coef_row(r"\hspace{1em} Received Answer (net post-answer effect)", "did_coef", "did_p", "did_se")
+        _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "did_ci_lo", "did_ci_hi")
+        _bootstrap_overlay()
         lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{\quad Decomposition (nested time-varying terms)}}}} \\")
         _coef_row(r"\hspace{2em} Waiting period: Received Answer $\times$ Post-Question", "gap_coef", "gap_p")
         _coef_row(r"\hspace{2em} Answer arrival: $\times$ Post-Answer Received", "treat_coef", "treat_p", "treat_se")
@@ -430,10 +448,71 @@ def generate_revision_robustness_table(
     label: str,
     spec_col: str = "spec",
 ) -> str:
-    """Generic HR table for revision_robustness.py CSV outputs."""
+    """Generic HR table for revision_robustness.py CSV outputs.
+
+    ISS-24 re-headline: when HEADLINE_ESTIMAND=="arrival" and the CSV carries the arrival
+    increment (HR_increment_only + arrival_ci_*), the PRIMARY HR column is the arrival
+    increment (beta_4) and the summed DiD (HR/CI_low/CI_high) is shown as a labeled
+    secondary "Summed (upper bound)" column. Otherwise the single HR column is the summed
+    DiD (legacy behavior)."""
     if df.empty or "HR" not in df.columns:
         return ""
     spec_name = spec_col if spec_col in df.columns else ("model" if "model" in df.columns else None)
+
+    arrival_primary = (
+        HEADLINE_ESTIMAND == "arrival"
+        and "HR_increment_only" in df.columns
+        and df["HR_increment_only"].notna().any()
+        and "arrival_ci_lo" in df.columns
+    )
+
+    def _row_label(r):
+        label_txt = str(r[spec_name]) if spec_name else str(r.get("model", ""))
+        if "tenure_bucket" in r and pd.notna(r["tenure_bucket"]):
+            label_txt = f"{label_txt} ({r['tenure_bucket']})"
+        if "outcome" in r and pd.notna(r["outcome"]):
+            label_txt = str(r["outcome"])
+        return label_txt.replace("_", r"\_")
+
+    if arrival_primary:
+        lines = [
+            r"\begin{table}[H]",
+            rf"\caption{{{caption}}}",
+            rf"\label{{{label}}}",
+            r"\centering",
+            r"\footnotesize",
+            r"\begin{tabular}{@{}lrrrrr@{}}",
+            r"\toprule",
+            r"\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Summed HR (upper bnd)} & \textbf{N} & \textbf{Events} \\",
+            r"\midrule",
+        ]
+        for _, r in df.iterrows():
+            n_col = "N_questions" if "N_questions" in r else "N"
+            n_val = int(r.get(n_col, 0))
+            arr_hr = r.get("HR_increment_only", np.nan)
+            arr_lo, arr_hi = r.get("arrival_ci_lo", np.nan), r.get("arrival_ci_hi", np.nan)
+            arr_ci = f"[{arr_lo:.3f}, {arr_hi:.3f}]" if pd.notna(arr_lo) and pd.notna(arr_hi) else "—"
+            summed_hr = r.get("HR", np.nan)
+            s_lo, s_hi = r.get("CI_low", np.nan), r.get("CI_high", np.nan)
+            summed_txt = (
+                f"{summed_hr:.3f} [{s_lo:.2f}, {s_hi:.2f}]"
+                if pd.notna(summed_hr) and pd.notna(s_lo) and pd.notna(s_hi) else "—"
+            )
+            arr_hr_txt = f"{arr_hr:.3f}" if pd.notna(arr_hr) else "—"
+            lines.append(
+                rf"{_row_label(r)} & {arr_hr_txt} & {arr_ci} & {summed_txt} "
+                rf"& {n_val:,} & {int(r.get('events', 0)):,} \\"
+            )
+        lines += [
+            r"\bottomrule",
+            r"\multicolumn{6}{@{}l}{\footnotesize Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.} \\",
+            _standard_error_note(6),
+            _events_note(6),
+            r"\end{tabular}",
+            r"\end{table}",
+        ]
+        return "\n".join(lines)
+
     lines = [
         r"\begin{table}[H]",
         rf"\caption{{{caption}}}",
@@ -446,16 +525,10 @@ def generate_revision_robustness_table(
         r"\midrule",
     ]
     for _, r in df.iterrows():
-        label_txt = str(r[spec_name]) if spec_name else str(r.get("model", ""))
-        if "tenure_bucket" in r and pd.notna(r["tenure_bucket"]):
-            label_txt = f"{label_txt} ({r['tenure_bucket']})"
-        if "outcome" in r and pd.notna(r["outcome"]):
-            label_txt = str(r["outcome"])
-        label_tex = label_txt.replace("_", r"\_")
         n_col = "N_questions" if "N_questions" in r else "N"
         n_val = int(r.get(n_col, 0))
         lines.append(
-            rf"{label_tex} & {r['HR']:.3f} "
+            rf"{_row_label(r)} & {r['HR']:.3f} "
             rf"& [{r['CI_low']:.3f}, {r['CI_high']:.3f}] "
             rf"& {n_val:,} & {int(r.get('events', 0)):,} \\"
         )
@@ -493,6 +566,16 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
     if "outcome" in df.columns:
         df["_o"] = df["outcome"].map(order).fillna(99)
         df = df.sort_values("_o")
+    # ISS-24 re-headline: when "arrival", the PRIMARY treatment-effect column is the
+    # answer-arrival increment HR ($\exp(\beta_4)$); the summed DiD ($\exp(\beta_2+\beta_4)$)
+    # is a labeled secondary upper-bound column, and $\beta_2$ stays shown as a pre-trend.
+    arrival_primary = HEADLINE_ESTIMAND == "arrival"
+    if arrival_primary:
+        primary_hdr = r"\textbf{Arrival HR [95\% CI] ($\beta_4$)}"
+        secondary_hdr = r"\textbf{Summed HR (upper bnd)}"
+    else:
+        primary_hdr = r"\textbf{Treatment HR [95\% CI] (summed)}"
+        secondary_hdr = r"\textbf{Arrival $\exp(\beta_4)$}"
     lines = [
         r"\begin{table}[H]",
         r"\caption{Reciprocity Effect Decomposed by Help Type (ISS-04)}",
@@ -501,22 +584,36 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
         r"\footnotesize",
         r"\begin{tabular}{@{}lcccr@{}}",
         r"\toprule",
-        r"\textbf{Outcome} & \textbf{Treatment HR [95\% CI]} & \textbf{Waiting $\beta_2$} & \textbf{Arrival $\beta_4$} & \textbf{Events} \\",
+        rf"\textbf{{Outcome}} & {primary_hdr} & {secondary_hdr} & \textbf{{Waiting $\beta_2$}} & \textbf{{Events}} \\",
         r"\midrule",
     ]
     for _, r in df.iterrows():
         name = label_map.get(str(r.get("outcome", "")), str(r.get("outcome", "")).replace("_", r"\_"))
-        hr, lo, hi = r.get("HR", np.nan), r.get("CI_low", np.nan), r.get("CI_high", np.nan)
-        hr_txt = f"{hr:.2f}" if pd.notna(hr) else "—"
-        ci_txt = f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else ""
+        summed_hr, lo, hi = r.get("HR", np.nan), r.get("CI_low", np.nan), r.get("CI_high", np.nan)
         b2, b4 = r.get("waiting_coef", np.nan), r.get("arrival_coef", np.nan)
-        b2_txt = f"{b2:+.2f}" if pd.notna(b2) else "—"
-        b4_txt = f"{b4:+.2f}" if pd.notna(b4) else "—"
+        arr_hr = r.get("HR_increment_only", np.nan)
+        if pd.isna(arr_hr) and pd.notna(b4):
+            arr_hr = float(np.exp(b4))
+        arr_lo, arr_hi = r.get("arrival_ci_lo", np.nan), r.get("arrival_ci_hi", np.nan)
         events = int(r.get("events", 0)) if pd.notna(r.get("events", np.nan)) else 0
-        lines.append(rf"{name} & {hr_txt}\,{ci_txt} & {b2_txt} & {b4_txt} & {events:,} \\")
+        summed_ci = f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else ""
+        summed_txt = f"{summed_hr:.2f}\\,{summed_ci}" if pd.notna(summed_hr) else "—"
+        arr_ci = f"[{arr_lo:.2f}, {arr_hi:.2f}]" if pd.notna(arr_lo) and pd.notna(arr_hi) else ""
+        arr_txt = f"{arr_hr:.2f}\\,{arr_ci}" if pd.notna(arr_hr) else "—"
+        b2_txt = f"{b2:+.2f}" if pd.notna(b2) else "—"
+        if arrival_primary:
+            primary_cell, secondary_cell = arr_txt, summed_txt
+        else:
+            primary_cell, secondary_cell = summed_txt, (f"{arr_hr:.2f}" if pd.notna(arr_hr) else "—")
+        lines.append(rf"{name} & {primary_cell} & {secondary_cell} & {b2_txt} & {events:,} \\")
+    foot_primary = (
+        r"\multicolumn{5}{@{}l}{\footnotesize Arrival HR is the answer-arrival increment $\exp(\beta_4)$ (primary); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound); $\beta_2$ is the waiting-period (anticipatory-engagement) pre-trend.} \\"
+        if arrival_primary
+        else r"\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\"
+    )
     lines += [
         r"\bottomrule",
-        r"\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\",
+        foot_primary,
         r"\multicolumn{5}{@{}l}{\footnotesize $^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.} \\",
         _standard_error_note(5),
         _events_note(5),
@@ -610,25 +707,55 @@ def generate_main_results_table(df: pd.DataFrame, bootstrap_available: bool = Fa
 
     have_did = "did_coef" in df.columns and df["did_coef"].notna().any()
 
-    if have_did:
-        # Headline: the DiD treatment effect is the SUM of the two nested treated terms
-        # (post-answer vs. pre-question baseline, treated vs. control). The raw
-        # is_treated_active coefficient alone is only the post-answer increment over the
-        # (now large) waiting-period term, so it is not the treatment effect.
-        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Treatment Effect (DiD): post-answer vs.\ pre-question}} \\")
-        did_coef_cells, did_se_cells, did_hr_cells = [], [], []
-        for _, r in df.iterrows():
-            did_coef_cells.append(_fmt_coef(r["did_coef"], r.get("did_p", np.nan)) if pd.notna(r.get("did_coef")) else "—")
-            did_se_cells.append(_fmt_se(r["did_se"]) if pd.notna(r.get("did_se")) else "")
-            if pd.notna(r.get("did_ci_lo")) and pd.notna(r.get("did_ci_hi")):
-                did_hr_cells.append(f"[{r['did_ci_lo']:.2f}, {r['did_ci_hi']:.2f}]")
-            else:
-                did_hr_cells.append("—")
-        lines.append(rf"\hspace{{1em}}Received Answer (net post-answer) & " + " & ".join(did_coef_cells) + r" \\")
-        lines.append(rf" & " + " & ".join(did_se_cells) + r" \\")
-        lines.append(rf"\hspace{{1em}}\textit{{Hazard Ratio [95\% CI]}} & " + " & ".join(did_hr_cells) + r" \\[4pt]")
+    def _section(title):
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{" + title + r"}} \\")
 
-        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\")
+    def _coef_se_block(label, coef_key, p_key, se_key):
+        coef_cells, se_cells = [], []
+        for _, r in df.iterrows():
+            coef_cells.append(_fmt_coef(r[coef_key], r.get(p_key, np.nan)) if pd.notna(r.get(coef_key)) else "—")
+            se_cells.append(_fmt_se(r[se_key]) if (se_key and pd.notna(r.get(se_key))) else "")
+        lines.append(rf"{label} & " + " & ".join(coef_cells) + r" \\")
+        lines.append(r" & " + " & ".join(se_cells) + r" \\")
+
+    def _hr_ci_block(label, lo_key, hi_key, coef_key=None, se_key=None):
+        # Prefer explicit CI columns; fall back to a normal-approx CI from coef/se so old
+        # CSVs (or the arrival increment) still render a Hazard Ratio [95% CI] row.
+        cells = []
+        for _, r in df.iterrows():
+            lo, hi = r.get(lo_key, np.nan), r.get(hi_key, np.nan)
+            if (pd.isna(lo) or pd.isna(hi)) and coef_key and pd.notna(r.get(coef_key)) and pd.notna(r.get(se_key)):
+                lo = float(np.exp(r[coef_key] - 1.96 * r[se_key]))
+                hi = float(np.exp(r[coef_key] + 1.96 * r[se_key]))
+            cells.append(f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else "—")
+        lines.append(rf"{label} & " + " & ".join(cells) + r" \\[4pt]")
+
+    if have_did and HEADLINE_ESTIMAND == "arrival":
+        # ISS-24 re-headline: LEAD with the answer-arrival increment (beta_4), with its own
+        # Hazard Ratio [95% CI] (from arrival_ci_*, else exp(treat_coef ± 1.96·treat_se)).
+        # Demote the summed DiD to a labeled secondary "Total elevation (upper bound)".
+        # Keep beta_2 as a pre-trend diagnostic. BOTH remain visible.
+        _section(r"Treatment effect: increment at answer arrival ($\beta_4$)")
+        _coef_se_block(r"\hspace{1em}Answer arrival ($\times$ Post-Answer Received)", "treat_coef", "treat_p", "treat_se")
+        _hr_ci_block(r"\hspace{1em}\textit{Hazard Ratio [95\% CI]}", "arrival_ci_lo", "arrival_ci_hi", "treat_coef", "treat_se")
+        _section(r"Total elevation (summed DiD, upper bound)")
+        _coef_se_block(r"\hspace{1em}Received Answer (net post-answer)", "did_coef", "did_p", "did_se")
+        _hr_ci_block(r"\hspace{1em}\textit{Hazard Ratio [95\% CI]}", "did_ci_lo", "did_ci_hi")
+        _section(r"\quad Pre-trend diagnostic (nested time-varying terms)")
+        gap_cells = [
+            _fmt_coef(r["gap_coef"], r.get("gap_p", np.nan)) if pd.notna(r.get("gap_coef")) else "—"
+            for _, r in df.iterrows()
+        ]
+        lines.append(rf"\hspace{{2em}}Waiting period ($\beta_2$, $\times$ Post-Question) & " + " & ".join(gap_cells) + r" \\[4pt]")
+    elif have_did:
+        # Summed-primary layout (HEADLINE_ESTIMAND == "summed"): the DiD treatment effect is
+        # the SUM of the two nested treated terms (post-answer vs. pre-question baseline,
+        # treated vs. control). The raw is_treated_active coefficient alone is only the
+        # post-answer increment over the (now large) waiting-period term.
+        _section(r"Treatment Effect (DiD): post-answer vs.\ pre-question")
+        _coef_se_block(r"\hspace{1em}Received Answer (net post-answer)", "did_coef", "did_p", "did_se")
+        _hr_ci_block(r"\hspace{1em}\textit{Hazard Ratio [95\% CI]}", "did_ci_lo", "did_ci_hi")
+        _section(r"\quad Decomposition (nested time-varying terms)")
         gap_cells = [
             _fmt_coef(r["gap_coef"], r.get("gap_p", np.nan)) if pd.notna(r.get("gap_coef")) else "—"
             for _, r in df.iterrows()
@@ -703,41 +830,68 @@ def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) ->
     have_did = "did_coef" in df.columns and df["did_coef"].notna().any()
     have_did_speed = "did_speed_coef" in df.columns and df["did_speed_coef"].notna().any()
 
-    # Base treatment effect (at mean response time; covariates are mean-centred).
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Base Treatment Effect (DiD, at mean response time)}} \\")
-    cells, se_cells = [], []
-    for _, r in df.iterrows():
-        if have_did and pd.notna(r.get("did_coef")):
-            cells.append(_fmt_coef(r["did_coef"], r.get("did_p", np.nan)))
-            se_cells.append(_fmt_se(r["did_se"]) if pd.notna(r.get("did_se")) else "")
-        else:
-            cells.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
-            se_cells.append(_fmt_se(r["treat_se"]))
-    lines.append(rf"\hspace{{1em}}Received Answer (net post-answer) & " + " & ".join(cells) + r" \\")
-    lines.append(rf" & " + " & ".join(se_cells) + r" \\[4pt]")
+    def _section(title):
+        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{" + title + r"}} \\")
 
-    # Net response-time moderation of the DiD = sum of the two RT interactions.
-    if have_did_speed:
-        lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{Net Response-Time Moderation of DiD (summed)}} \\")
-        net_cells, net_se_cells = [], []
+    def _coef_se_block(label, coef_key, p_key, se_key, trail=r" \\[4pt]"):
+        coef_cells, se_cells = [], []
         for _, r in df.iterrows():
-            net_cells.append(_fmt_coef(r["did_speed_coef"], r.get("did_speed_p", np.nan)) if pd.notna(r.get("did_speed_coef")) else "—")
-            net_se_cells.append(_fmt_se(r["did_speed_se"]) if pd.notna(r.get("did_speed_se")) else "")
-        lines.append(rf"\hspace{{1em}}Treatment $\times$ log(RT), summed & " + " & ".join(net_cells) + r" \\")
-        lines.append(rf" & " + " & ".join(net_se_cells) + r" \\[4pt]")
+            coef_cells.append(_fmt_coef(r[coef_key], r.get(p_key, np.nan)) if pd.notna(r.get(coef_key)) else "—")
+            se_cells.append(_fmt_se(r[se_key]) if (se_key and pd.notna(r.get(se_key))) else "")
+        lines.append(rf"{label} & " + " & ".join(coef_cells) + r" \\")
+        lines.append(r" & " + " & ".join(se_cells) + trail)
 
-    # Components of the RT interaction (each attaches to one nested base term).
-    lines.append(r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\textit{\quad Components}} \\")
-    speed_cells, speed_se_cells = [], []
-    for _, r in df.iterrows():
-        speed_cells.append(_fmt_coef(r["speed_coef"], r["speed_p"]))
-        speed_se_cells.append(_fmt_se(r["speed_se"]))
-    lines.append(rf"\hspace{{2em}}Answer arrival $\times$ log(RT) & " + " & ".join(speed_cells) + r" \\")
-    lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[2pt]")
-    gs_cells = []
-    for _, r in df.iterrows():
-        gs_cells.append(_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]))
-    lines.append(rf"\hspace{{2em}}Waiting period $\times$ log(RT) & " + " & ".join(gs_cells) + r" \\[4pt]")
+    if HEADLINE_ESTIMAND == "arrival":
+        # ISS-24 re-headline: PRIMARY base = the answer-arrival increment (beta_4); PRIMARY
+        # moderation = Answer arrival x log(RT) (gamma). The summed DiD base and the summed
+        # net RT moderation (gamma+delta) are shown as labeled secondaries. BOTH appear.
+        _section(r"Base treatment effect: arrival increment ($\beta_4$, at mean response time)")
+        _coef_se_block(r"\hspace{1em}Answer arrival (net post-answer)", "treat_coef", "treat_p", "treat_se")
+        if have_did:
+            _section(r"Base treatment effect (summed DiD, upper bound)")
+            _coef_se_block(r"\hspace{1em}Received Answer, summed", "did_coef", "did_p", "did_se")
+
+        _section(r"Response-time moderation")
+        _coef_se_block(r"\hspace{1em}Answer arrival $\times$ log(RT) ($\gamma$)", "speed_coef", "speed_p", "speed_se", trail=r" \\[2pt]")
+        if have_did_speed:
+            _coef_se_block(r"\hspace{1em}Net: Treatment $\times$ log(RT), summed ($\gamma+\delta$, upper bound)", "did_speed_coef", "did_speed_p", "did_speed_se", trail=r" \\[2pt]")
+        gs_cells = [_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]) for _, r in df.iterrows()]
+        lines.append(rf"\hspace{{2em}}Waiting period $\times$ log(RT) ($\delta$) & " + " & ".join(gs_cells) + r" \\[4pt]")
+    else:
+        # Summed-primary layout (HEADLINE_ESTIMAND == "summed").
+        # Base treatment effect (at mean response time; covariates are mean-centred).
+        _section(r"Base Treatment Effect (DiD, at mean response time)")
+        cells, se_cells = [], []
+        for _, r in df.iterrows():
+            if have_did and pd.notna(r.get("did_coef")):
+                cells.append(_fmt_coef(r["did_coef"], r.get("did_p", np.nan)))
+                se_cells.append(_fmt_se(r["did_se"]) if pd.notna(r.get("did_se")) else "")
+            else:
+                cells.append(_fmt_coef(r["treat_coef"], r["treat_p"]))
+                se_cells.append(_fmt_se(r["treat_se"]))
+        lines.append(rf"\hspace{{1em}}Received Answer (net post-answer) & " + " & ".join(cells) + r" \\")
+        lines.append(rf" & " + " & ".join(se_cells) + r" \\[4pt]")
+
+        # Net response-time moderation of the DiD = sum of the two RT interactions.
+        if have_did_speed:
+            _section(r"Net Response-Time Moderation of DiD (summed)")
+            net_cells, net_se_cells = [], []
+            for _, r in df.iterrows():
+                net_cells.append(_fmt_coef(r["did_speed_coef"], r.get("did_speed_p", np.nan)) if pd.notna(r.get("did_speed_coef")) else "—")
+                net_se_cells.append(_fmt_se(r["did_speed_se"]) if pd.notna(r.get("did_speed_se")) else "")
+            lines.append(rf"\hspace{{1em}}Treatment $\times$ log(RT), summed & " + " & ".join(net_cells) + r" \\")
+            lines.append(rf" & " + " & ".join(net_se_cells) + r" \\[4pt]")
+
+        # Components of the RT interaction (each attaches to one nested base term).
+        _section(r"\quad Components")
+        speed_cells, speed_se_cells = [], []
+        for _, r in df.iterrows():
+            speed_cells.append(_fmt_coef(r["speed_coef"], r["speed_p"]))
+            speed_se_cells.append(_fmt_se(r["speed_se"]))
+        lines.append(rf"\hspace{{2em}}Answer arrival $\times$ log(RT) & " + " & ".join(speed_cells) + r" \\")
+        lines.append(rf" & " + " & ".join(speed_se_cells) + r" \\[2pt]")
+        gs_cells = [_fmt_coef(r["gap_speed_coef"], r["gap_speed_p"]) for _, r in df.iterrows()]
+        lines.append(rf"\hspace{{2em}}Waiting period $\times$ log(RT) & " + " & ".join(gs_cells) + r" \\[4pt]")
 
     # N = unique questions; Events = helping events
     lines.append(r"\midrule")
@@ -777,11 +931,21 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
         r"\textbf{Response time} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\",
         r"\midrule",
     ]
-    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
-    hr_key, lo_key, hi_key, p_key = (
-        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
-        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
-    )
+    # ISS-24 re-headline: under "arrival" report the per-bin ARRIVAL increment HR as
+    # primary (treat_* = is_treated_active, which this CSV already carries); the summed DiD
+    # contrast remains available in the pooled regression tables. Under "summed" keep the
+    # summed DiD contrast (did_*) primary, which is comparable across bins.
+    have_arrival = "treat_hr" in df.columns and df["treat_hr"].notna().any()
+    have_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    if HEADLINE_ESTIMAND == "arrival" and have_arrival:
+        use_did = False
+        hr_key, lo_key, hi_key, p_key = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    elif have_did:
+        use_did = True
+        hr_key, lo_key, hi_key, p_key = ("did_hr", "did_ci_lo", "did_ci_hi", "did_p")
+    else:
+        use_did = False
+        hr_key, lo_key, hi_key, p_key = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
     for _, r in df.iterrows():
         p = r.get(p_key, np.nan)
         stars = _sig_stars(p) if pd.notna(p) else ""
@@ -799,7 +963,7 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
     detail_note = (
         r"\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD contrast (post-answer vs.\ pre-question, treated vs.\ control); comparable across bins.} \\"
         if use_did
-        else r"\multicolumn{5}{@{}l}{\footnotesize HR is the post-answer increment only (is\_treated\_active); not comparable across bins when the waiting-period term is nonzero.} \\"
+        else r"\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables.} \\"
     )
     lines += [
         r"\bottomrule",
@@ -828,27 +992,53 @@ def generate_selection_bounds_table(df: pd.DataFrame) -> str:
     df["scope_order"] = df["scope"].map(scope_order).fillna(999)
     df = df.sort_values(["scope_order", "assumed_control_zero_post_event_fraction"])
 
+    # ISS-24 re-headline: when "arrival", the Base HR column is the answer-arrival increment
+    # (beta_4) and the summed DiD is shown as a labeled secondary column (upper bound), when
+    # the CSV carries base_hr_summed. Adjusted RR is an independent event-rate proxy.
+    show_summed = (
+        HEADLINE_ESTIMAND == "arrival"
+        and "base_hr_summed" in df.columns
+        and df["base_hr_summed"].notna().any()
+    )
+    base_hr_hdr = r"\textbf{Base HR (arrival)}" if HEADLINE_ESTIMAND == "arrival" else r"\textbf{Base HR}"
+    n_cols = 6 if show_summed else 5
+    col_spec = r"@{}lrrrrr@{}" if show_summed else r"@{}lrrrr@{}"
+    summed_hdr = r" & \textbf{Summed HR (upper bnd)}" if show_summed else ""
     lines = [
         r"\begin{table}[H]",
         r"\caption{Selection Sensitivity Based on Zero Post-Question Helping}",
         r"\label{tab:selection_bounds}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lrrrr@{}}",
+        rf"\begin{{tabular}}{{{col_spec}}}",
         r"\toprule",
-        r"\textbf{Scope} & \textbf{Assumed frac.} & \textbf{Base HR} & \textbf{Control zero share} & \textbf{Adjusted RR proxy} \\",
+        rf"\textbf{{Scope}} & \textbf{{Assumed frac.}} & {base_hr_hdr}{summed_hdr} & \textbf{{Control zero share}} & \textbf{{Adjusted RR proxy}} \\",
         r"\midrule",
     ]
     for _, r in df.iterrows():
+        summed_cell = ""
+        if show_summed:
+            sv = r.get("base_hr_summed", np.nan)
+            summed_cell = rf" & {sv:.2f}" if pd.notna(sv) else r" & —"
         lines.append(
             rf"{_latex_bucket(str(r['scope']))} & {r['assumed_control_zero_post_event_fraction']:.2f} "
-            rf"& {r['base_hr']:.2f} & {r['control_zero_post_help_share'] * 100:.1f}\% "
+            rf"& {r['base_hr']:.2f}{summed_cell} & {r['control_zero_post_help_share'] * 100:.1f}\% "
             rf"& {r['adjusted_event_rate_rr_proxy']:.2f} \\"
         )
     lines += [
         r"\bottomrule",
-        r"\multicolumn{5}{@{}l}{\footnotesize Assumed frac. is the fraction of zero-post-help control questions assigned one latent help event.} \\",
-        r"\multicolumn{5}{@{}l}{\footnotesize Adjusted RR is an event-rate proxy, not a refitted Cox hazard ratio.} \\",
+        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Assumed frac. is the fraction of zero-post-help control questions assigned one latent help event.}} \\",
+        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Adjusted RR is an event-rate proxy, not a refitted Cox hazard ratio.}} \\",
+    ]
+    if show_summed:
+        lines.append(
+            rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Base HR is the answer-arrival increment ($\beta_4$); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound).}} \\"
+        )
+    elif HEADLINE_ESTIMAND == "arrival":
+        lines.append(
+            rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Base HR is the answer-arrival increment ($\beta_4$, is\_treated\_active); the summed DiD $\exp(\beta_2+\beta_4)$ is reported in the pooled tables.}} \\"
+        )
+    lines += [
         r"\end{tabular}",
         r"\end{table}",
     ]
@@ -859,9 +1049,19 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
     """Generate LaTeX table for matched-pair bootstrap uncertainty."""
     if df.empty or "bootstrap_hr_ci_lo" not in df.columns:
         return ""
+    # ISS-24 re-headline: the bootstrap CSV carries only SUMMED-DiD draws (base_hr =
+    # exp(beta_2+beta_4)). We do NOT fabricate arrival-increment draws; this table is
+    # explicitly labeled the summed DiD (upper bound). The headline treatment effect in the
+    # main/regression tables is the arrival increment (beta_4).
+    summed_caption = (
+        r"Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect "
+        r"(upper bound; Model A)"
+        if HEADLINE_ESTIMAND == "arrival"
+        else r"Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect (Model A)"
+    )
     lines = [
         r"\begin{table}[H]",
-        r"\caption{Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect (Model A)}",
+        rf"\caption{{{summed_caption}}}",
         r"\label{tab:pair_bootstrap}",
         r"\centering",
         r"\footnotesize",
@@ -885,6 +1085,12 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
     lines += [
         r"\bottomrule",
         r"\multicolumn{5}{@{}l}{\footnotesize Replicates resample whole matched pairs with replacement.} \\",
+    ]
+    if HEADLINE_ESTIMAND == "arrival":
+        lines.append(
+            r"\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD ($\exp(\beta_2+\beta_4)$, upper bound); the headline treatment effect elsewhere is the answer-arrival increment ($\beta_4$).} \\"
+        )
+    lines += [
         r"\end{tabular}",
         r"\end{table}",
     ]
@@ -901,13 +1107,18 @@ def generate_reciprocity_figure(df: pd.DataFrame):
     with 95% CI error bars.
     """
     df = df.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
-    # Prefer the summed DiD hazard ratio (post-answer vs pre-question, treated vs
-    # control); fall back to the legacy is_treated_active HR only if did_* is absent.
-    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
-    hr_col, lo_col, hi_col, p_col = (
-        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
-        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
-    )
+    # ISS-24 re-headline: under HEADLINE_ESTIMAND=="arrival" plot the answer-arrival
+    # increment (beta_4, is_treated_active) as the primary series so this headline figure
+    # matches the re-headlined tables; under "summed" plot the summed DiD. Fall back to
+    # whichever column set is present.
+    have_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    have_arrival = "treat_hr" in df.columns and df["treat_hr"].notna().any()
+    if HEADLINE_ESTIMAND == "arrival" and have_arrival:
+        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    elif have_did:
+        hr_col, lo_col, hi_col, p_col = ("did_hr", "did_ci_lo", "did_ci_hi", "did_p")
+    else:
+        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
     df = df.dropna(subset=[hr_col])
 
     fig, ax = plt.subplots(figsize=(8, 5))
@@ -1106,13 +1317,18 @@ def generate_interaction_effect_figure(
 
 def _plot_interaction_effect_bins(df: pd.DataFrame):
     """Connected dots and line for treatment effect (HR) by response time bin."""
-    # Prefer the summed DiD contrast so bins are comparable (the is_treated_active
-    # increment alone is not, because the waiting-period term varies with response time).
-    use_did = "did_hr" in df.columns and df["did_hr"].notna().any()
-    hr_col, lo_col, hi_col, p_col = (
-        ("did_hr", "did_ci_lo", "did_ci_hi", "did_p") if use_did
-        else ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
-    )
+    # ISS-24 re-headline: match the re-headlined response-time-bins TABLE. Under
+    # HEADLINE_ESTIMAND=="arrival" plot the per-bin answer-arrival increment (beta_4) as the
+    # primary series; under "summed" plot the summed DiD per bin. Both per-bin gradients are
+    # in the CSV; the summed contrast is also reported in the pooled tables.
+    have_did = "did_hr" in df.columns and df["did_hr"].notna().any()
+    have_arrival = "treat_hr" in df.columns and df["treat_hr"].notna().any()
+    if HEADLINE_ESTIMAND == "arrival" and have_arrival:
+        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    elif have_did:
+        hr_col, lo_col, hi_col, p_col = ("did_hr", "did_ci_lo", "did_ci_hi", "did_p")
+    else:
+        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
     labels = df["bucket"].tolist()
     hrs = df[hr_col].values
     ci_lo = df[lo_col].values

@@ -73,6 +73,12 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
         "HR_waiting": float(np.exp(waiting_coef)) if np.isfinite(waiting_coef) else float("nan"),
         "arrival_coef": float(inc["coef"]),                 # beta_4 (arrival increment)
         "HR_increment_only": float(np.exp(inc["coef"])),   # exp(beta_4), reference
+        # ISS-24 re-headline: full arrival uncertainty so create_figures can lead with the
+        # arrival increment (primary) and show the summed DiD as a labeled secondary column.
+        "arrival_se": float(inc["se(coef)"]),
+        "arrival_p": float(inc["p"]),
+        "arrival_ci_lo": float(np.exp(inc["coef lower 95%"])),
+        "arrival_ci_hi": float(np.exp(inc["coef upper 95%"])),
     }
 
 

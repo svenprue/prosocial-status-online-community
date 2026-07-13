@@ -163,6 +163,13 @@ def _extract_model_row(result, model_name: str, n_questions: int) -> dict | None
         "SE": combo["se"],
         "p": combo["p"],
         "HR_increment_only": float(np.exp(inc["coef"])),
+        # ISS-24 re-headline: arrival increment (beta_4) uncertainty for the arrival-primary
+        # column in create_figures.generate_revision_robustness_table.
+        "arrival_coef": float(inc["coef"]),
+        "arrival_se": float(inc["se(coef)"]),
+        "arrival_p": float(inc["p"]),
+        "arrival_ci_lo": float(np.exp(inc["coef lower 95%"])),
+        "arrival_ci_hi": float(np.exp(inc["coef upper 95%"])),
     }
 
 
@@ -235,7 +242,10 @@ def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use
             if pre_row is not None:
                 rows.append(pre_row)
 
-    results = pd.DataFrame(rows, columns=["model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p", "HR_increment_only"])
+    results = pd.DataFrame(rows, columns=[
+        "model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p", "HR_increment_only",
+        "arrival_coef", "arrival_se", "arrival_p", "arrival_ci_lo", "arrival_ci_hi",
+    ])
     out_path = os.path.join(CACHE_DIR, "results_cohort_robustness.csv")
     results.to_csv(out_path, index=False)
     print(f"✓ Saved cohort robustness results to {out_path}")

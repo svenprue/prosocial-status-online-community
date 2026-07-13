@@ -13,6 +13,18 @@ BUCKET_ORDER = [
 ROUND_TO_HOURS = 1
 MAX_FIT_ROWS = 8_000_000
 SUBSAMPLE_SEED = 42
+
+# ISS-24 re-headline: which estimand LEADS the reported tables/figures. Reversible
+# config switch. "arrival" = the answer-arrival increment (beta_4 = is_treated_active),
+# reported as PRIMARY; "summed" = the summed DiD (beta_2 + beta_4). Under either value,
+# create_figures.py always shows BOTH — the non-headline estimand becomes a labeled
+# secondary row/column and beta_2 is shown as a pre-trend diagnostic. Never delete the
+# summed computation.
+HEADLINE_ESTIMAND = "arrival"  # "arrival" | "summed"
+
+# fix(cache): bump when the data/covariate construction changes so stale model/interval
+# caches miss instead of silently mixing generations. Backward-safe (old caches just miss).
+DATA_VERSION = "rev1"
 # Cap concurrent lifelines fits (each can hold up to MAX_FIT_ROWS). Override via
 # --n-jobs / COX_MAX_FIT_WORKERS; default keeps Stage-6 RT-bin and bootstrap pools
 # from OOM'ing when cpu_count is large.
@@ -29,6 +41,18 @@ CONTINUOUS_COVARIATES = [
     "treated_response_time_interaction",
     "treated_post_question_response_time_interaction",
 ]
+
+# fix(scale): the three response-time interaction terms are now built in
+# cox_data._build_covariates from a SINGLE standardized log-RT (standardized once on
+# the treated rows), so they already share a common scale. fit_cox_cached must therefore
+# SKIP its per-column winsorize+z-score for these (which would re-scale each by its own
+# nonzero-row SD and make gamma+delta a sum of differently-scaled coefficients). They
+# remain counted for has_continuous / penalizer / step_size.
+RT_INTERACTION_TERMS = {
+    "hasAnswer_response_time_interaction",
+    "treated_response_time_interaction",
+    "treated_post_question_response_time_interaction",
+}
 
 COVARIATES_MAIN = [
     "hasAnswer",

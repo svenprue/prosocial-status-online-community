@@ -1,6 +1,7 @@
 """Cox model fitting: cached fitter, tenure-bucket models, all-data and RT-bin models."""
 import os
 import pickle
+import hashlib
 import time as timer
 import inspect
 from multiprocessing import Pool, cpu_count
@@ -15,6 +16,7 @@ from cox_config import (
     ROUND_TO_HOURS,
     CONTINUOUS_COVARIATES,
     CONTINUOUS_COVARIATES_EXTENDED,
+    RT_INTERACTION_TERMS,
     MAX_FIT_ROWS,
     MAX_FIT_WORKERS,
     SUBSAMPLE_SEED,
@@ -24,6 +26,7 @@ from cox_config import (
     RT_BIN_LABELS,
     VARIANCE_ESTIMATOR,
     CLUSTER_COL,
+    DATA_VERSION,
 )
 
 
@@ -102,6 +105,31 @@ def _did_fields(res, terms=DID_TERMS, prefix="did"):
     return {f"{prefix}_{k}": combo[k] for k in keys}
 
 
+def _arrival_fields(summary, term="is_treated_active", prefix="arrival"):
+    """ISS-24 re-headline: emit the ARRIVAL increment (a single fitted coefficient) with a
+    normal-approx 95% CI (exp(coef ± 1.96·se)) so every results CSV carries
+    {prefix}_coef/se/p/hr/ci_lo/ci_hi alongside the summed did_* fields. create_figures then
+    picks the primary reported effect per HEADLINE_ESTIMAND while keeping both visible.
+
+    For the headline treatment effect pass term='is_treated_active' (beta_4). For the RT
+    moderation pass term='treated_response_time_interaction' (gamma) with prefix='arr_speed'.
+    Returns all-NaN fields if the term is absent (keeps CSV columns consistent)."""
+    keys = ["coef", "se", "p", "hr", "ci_lo", "ci_hi"]
+    if term not in summary.index:
+        return {f"{prefix}_{k}": float("nan") for k in keys}
+    coef = float(summary.loc[term, "coef"])
+    se = float(summary.loc[term, "se(coef)"])
+    p = float(summary.loc[term, "p"])
+    return {
+        f"{prefix}_coef": coef,
+        f"{prefix}_se": se,
+        f"{prefix}_p": p,
+        f"{prefix}_hr": float(np.exp(coef)),
+        f"{prefix}_ci_lo": float(np.exp(coef - 1.96 * se)),
+        f"{prefix}_ci_hi": float(np.exp(coef + 1.96 * se)),
+    }
+
+
 class CachedCoxResult:
     """Lightweight proxy for a fitted CoxTimeVaryingFitter."""
 
@@ -146,7 +174,11 @@ def fit_cox_cached(
         round_to_hours = ROUND_TO_HOURS
     base_suffix = f"_{round_to_hours}h" if round_to_hours and round_to_hours != 0.1 else ""
     variance_suffix = f"_{VARIANCE_ESTIMATOR}" if robust else ""
-    cache_name = f"{model_name}{base_suffix}{variance_suffix}"
+    # fix(cache): key on DATA_VERSION and a short hash of the (sorted) covariate list, so
+    # two specs that share a model_name but differ in covariates — or a rerun after a data
+    # rebuild — get distinct cache files instead of colliding. Backward-safe (old names miss).
+    cov_hash = hashlib.md5(",".join(sorted(covariates)).encode("utf-8")).hexdigest()[:8]
+    cache_name = f"{model_name}{base_suffix}{variance_suffix}_{DATA_VERSION}_{cov_hash}"
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = _model_path(cache_name)
 
@@ -159,7 +191,12 @@ def fit_cox_cached(
             print(f"  ⚠ Cache load failed ({e}), refitting…")
 
     keep = ["unique_id", "start", "stop", "event_occurred"] + covariates
-    extra = [cluster_col] if robust and cluster_col and cluster_col in subset_df.columns else []
+    # fix(subsample): retain match_id (when present) through the subsample step for BOTH
+    # robust and non-robust fits, so the >MAX_FIT_ROWS block below takes its match_id branch
+    # and keeps matched pairs together (the "matched-pair subsample" the footnote promises),
+    # instead of falling through to the unique_id branch. match_id is dropped before ctv.fit
+    # (below) whenever it is not the active cluster column, so it is never fit as a covariate.
+    extra = [cluster_col] if cluster_col and cluster_col in subset_df.columns else []
     fit_df = subset_df[[c for c in keep + extra if c in subset_df.columns]].copy()
     if round_to_hours and round_to_hours > 0:
         fit_df["start"] = (fit_df["start"] / round_to_hours).round() * round_to_hours
@@ -199,6 +236,13 @@ def fit_cox_cached(
     for col in covariates:
         if col not in fit_df.columns or col not in CONTINUOUS_COVARIATES_EXTENDED:
             continue
+        # fix(scale): the RT interaction terms are pre-standardized in cox_data on a single
+        # common (treated-row) scale. Re-winsorizing/z-scoring them here — each by its own
+        # nonzero-row SD — would re-break the common scale and make gamma+delta an invalid
+        # sum of differently-scaled coefficients. Skip them, but keep them counted for
+        # has_continuous / penalizer / step_size (they stay in CONTINUOUS_COVARIATES_EXTENDED).
+        if col in RT_INTERACTION_TERMS:
+            continue
         q05, q95 = fit_df[col].quantile([0.05, 0.95])
         fit_df[col] = fit_df[col].clip(lower=q05, upper=q95)
         mu, sigma = fit_df[col].mean(), fit_df[col].std()
@@ -219,6 +263,20 @@ def fit_cox_cached(
             f"Requested clustered Cox SEs with cluster_col='{cluster_col}', but that column is absent. "
             "Regenerate the model dataframe or call fit_cox_cached(..., robust=False)."
         )
+
+    # fix(subsample): match_id was retained above only so the matched-pair subsample keeps
+    # pairs together. Drop it (and any other non-covariate id column) now — before the fit —
+    # so lifelines does not treat it as a covariate. Keep it ONLY when it is the active
+    # cluster column (the robust/cluster path passes it via cluster_col / robust below).
+    # Derive the drop list from the retained id columns (`extra`), not a hardcoded
+    # ["match_id"], so a non-default cluster_col passed with robust=False is also dropped
+    # rather than silently fit as a covariate.
+    drop_before_fit = [
+        c for c in extra
+        if c in fit_df.columns and c not in covariates and c != cluster_for_fit
+    ]
+    if drop_before_fit:
+        fit_df = fit_df.drop(columns=drop_before_fit)
     variance_label = f"clustered by {cluster_for_fit}" if cluster_for_fit else "model-based"
     print(
         f"  Fitting '{cache_name}' — {len(fit_df):,} rows, {n_events_fit:,} fit events"
@@ -332,6 +390,9 @@ def _fit_one_rt_bin(args):
     # is comparable across bins. `treat_*` alone is only the post-answer increment and is
     # not comparable across response-time bins (the waiting-period term varies with RT).
     row.update(_did_fields(res))
+    # ISS-24 re-headline: also carry the arrival increment (beta_4) with its own CI so the
+    # per-bin table can lead with arrival when HEADLINE_ESTIMAND=="arrival".
+    row.update(_arrival_fields(s))
     return (label, row)
 
 
@@ -428,6 +489,8 @@ def _fit_one_tenure_bucket(args):
     }
     # Summed DiD treatment effect (post- vs pre-question baseline, treated vs control).
     main_row.update(_did_fields(res_a))
+    # ISS-24 re-headline: arrival increment (beta_4) with its own CI, primary under "arrival".
+    main_row.update(_arrival_fields(s_a))
 
     res_b = fit_cox_cached(subset, f"ModelB_{bucket}", COVARIATES_SPEED, use_cache=use_cache, round_to_hours=round_to_hours, initial_point=None)
     if res_b is None:
@@ -454,6 +517,10 @@ def _fit_one_tenure_bucket(args):
     # interaction terms (`did_speed_*`), not `speed_coef` alone.
     speed_row.update(_did_fields(res_b, prefix="did"))
     speed_row.update(_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"))
+    # ISS-24 re-headline: arrival base increment (beta_4) and the arrival RT moderation
+    # (gamma = treated_response_time_interaction) with their own CIs, primary under "arrival".
+    speed_row.update(_arrival_fields(s_b))
+    speed_row.update(_arrival_fields(s_b, term="treated_response_time_interaction", prefix="arr_speed"))
     return (bucket, main_row, speed_row)
 
 
@@ -516,6 +583,8 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "gap_hr": np.exp(s_a.loc["treated_post_question", "coef"]),
         "gap_p": s_a.loc["treated_post_question", "p"],
         **_did_fields(res_a),
+        # ISS-24 re-headline: arrival increment (beta_4) with its own CI.
+        **_arrival_fields(s_a),
     }]
     results_speed_all = [{
         "model": "AllData_Speed",
@@ -535,6 +604,10 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "speed_p": s_b.loc["treated_response_time_interaction", "p"],
         **_did_fields(res_b),
         **_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"),
+        # ISS-24 re-headline: arrival base increment (beta_4) and arrival RT moderation
+        # (gamma = treated_response_time_interaction), each with its own CI.
+        **_arrival_fields(s_b),
+        **_arrival_fields(s_b, term="treated_response_time_interaction", prefix="arr_speed"),
     }]
     df_main_all = pd.DataFrame(results_main_all)
     df_speed_all = pd.DataFrame(results_speed_all)

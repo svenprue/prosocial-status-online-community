@@ -24,7 +24,7 @@ _ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ANALYSIS_DIR not in sys.path:
     sys.path.insert(0, _ANALYSIS_DIR)
 
-from cox_config import BUCKET_ORDER, CACHE_DIR
+from cox_config import BUCKET_ORDER, CACHE_DIR, HEADLINE_ESTIMAND
 from cox_data import create_tenure_buckets
 
 
@@ -99,22 +99,34 @@ def compute_churn_summary(input_folder: str) -> pd.DataFrame:
 
 
 def _base_hr_fields(r: pd.Series) -> dict:
-    """Prefer the summed DiD (did_*) columns; fall back to legacy is_treated_active."""
-    if pd.notna(r.get("did_hr", np.nan)):
-        return {
-            "base_hr": r.get("did_hr", np.nan),
-            "base_ci_lo": r.get("did_ci_lo", np.nan),
-            "base_ci_hi": r.get("did_ci_hi", np.nan),
-            "base_se": r.get("did_se", np.nan),
-            "base_p": r.get("did_p", np.nan),
-        }
-    return {
+    """ISS-24 re-headline: the PRIMARY base HR is the answer-arrival increment (treat_* =
+    is_treated_active, beta_4) when HEADLINE_ESTIMAND=="arrival"; the summed DiD (did_*) is
+    carried alongside as base_hr_summed/base_ci_*_summed. Under "summed" the primary reverts
+    to the summed DiD. Both are always emitted so the bounds table can show both."""
+    summed = {
+        "base_hr_summed": r.get("did_hr", np.nan),
+        "base_ci_lo_summed": r.get("did_ci_lo", np.nan),
+        "base_ci_hi_summed": r.get("did_ci_hi", np.nan),
+    }
+    arrival = {
         "base_hr": r.get("treat_hr", np.nan),
         "base_ci_lo": r.get("treat_ci_lo", np.nan),
         "base_ci_hi": r.get("treat_ci_hi", np.nan),
         "base_se": r.get("treat_se", np.nan),
         "base_p": r.get("treat_p", np.nan),
     }
+    summed_primary = {
+        "base_hr": r.get("did_hr", np.nan),
+        "base_ci_lo": r.get("did_ci_lo", np.nan),
+        "base_ci_hi": r.get("did_ci_hi", np.nan),
+        "base_se": r.get("did_se", np.nan),
+        "base_p": r.get("did_p", np.nan),
+    }
+    if HEADLINE_ESTIMAND == "arrival" and pd.notna(r.get("treat_hr", np.nan)):
+        return {**arrival, **summed}
+    if pd.notna(r.get("did_hr", np.nan)):
+        return {**summed_primary, **summed}
+    return {**arrival, **summed}
 
 
 def _base_model_rows(cache_dir: str) -> pd.DataFrame:
@@ -177,6 +189,10 @@ def compute_sensitivity_bounds(
                 "base_ci_hi": model["base_ci_hi"],
                 "base_se": model["base_se"],
                 "base_p": model["base_p"],
+                # ISS-24: summed DiD base HR carried as a labeled secondary (upper bound).
+                "base_hr_summed": model.get("base_hr_summed", np.nan),
+                "base_ci_lo_summed": model.get("base_ci_lo_summed", np.nan),
+                "base_ci_hi_summed": model.get("base_ci_hi_summed", np.nan),
                 "treated_n": int(treated["n_questions"]),
                 "control_n": int(control["n_questions"]),
                 "treated_post_help_event_rate": treated_rate,

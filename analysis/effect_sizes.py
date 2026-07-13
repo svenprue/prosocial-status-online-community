@@ -31,7 +31,7 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from cox_config import BUCKET_ORDER, CACHE_DIR  # noqa: E402
+from cox_config import BUCKET_ORDER, CACHE_DIR, HEADLINE_ESTIMAND  # noqa: E402
 
 MAIN_PATH = os.path.join(CACHE_DIR, "results_main.csv")
 MAIN_ALL_PATH = os.path.join(CACHE_DIR, "results_main_all.csv")
@@ -91,42 +91,58 @@ def _baseline_event_rate(row: pd.Series, descriptives: dict) -> float:
     return float(n_events) / float(n_questions)
 
 
-def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict:
-    baseline = _baseline_event_rate(row, descriptives)
-    # Prefer the summed DiD contrast (treated_post_question + is_treated_active). The raw
-    # is_treated_active HR is only the post-answer increment over the waiting-period term,
-    # not the treatment effect, so ARD/NNT built on it would carry the wrong sign.
-    if pd.notna(row.get("did_hr")) or pd.notna(row.get("did_coef")):
-        hr = float(row["did_hr"]) if pd.notna(row.get("did_hr")) else float(np.exp(float(row["did_coef"])))
-        hr_ci_lo = row.get("did_ci_lo")
-        hr_ci_hi = row.get("did_ci_hi")
-        coef_used = row.get("did_coef")
-        hr_source = "did_sum"
-    else:
-        hr = row.get("treat_hr")
-        if pd.isna(hr) and pd.notna(row.get("treat_coef")):
-            hr = float(np.exp(float(row["treat_coef"])))
-        hr_ci_lo = row.get("treat_ci_lo")
-        hr_ci_hi = row.get("treat_ci_hi")
-        coef_used = row.get("treat_coef")
-        hr_source = "is_treated_active"
-
+def _ard_nnt(baseline: float, hr, hr_ci_lo, hr_ci_hi) -> dict:
+    """Absolute-risk-difference proxy and NNT (with CI) for a hazard ratio."""
     ard = baseline * (float(hr) - 1.0) if pd.notna(baseline) and pd.notna(hr) else np.nan
     ard_ci_lo = baseline * (float(hr_ci_lo) - 1.0) if pd.notna(baseline) and pd.notna(hr_ci_lo) else np.nan
     ard_ci_hi = baseline * (float(hr_ci_hi) - 1.0) if pd.notna(baseline) and pd.notna(hr_ci_hi) else np.nan
-
     nnt = 1.0 / ard if pd.notna(ard) and ard > 0 else np.nan
-    if (
-        pd.notna(ard_ci_lo)
-        and pd.notna(ard_ci_hi)
-        and ard_ci_lo > 0
-        and ard_ci_hi > 0
-    ):
+    if pd.notna(ard_ci_lo) and pd.notna(ard_ci_hi) and ard_ci_lo > 0 and ard_ci_hi > 0:
         nnt_ci_lo = 1.0 / ard_ci_hi
         nnt_ci_hi = 1.0 / ard_ci_lo
     else:
         nnt_ci_lo = np.nan
         nnt_ci_hi = np.nan
+    return {
+        "ard": ard, "ard_ci_lo": ard_ci_lo, "ard_ci_hi": ard_ci_hi,
+        "nnt": nnt, "nnt_ci_lo": nnt_ci_lo, "nnt_ci_hi": nnt_ci_hi,
+    }
+
+
+def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict:
+    baseline = _baseline_event_rate(row, descriptives)
+
+    # ISS-24 re-headline: base the PRIMARY absolute effect (HR/ARD/NNT) on the answer-arrival
+    # increment (beta_4 = is_treated_active) when HEADLINE_ESTIMAND=="arrival". Keep the
+    # SUMMED DiD (exp(beta_2+beta_4)) as a labeled secondary set of columns. Under "summed"
+    # the primary reverts to the summed DiD (the prior behavior).
+    summed_hr = (
+        float(row["did_hr"]) if pd.notna(row.get("did_hr"))
+        else (float(np.exp(float(row["did_coef"]))) if pd.notna(row.get("did_coef")) else np.nan)
+    )
+    summed_ci_lo, summed_ci_hi = row.get("did_ci_lo"), row.get("did_ci_hi")
+    summed_coef = row.get("did_coef")
+
+    arrival_hr = row.get("treat_hr")
+    if pd.isna(arrival_hr) and pd.notna(row.get("treat_coef")):
+        arrival_hr = float(np.exp(float(row["treat_coef"])))
+    arrival_ci_lo = row.get("arrival_ci_lo", row.get("treat_ci_lo"))
+    arrival_ci_hi = row.get("arrival_ci_hi", row.get("treat_ci_hi"))
+    arrival_coef = row.get("treat_coef")
+
+    use_arrival = HEADLINE_ESTIMAND == "arrival" and pd.notna(arrival_hr)
+    if use_arrival:
+        hr, hr_ci_lo, hr_ci_hi = arrival_hr, arrival_ci_lo, arrival_ci_hi
+        coef_used, hr_source = arrival_coef, "is_treated_active (arrival)"
+    elif pd.notna(summed_hr):
+        hr, hr_ci_lo, hr_ci_hi = summed_hr, summed_ci_lo, summed_ci_hi
+        coef_used, hr_source = summed_coef, "did_sum"
+    else:
+        hr, hr_ci_lo, hr_ci_hi = arrival_hr, arrival_ci_lo, arrival_ci_hi
+        coef_used, hr_source = arrival_coef, "is_treated_active"
+
+    primary = _ard_nnt(baseline, hr, hr_ci_lo, hr_ci_hi)
+    summed = _ard_nnt(baseline, summed_hr, summed_ci_lo, summed_ci_hi)
 
     return {
         "source_file": source_name,
@@ -142,12 +158,18 @@ def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict
         "treat_hr": hr,
         "treat_ci_lo": hr_ci_lo,
         "treat_ci_hi": hr_ci_hi,
-        "absolute_risk_difference_proxy": ard,
-        "ard_ci_lo": ard_ci_lo,
-        "ard_ci_hi": ard_ci_hi,
-        "nnt": nnt,
-        "nnt_ci_lo": nnt_ci_lo,
-        "nnt_ci_hi": nnt_ci_hi,
+        "absolute_risk_difference_proxy": primary["ard"],
+        "ard_ci_lo": primary["ard_ci_lo"],
+        "ard_ci_hi": primary["ard_ci_hi"],
+        "nnt": primary["nnt"],
+        "nnt_ci_lo": primary["nnt_ci_lo"],
+        "nnt_ci_hi": primary["nnt_ci_hi"],
+        # Secondary (summed DiD, upper bound) — kept visible per ISS-24.
+        "summed_hr": summed_hr,
+        "summed_ci_lo": summed_ci_lo,
+        "summed_ci_hi": summed_ci_hi,
+        "summed_ard": summed["ard"],
+        "summed_nnt": summed["nnt"],
     }
 
 
@@ -204,12 +226,14 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
         r"\label{tab:absolute_effects}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lrrrrr@{}}",
+        r"\begin{tabular}{@{}lrrrrrr@{}}",
         r"\toprule",
-        r"\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} \\",
+        r"\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} & \textbf{Summed HR} \\",
         r"\midrule",
     ]
 
+    # ISS-24 re-headline: primary HR/ARD/NNT are the answer-arrival increment (when
+    # HEADLINE_ESTIMAND=="arrival"); the summed DiD HR is shown as a labeled upper bound.
     for _, row in df.iterrows():
         nnt_ci = "—"
         if pd.notna(row.get("nnt_ci_lo")) and pd.notna(row.get("nnt_ci_hi")):
@@ -223,6 +247,7 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
                     _fmt_num(row.get("absolute_risk_difference_proxy"), 5),
                     _fmt_num(row.get("nnt"), 1),
                     nnt_ci,
+                    _fmt_num(row.get("summed_hr"), 3),
                 ]
             )
             + r" \\"
@@ -230,6 +255,7 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
 
     lines += [
         r"\bottomrule",
+        r"\multicolumn{7}{@{}l}{\footnotesize HR/ARD/NNT are the primary (headline) estimand; ``Summed HR'' is the summed DiD ($\exp(\beta_2+\beta_4)$, upper bound).} \\",
         r"\end{tabular}",
         r"\end{table}",
     ]

@@ -4,7 +4,7 @@ import pickle
 import pandas as pd
 import numpy as np
 
-from cox_config import BUCKET_ORDER, DATA_CACHE_DIR
+from cox_config import BUCKET_ORDER, DATA_CACHE_DIR, DATA_VERSION
 
 
 def create_tenure_buckets(df: pd.DataFrame) -> pd.DataFrame:
@@ -120,19 +120,41 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
         (full_df["hasAnswer"] == 1) & (full_df["phase_post"] == 1)
     ).astype(int)
 
+    # fix(scale): standardize log-RT ONCE, on the treated rows with a positive response
+    # time, and build ALL THREE RT interaction terms from that single standardized log-RT.
+    # Previously each interaction was z-scored downstream by its OWN nonzero-row SD (in
+    # fit_cox_cached), so gamma (treated_response_time_interaction) and delta
+    # (treated_post_question_response_time_interaction) lived on different scales and their
+    # sum gamma+delta was not a valid net moderation. A single common scale fixes that;
+    # fit_cox_cached now skips re-scaling these (see RT_INTERACTION_TERMS).
     full_df["log_response_time"] = np.where(
         full_df["hasAnswer"] == 1,
         np.log1p(np.maximum(full_df["t_answer"] - full_df["t_question"], 0)),
         0.0,
     )
+    rt_std_mask = (full_df["hasAnswer"] == 1) & (
+        (full_df["t_answer"] - full_df["t_question"]) > 0
+    )
+    rt_ref = full_df.loc[rt_std_mask, "log_response_time"]
+    rt_mu = float(rt_ref.mean()) if len(rt_ref) else 0.0
+    rt_sd = float(rt_ref.std()) if len(rt_ref) > 1 else 0.0
+    if not (rt_sd and rt_sd > 0):
+        rt_sd = 1.0  # degenerate/absent RT: fall back to unit scale (no division blow-up)
+    # Standardized log-RT is defined only on treated rows; control rows keep 0 so the
+    # indicator-multiplied interactions stay 0 for controls (as before).
+    log_rt_std = np.where(
+        full_df["hasAnswer"] == 1,
+        (full_df["log_response_time"] - rt_mu) / rt_sd,
+        0.0,
+    )
     full_df["hasAnswer_response_time_interaction"] = np.where(
-        full_df["hasAnswer"] == 1, full_df["log_response_time"], 0.0
+        full_df["hasAnswer"] == 1, log_rt_std, 0.0
     )
     full_df["treated_response_time_interaction"] = (
-        full_df["is_treated_active"] * full_df["log_response_time"]
+        full_df["is_treated_active"] * log_rt_std
     )
     full_df["treated_post_question_response_time_interaction"] = (
-        full_df["treated_post_question"] * full_df["log_response_time"]
+        full_df["treated_post_question"] * log_rt_std
     )
 
     full_df["response_time_hours"] = np.where(
@@ -165,6 +187,30 @@ def _build_covariates(intervals: pd.DataFrame, timelines: pd.DataFrame) -> pd.Da
             control_mask = full_df["hasAnswer"] == 0
             full_df.loc[control_mask, acol] = full_df.loc[control_mask, acol].fillna(0.0)
 
+    # fix(fillna): guard asymmetric attrition. We just filled answer-quality NaNs to 0 for
+    # CONTROL rows only (a control has no answer, so 0 is the correct absence value). A
+    # TREATED row with a NaN in these answer-derived columns is NOT filled here (0 is a
+    # real score/length, not "missing"), so it is later dropped by the answer-quality
+    # spec's per-model dropna in fit_cox_cached — while its matched control survives. That
+    # asymmetric attrition biases the treated-vs-control DiD. We do not silently fill; we
+    # warn so the count is visible and can be triaged.
+    quality_cols = [
+        c for c in ["hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars"]
+        if c in full_df.columns
+    ]
+    if quality_cols:
+        treated_nan_mask = (full_df["hasAnswer"] == 1) & full_df[quality_cols].isna().any(axis=1)
+        n_treated_nan_rows = int(treated_nan_mask.sum())
+        if n_treated_nan_rows > 0:
+            n_affected_questions = int(full_df.loc[treated_nan_mask, "question_id"].nunique())
+            print(
+                f"  ⚠ fix(fillna): {n_treated_nan_rows:,} TREATED interval rows "
+                f"({n_affected_questions:,} questions) carry NaN in answer-quality covariates "
+                f"{quality_cols}. These treated rows (not their matched controls) will be "
+                "dropped by the answer-quality spec's dropna → asymmetric attrition. NOT "
+                "auto-filling to 0 (0 is a real score/length)."
+            )
+
     # Columns that must be present on every retained row. The optional selection/quality
     # covariates below are deliberately NOT part of this list: each Cox spec drops its own
     # covariate-specific NaNs in fit_cox_cached (dropna(subset=keep)). Dropping on them
@@ -194,7 +240,9 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
     os.makedirs(DATA_CACHE_DIR, exist_ok=True)
     help_tag = "" if not event_help_types else "_" + "_".join(event_help_types)
     cache_tag = f"sample_{sample_size}" if sample_size else "full"
-    cache_tag = f"{cache_tag}{help_tag}"
+    # fix(cache): tag the interval cache with DATA_VERSION so a data-construction bump
+    # (e.g. the fix(scale) RT re-standardization) does not silently reuse stale intervals.
+    cache_tag = f"{cache_tag}{help_tag}_{DATA_VERSION}"
     interval_cache = os.path.join(DATA_CACHE_DIR, f"intervals_{cache_tag}.parquet")
     desc_cache = os.path.join(DATA_CACHE_DIR, f"descriptives_{cache_tag}.pkl")
 

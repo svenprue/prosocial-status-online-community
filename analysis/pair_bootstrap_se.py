@@ -396,8 +396,14 @@ def _bootstrap_sample_by_match(
 ) -> pd.DataFrame:
     """Resample whole pairs; prefix unique_id so with-replacement draws stay distinct.
 
-    match_id is left unchanged: fit_cox_cached(robust=False) drops it before the
-    MAX_FIT_ROWS downsample (which uses unique_id), so rebuilding match_id is pure waste.
+    ISS-24 fix(subsample) interaction: fit_cox_cached now RETAINS match_id through its
+    MAX_FIT_ROWS downsample so real matched pairs stay together. But a bootstrap replicate
+    deliberately draws the SAME match_id multiple times (distinctness is carried by the
+    draw-prefixed unique_id, not match_id). If we handed the duplicated match_id to
+    fit_cox_cached, its matched-pair subsample would collapse those repeated draws. So we
+    DROP match_id here: the replicate's resampling unit is the prefixed unique_id, and
+    fit_cox_cached(robust=False) does not need match_id (it would drop it before the fit
+    anyway). This keeps the replicate on the unique_id downsample path, as before.
     """
     sampled = _draw_match_ids(unique_ids, rng, max_pairs=max_pairs)
     n_pairs = len(sampled)
@@ -405,7 +411,7 @@ def _bootstrap_sample_by_match(
     boot = draws.merge(df, on="match_id", how="left", sort=False)
     draw_prefix = boot["_boot_draw"].astype(str)
     boot["unique_id"] = draw_prefix + "_" + boot["unique_id"].astype(str)
-    return boot.drop(columns=["_boot_draw"])
+    return boot.drop(columns=["_boot_draw", "match_id"])
 
 
 def _coef_from_result(result) -> float | None:
