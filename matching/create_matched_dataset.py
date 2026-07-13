@@ -117,11 +117,12 @@ def _jaccard_tag_overlap(a, b):
 def match_single_year_group(year, year_data, treatment_col, z_covariates, caliper,
                             tag_ids_col=None, max_neighbors_for_tiebreak=100):
     """
-    Worker function to perform PSM.
-    If tag_ids_col is set, among controls within caliper the one with highest
-    Jaccard tag overlap to the treated unit is chosen (tie-breaker); controls
-    are used at most once when possible.
-    Returns a list of dicts mapping global_index to a unique match_id.
+    Worker function to perform PSM (nearest-neighbor, WITH replacement).
+    Each treated unit is paired with its best control within the caliper: highest
+    Jaccard tag overlap to the treated unit (if tag_ids_col is set), then nearest
+    propensity score. A control may be matched to more than one treated unit; the
+    reuse count (M_i) is summarized and recorded downstream (control_reuse_count).
+    Returns a list of dicts mapping global_index to a match_id.
     """
     if year_data[treatment_col].nunique() < 2:
         return []
@@ -155,29 +156,28 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
 
     match_records = []
     pair_counter = 0
-    used_control_positions = set()
 
     for i in range(len(treated)):
         dist_i = distances[i]
         ind_i = indices[i]
-        # Candidates: controls within caliper (by propensity distance) that have NOT
-        # already been matched to another treated unit — 1:1 matching WITHOUT
-        # replacement so each control appears in at most one pair (pairs stay
-        # independent for downstream inference).
+        # Candidates: controls within caliper (by propensity distance). Matching is
+        # WITH replacement: a control may be matched to more than one treated unit, so
+        # already-used controls are NOT excluded — each treated unit gets its
+        # closest/best control. This lowers bias and keeps every treated unit that has
+        # any within-caliper control (important here, where controls are the minority).
+        # Reuse (M_i) is recorded downstream as control_reuse_count for weighting/SEs.
         if caliper is not None:
             within = np.where(dist_i <= caliper)[0]
         else:
             within = np.arange(len(ind_i))
-        within = [int(j) for j in within if ind_i[j] not in used_control_positions]
         if len(within) == 0:
-            # No unused control within caliper: leave this treated unit unmatched
-            # rather than reusing a control.
+            # No control within caliper for this treated unit: leave it unmatched.
             continue
 
-        # Among the unused candidates, choose by Jaccard tag overlap if available
+        # Choose the best control: highest Jaccard tag overlap, then nearest PS distance.
         if tag_ids_col and tag_ids_col in treated.columns and tag_ids_col in control.columns:
             t_tags = treated.iloc[i][tag_ids_col]
-            # (control_df_position, jaccard, ps_distance); prefer higher Jaccard, then nearer PS
+            # (control_df_position, jaccard, ps_distance)
             candidates_with_j = [
                 (ind_i[j], _jaccard_tag_overlap(t_tags, control.iloc[ind_i[j]][tag_ids_col]), dist_i[j])
                 for j in within
@@ -185,10 +185,9 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
             candidates_with_j.sort(key=lambda x: (-x[1], x[2]))
             c_pos_in_control = candidates_with_j[0][0]
         else:
-            # No tie-breaker: use nearest unused control within caliper (within is ordered by distance)
+            # No tie-breaker: nearest control within caliper (within is ordered by distance)
             c_pos_in_control = ind_i[within[0]]
 
-        used_control_positions.add(c_pos_in_control)
         match_id = f"{year}_{pair_counter}"
         t_indices = treated.iloc[i]['all_indices']
         c_indices = control.iloc[c_pos_in_control]['all_indices']
@@ -305,13 +304,31 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     print(f"  Matches: {n_pairs:,} pairs → {n_matched_rows:,} rows (each pair = 1 treated + 1 control question)")
     n_unmatched_treated = max(0, n_treated_available - n_pairs)
     print(f"  Treated questions matched: {n_pairs:,} / {n_treated_available:,} eligible "
-          f"({n_unmatched_treated:,} left unmatched — no unused control within caliper).")
+          f"({n_unmatched_treated:,} left unmatched — no control within caliper).")
 
     # Merge the match_id back to the original work_df
     final_matched_df = pd.merge(match_mapping, work_df, on='global_index', how='inner')
     n_t_matched = (final_matched_df[treatment_col] == 1).sum()
     n_c_matched = (final_matched_df[treatment_col] == 0).sum()
     print(f"  Matched sample: treated (hasAnswer=1) {n_t_matched:,}, control (hasAnswer=0) {n_c_matched:,}")
+
+    # With-replacement reuse weight M_i: number of pairs each control question is in.
+    # Treated rows get 1. A control reused in M_i pairs already appears in M_i rows, so
+    # the row-duplicated matched sample IS the M_i-weighted ATT sample (no extra weight
+    # needed for the point estimate/balance); this column exposes M_i for optional
+    # control-clustered SEs and for reporting the reuse distribution.
+    final_matched_df['control_reuse_count'] = 1
+    ctrl_mask = final_matched_df[treatment_col] == 0
+    if ctrl_mask.any() and 'questionId' in final_matched_df.columns:
+        reuse = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].transform('nunique')
+        final_matched_df.loc[reuse.index, 'control_reuse_count'] = reuse
+        mi = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].nunique()
+        n_distinct_controls = int(mi.shape[0])
+        sq = float(mi.pow(2).sum())
+        eff = float(mi.sum() ** 2 / sq) if sq > 0 else float('nan')
+        print(f"  Control reuse (with replacement): {n_distinct_controls:,} distinct controls across "
+              f"{n_pairs:,} pairs; max M_i={int(mi.max())}, mean={mi.mean():.2f}, "
+              f"reused>1x={(mi > 1).mean() * 100:.1f}%; effective #controls (Kish)≈{eff:,.0f}")
 
     gc.collect()
     return final_matched_df
