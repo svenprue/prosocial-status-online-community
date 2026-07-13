@@ -1,4 +1,5 @@
 import ast
+import json
 import pickle
 import sys
 import os
@@ -28,6 +29,10 @@ TAG_DICTIONARY_PATH = _BASE_DIR / "data" / "input" / "question_centered_model_7d
 BALANCE_TEX_PATH = _SCRIPT_DIR / "balance_check.tex"
 PLOT_COMMON_SUPPORT = _SCRIPT_DIR / "common_support.pdf"
 PLOT_LOVE = _SCRIPT_DIR / "love_plot.pdf"
+# Slim pre-match pool + covariate list persisted so refresh_matching_plots.py can
+# regenerate diagnostics against exactly the data/covariates matching used.
+PREMATCH_POOL_PATH = _BASE_DIR / "data" / "input" / "prematch_pool.parquet"
+PREMATCH_COVS_PATH = _BASE_DIR / "data" / "input" / "prematch_covariates.json"
 
 TOP_K_TAGS = 50  # used only for tie-break / reference; PSM uses tag accept-share summary
 MAX_NEIGHBORS_FOR_TIEBREAK = 100  # number of nearest controls to consider for Jaccard tie-break
@@ -68,7 +73,11 @@ CONTINUOUS_COVS = [
     'numQuestionsAsked30D', 'numHelpProvided30D', 'numQuestionsAsked7D',
     'numHelpProvided7D',
     'postHour', 'postDayOfWeek', 'numTags',
-    'viewCount', 'bodyLenChars', 'titleLenChars', 'ownerReputation',
+    # viewCount is intentionally NOT a propensity covariate: it accrues after a
+    # question is posted and answered questions attract more views, so it is a
+    # post-treatment / collider variable. It is still loaded and imputed below and
+    # carried into matched_questions.parquet for the placebo analysis only.
+    'bodyLenChars', 'titleLenChars', 'ownerReputation',
 ]
 
 BUCKET_LABELS = [
@@ -126,7 +135,9 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
         ps_model = LogisticRegression(max_iter=1000, random_state=0).fit(X, y)
         year_data = year_data.copy()
         year_data['propensity_score'] = ps_model.predict_proba(X)[:, 1]
-    except Exception:
+    except Exception as e:
+        print(f"    [warn] propensity fit failed for stratum {year!r} "
+              f"({len(year_data):,} rows): {type(e).__name__}: {e}; stratum skipped.")
         return []
 
     treated = year_data[year_data[treatment_col] == 1].reset_index(drop=True)
@@ -149,29 +160,33 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
     for i in range(len(treated)):
         dist_i = distances[i]
         ind_i = indices[i]
-        # Candidates: controls within caliper (by propensity distance)
+        # Candidates: controls within caliper (by propensity distance) that have NOT
+        # already been matched to another treated unit — 1:1 matching WITHOUT
+        # replacement so each control appears in at most one pair (pairs stay
+        # independent for downstream inference).
         if caliper is not None:
             within = np.where(dist_i <= caliper)[0]
         else:
             within = np.arange(len(ind_i))
+        within = [int(j) for j in within if ind_i[j] not in used_control_positions]
         if len(within) == 0:
+            # No unused control within caliper: leave this treated unit unmatched
+            # rather than reusing a control.
             continue
 
-        # Among candidates, choose by Jaccard tag overlap if available
+        # Among the unused candidates, choose by Jaccard tag overlap if available
         if tag_ids_col and tag_ids_col in treated.columns and tag_ids_col in control.columns:
             t_tags = treated.iloc[i][tag_ids_col]
-            # (within_idx, control_df_position, jaccard)
+            # (control_df_position, jaccard, ps_distance); prefer higher Jaccard, then nearer PS
             candidates_with_j = [
-                (j, ind_i[j], _jaccard_tag_overlap(t_tags, control.iloc[ind_i[j]][tag_ids_col]))
+                (ind_i[j], _jaccard_tag_overlap(t_tags, control.iloc[ind_i[j]][tag_ids_col]), dist_i[j])
                 for j in within
             ]
-            # Prefer unused controls (False < True), then higher Jaccard first
-            candidates_with_j.sort(key=lambda x: (x[1] in used_control_positions, -x[2]))
-            best_j, c_pos_in_control, _ = candidates_with_j[0]
+            candidates_with_j.sort(key=lambda x: (-x[1], x[2]))
+            c_pos_in_control = candidates_with_j[0][0]
         else:
-            # No tie-breaker: use nearest within caliper (first in list)
-            best_j = within[0]
-            c_pos_in_control = ind_i[best_j]
+            # No tie-breaker: use nearest unused control within caliper (within is ordered by distance)
+            c_pos_in_control = ind_i[within[0]]
 
         used_control_positions.add(c_pos_in_control)
         match_id = f"{year}_{pair_counter}"
@@ -252,6 +267,7 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     n_after_z = len(unique_data)
     if n_after_z < n_questions:
         print(f"  After dropping NaN in z-covariates: {n_after_z:,} questions ({n_questions - n_after_z:,} dropped)")
+    n_treated_available = int((unique_data[treatment_col] == 1).sum())
 
     # Parallel execution: batch strata so each task runs many strata (fewer pickles, better load balance)
     grouped_data = [group for _, group in unique_data.groupby(exact_match_col)]
@@ -287,6 +303,9 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     n_pairs = match_mapping['match_id'].nunique()
     n_matched_rows = len(match_mapping)
     print(f"  Matches: {n_pairs:,} pairs → {n_matched_rows:,} rows (each pair = 1 treated + 1 control question)")
+    n_unmatched_treated = max(0, n_treated_available - n_pairs)
+    print(f"  Treated questions matched: {n_pairs:,} / {n_treated_available:,} eligible "
+          f"({n_unmatched_treated:,} left unmatched — no unused control within caliper).")
 
     # Merge the match_id back to the original work_df
     final_matched_df = pd.merge(match_mapping, work_df, on='global_index', how='inner')
@@ -298,14 +317,30 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     return final_matched_df
 
 def save_balance_latex(df_unmatched, df_matched, treatment_col, covariates, filename="balance_check.tex"):
-    def get_stats(df, cov, t_col):
-        data = df[df['phase'] == 1] if 'phase' in df.columns else df
-        t_data = data[data[t_col] == 1][cov].dropna()
-        c_data = data[data[t_col] == 0][cov].dropna()
-        if len(t_data) == 0 or len(c_data) == 0: return np.nan, np.nan, np.nan
+    def _phase1(df):
+        return df[df['phase'] == 1] if 'phase' in df.columns else df
+    u = _phase1(df_unmatched)
+
+    def ref_sd(cov):
+        # Fixed reference denominator: pre-match pooled SD (Austin/Stuart/cobalt
+        # convention). Used for BOTH the Unmatched and Matched SMD columns so the
+        # two are on a comparable scale (a matched-sample denominator would shrink
+        # as matching compresses variance and distort the reported SMD).
+        t = u[u[treatment_col] == 1][cov].dropna()
+        c = u[u[treatment_col] == 0][cov].dropna()
+        if len(t) < 2 or len(c) < 2:
+            return np.nan
+        return np.sqrt((t.var() + c.var()) / 2)
+
+    def get_stats(df, cov, denom):
+        data = _phase1(df)
+        t_data = data[data[treatment_col] == 1][cov].dropna()
+        c_data = data[data[treatment_col] == 0][cov].dropna()
+        if len(t_data) == 0 or len(c_data) == 0:
+            return np.nan, np.nan, np.nan
         t_mean, c_mean = t_data.mean(), c_data.mean()
-        pooled_sd = np.sqrt((t_data.var() + c_data.var()) / 2)
-        return t_mean, c_mean, (t_mean - c_mean) / pooled_sd if pooled_sd != 0 else 0.0
+        smd = (t_mean - c_mean) / denom if denom and denom > 0 else 0.0
+        return t_mean, c_mean, smd
 
     with open(filename, "w") as f:
         f.write(r"\begin{table}[htbp]\centering\small" + "\n")
@@ -313,8 +348,9 @@ def save_balance_latex(df_unmatched, df_matched, treatment_col, covariates, file
         f.write(r" & \multicolumn{3}{c}{Unmatched} & \multicolumn{3}{c}{Matched} \\ \cmidrule(lr){2-4} \cmidrule(lr){5-7}" + "\n")
         f.write(r" Covariate & Tr Mean & Ct Mean & SMD & Tr Mean & Ct Mean & SMD \\\midrule" + "\n")
         for cov in covariates:
-            u_t, u_c, u_smd = get_stats(df_unmatched, cov, treatment_col)
-            m_t, m_c, m_smd = get_stats(df_matched, cov, treatment_col)
+            denom = ref_sd(cov)
+            u_t, u_c, u_smd = get_stats(df_unmatched, cov, denom)
+            m_t, m_c, m_smd = get_stats(df_matched, cov, denom)
             f.write(f" {cov.replace('_', ' ')} & {u_t:.2f} & {u_c:.2f} & {u_smd:.3f} & {m_t:.2f} & {m_c:.2f} & {m_smd:.3f} \\\\\n")
         f.write(r"\bottomrule\end{tabular}\end{table}" + "\n")
 
@@ -324,15 +360,22 @@ def plot_psm_diagnostics_phase1(original_df, matched_df, treatment_col, continuo
     orig_p1 = _orig.dropna(subset=[treatment_col] + continuous_covariates).copy()
     matched_p1 = _matched.copy()
 
-    X_orig = orig_p1[continuous_covariates].astype(np.float64)
+    # Fit the propensity model on the SAME z-standardized covariates the matching
+    # used. sklearn's default L2 penalty is scale-sensitive, so a raw-covariate fit
+    # produces a different score than the standardized per-stratum model that drove
+    # matching. This is a pooled approximation used only to visualize overall
+    # common support (the actual matching PS is fit within each stratum).
+    X_orig_raw = orig_p1[continuous_covariates].astype(np.float64)
+    mu = X_orig_raw.mean()
+    sigma = X_orig_raw.std().replace(0.0, 1.0)
+    X_orig = (X_orig_raw - mu) / sigma
     model = LogisticRegression(max_iter=1000, random_state=0).fit(X_orig, orig_p1[treatment_col])
     orig_p1['ps'] = model.predict_proba(X_orig)[:, 1]
     valid = matched_p1[continuous_covariates].notna().all(axis=1)
     matched_p1['ps'] = np.nan
     if valid.any():
-        matched_p1.loc[valid, 'ps'] = model.predict_proba(
-            matched_p1.loc[valid, continuous_covariates].astype(np.float64)
-        )[:, 1]
+        X_m = (matched_p1.loc[valid, continuous_covariates].astype(np.float64) - mu) / sigma
+        matched_p1.loc[valid, 'ps'] = model.predict_proba(X_m)[:, 1]
 
     plt.figure(figsize=(10, 5))
     sns.kdeplot(orig_p1.loc[orig_p1[treatment_col] == 0, 'ps'].to_numpy(), label='Control (Orig)', color='grey', fill=True)
@@ -346,62 +389,73 @@ def generate_love_plot(df_unmatched, df_matched, treatment_col, covariates, save
     Generates a Love Plot (Covariate Balance Plot) comparing ASMD before and after matching.
     """
     print(f"Generating Love Plot at {save_path}...")
-    
-    def calculate_smd(df, cov):
-        data = df[df['phase'] == 1] if 'phase' in df.columns else df
-        t = data[data[treatment_col] == 1][cov]
-        c = data[data[treatment_col] == 0][cov]
-        
+
+    def _phase1(df):
+        return df[df['phase'] == 1] if 'phase' in df.columns else df
+    u = _phase1(df_unmatched)
+
+    def ref_sd(cov):
+        # Fixed pre-match pooled SD as the common denominator for both series.
+        t = u[u[treatment_col] == 1][cov].dropna()
+        c = u[u[treatment_col] == 0][cov].dropna()
+        if len(t) < 2 or len(c) < 2:
+            return np.nan
+        return np.sqrt((t.var() + c.var()) / 2)
+
+    def calculate_smd(df, cov, denom):
+        data = _phase1(df)
+        t = data[data[treatment_col] == 1][cov].dropna()
+        c = data[data[treatment_col] == 0][cov].dropna()
         if len(t) < 2 or len(c) < 2:
             return 0.0
-            
-        diff = t.mean() - c.mean()
-        pooled_var = (t.var() + c.var()) / 2
-        return abs(diff / np.sqrt(pooled_var)) if pooled_var > 0 else 0.0
+        return abs((t.mean() - c.mean()) / denom) if denom and denom > 0 else 0.0
 
     records = []
     for cov in covariates:
-        u_smd = calculate_smd(df_unmatched, cov)
-        m_smd = calculate_smd(df_matched, cov)
-        
+        denom = ref_sd(cov)
+        u_smd = calculate_smd(df_unmatched, cov, denom)
+        m_smd = calculate_smd(df_matched, cov, denom)
+
         # Add readable labels
         clean_name = cov.replace("num", "# ").replace("QuestionsAsked", "Q Asked").replace("HelpProvided", "Help Provided")
-        
+
         records.append({'Covariate': clean_name, 'Abs_SMD': u_smd, 'Dataset': 'Unmatched'})
         records.append({'Covariate': clean_name, 'Abs_SMD': m_smd, 'Dataset': 'Matched'})
 
     plot_df = pd.DataFrame(records)
-    
-    # Sort by Unmatched SMD for better visual hierarchy
+
+    # Order covariates by Unmatched ASMD (ascending). Set the plotting order via an
+    # ordered Categorical so seaborn places each point at the right position; do NOT
+    # relabel ticks afterward (plt.yticks(range(n), sort_order) renames positions
+    # without moving the data, which mislabels every point).
     sort_order = plot_df[plot_df['Dataset'] == 'Unmatched'].sort_values('Abs_SMD', ascending=True)['Covariate'].tolist()
+    plot_df['Covariate'] = pd.Categorical(plot_df['Covariate'], categories=sort_order, ordered=True)
+    plot_df = plot_df.sort_values('Covariate')
 
     plt.figure(figsize=(8, 6))
     sns.set_style("whitegrid")
-    
+
     # Create the scatter plot
     ax = sns.scatterplot(
-        data=plot_df, 
-        y='Covariate', 
-        x='Abs_SMD', 
-        hue='Dataset', 
+        data=plot_df,
+        y='Covariate',
+        x='Abs_SMD',
+        hue='Dataset',
         style='Dataset',
-        s=100, 
+        s=100,
         palette={'Unmatched': 'grey', 'Matched': 'red'},
         markers={'Unmatched': 'o', 'Matched': 'X'}
     )
-    
+
     # Add threshold line
     plt.axvline(x=0.1, color='black', linestyle='--', linewidth=1, alpha=0.5)
     plt.text(0.105, 0.5, 'Threshold (0.1)', rotation=90, verticalalignment='center', alpha=0.7)
-    
+
     # Set labels and title
     plt.title('Covariate Balance (Love Plot)', fontsize=14)
     plt.xlabel('Absolute Standardized Mean Difference (ASMD)')
     plt.ylabel('')
-    
-    # Reorder Y-axis based on sort_order
-    plt.yticks(range(len(sort_order)), sort_order)
-    
+
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
@@ -653,8 +707,10 @@ def main():
         df['isWeekend'] = (pd.to_numeric(df['postDayOfWeek'], errors='coerce') >= 5).astype(float)
         extra_matching_covs.append('isWeekend')
     if 'numTags' in df.columns:
+        # numTags is already in CONTINUOUS_COVS — coerce to numeric but do NOT append
+        # it here (appending duplicated it in the propensity model as a collinear
+        # z-column and produced a doubled row in every balance/love diagnostic).
         df['numTags'] = pd.to_numeric(df['numTags'], errors='coerce')
-        extra_matching_covs.append('numTags')
     if 'bodyLenChars' in df.columns:
         df['logBodyLenChars'] = np.log1p(pd.to_numeric(df['bodyLenChars'], errors='coerce'))
         extra_matching_covs.append('logBodyLenChars')
@@ -795,6 +851,18 @@ def main():
         print(f"  Excluded {n_strata_dropped:,} year-tag strata with < {MIN_QUESTIONS_PER_STRATUM} questions ({n_questions_dropped:,} rows removed). Remaining: {len(strata_kept):,} strata, {len(df):,} rows.")
     else:
         print(f"  All year-tag strata have ≥ {MIN_QUESTIONS_PER_STRATUM} questions; none excluded.")
+
+    # Persist the exact pre-match pool (slim: treatment + phase + covariates) and the
+    # covariate list, so refresh_matching_plots.py regenerates diagnostics against the
+    # same data/covariates matching used instead of re-deriving a different set.
+    _pool_cols = list(dict.fromkeys(
+        [c for c in ['phase', 'hasAnswer'] + continuous_covariates if c in df.columns]
+    ))
+    PREMATCH_POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df[_pool_cols].to_parquet(str(PREMATCH_POOL_PATH))
+    with open(PREMATCH_COVS_PATH, "w") as _f:
+        json.dump({"continuous_covariates": continuous_covariates}, _f)
+    print(f"  Wrote pre-match pool ({len(df):,} rows, {len(_pool_cols)} cols) to {PREMATCH_POOL_PATH}")
 
     print(f"\n--- PSM matching ---")
     matched_df = perform_psm_matching_phase1_only(
