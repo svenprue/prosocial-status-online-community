@@ -11,6 +11,7 @@
 \hspace{1em} Received Answer (net post-answer effect) & 0.0492*** & 0.1059*** \\
  & (0.0045) & (0.0048) \\
 \hspace{1em} Hazard Ratio [95\% CI] & [1.04, 1.06] & [1.10, 1.12] \\[4pt]
+\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & [1.02, 1.04] & — \\[4pt]
 \multicolumn{3}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\
 \hspace{2em} Waiting period: Received Answer $\times$ Post-Question & 0.0064 & 0.0311*** \\
 \hspace{2em} Answer arrival: $\times$ Post-Answer Received & 0.0428*** & 0.0748*** \\
@@ -24,7 +25,7 @@
 N & 24,527,534 & 24,527,534 \\
 Events & 4,273,912 & 4,273,912 \\
 \bottomrule
-\multicolumn{3}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\multicolumn{3}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.} \\
 \multicolumn{3}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\
 \multicolumn{3}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\
 \end{tabular}

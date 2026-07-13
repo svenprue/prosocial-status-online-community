@@ -7,10 +7,14 @@
 \toprule
 \textbf{Specification} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\
 \midrule
-ModelA\_Newcomer\_Baseline (< 1 Week) & 1.135 & [1.121, 1.148] & 4,049,574 & 374,439 \\
-ModelA\_Newcomer\_Observable (< 1 Week) & 1.226 & [1.213, 1.240] & 4,049,574 & 374,439 \\
-ModelB\_Newcomer\_Quality (< 1 Week) & 0.905 & [0.894, 0.915] & 4,049,574 & 374,439 \\
+ModelA\_Newcomer\_Baseline (< 1 Week) & 1.135 & [1.121, 1.148] & 4,049,574 & 477,466 \\
+ModelA\_Newcomer\_Observable (< 1 Week) & 1.226 & [1.213, 1.240] & 4,049,574 & 477,466 \\
+ModelB\_Newcomer\_Baseline (< 1 Week) & 1.054 & [1.041, 1.067] & 4,049,574 & 477,466 \\
+ModelB\_Newcomer\_LengthOnly (< 1 Week) & 1.047 & [1.034, 1.059] & 4,049,574 & 477,466 \\
+ModelB\_Newcomer\_ScoreOnly (< 1 Week) & 0.967 & [0.956, 0.979] & 4,049,574 & 477,466 \\
+ModelB\_Newcomer\_Quality (< 1 Week) & 0.905 & [0.894, 0.915] & 4,049,574 & 477,466 \\
 \bottomrule
 \multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\multicolumn{5}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\
 \end{tabular}
 \end{table}

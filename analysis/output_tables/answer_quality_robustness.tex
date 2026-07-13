@@ -7,9 +7,12 @@
 \toprule
 \textbf{Specification} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\
 \midrule
-speed\_baseline & 1.095 & [1.084, 1.106] & 24,527,534 & 640,237 \\
-speed\_quality\_controls & 0.959 & [0.950, 0.968] & 24,527,534 & 640,237 \\
+speed\_baseline & 1.095 & [1.084, 1.106] & 24,527,534 & 5,157,805 \\
+speed\_length\_only & 1.093 & [1.082, 1.104] & 24,527,534 & 5,157,805 \\
+speed\_score\_only & 1.021 & [1.011, 1.031] & 24,527,534 & 5,157,805 \\
+speed\_quality\_controls & 0.959 & [0.950, 0.968] & 24,527,534 & 5,157,805 \\
 \bottomrule
 \multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\multicolumn{5}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\
 \end{tabular}
 \end{table}

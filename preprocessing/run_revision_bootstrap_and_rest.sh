@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
-# After placebo/figures fix: run checkpointed pair bootstrap, then remaining stages.
-# Safe to re-run — bootstrap resumes from pair_bootstrap_checkpoint_*.csv.
+# Build answer+comment interval cache, then resume checkpointed 100x bootstrap + rest.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PYTHON="${PYTHON:-$ROOT/.venv/bin/python}"
 export PYTHONUNBUFFERED=1
 cd "$ROOT/analysis"
+CACHE="$ROOT/analysis/data_cache/intervals_full_answer_comment.parquet"
+
+if [ -f "$CACHE" ]; then
+  echo "=== $(date -Is) Interval cache already present: $CACHE ==="
+  ls -lh "$CACHE"
+else
+  echo "=== $(date -Is) Building intervals_full_answer_comment cache (once) ==="
+  "$PYTHON" -c "
+from cox_config import PRIMARY_HELP_TYPES
+from cox_data import load_and_prepare
+load_and_prepare('../data/event_history', event_help_types=PRIMARY_HELP_TYPES)
+print('=== interval cache build done ===', flush=True)
+"
+  ls -lh "$CACHE"
+fi
 
 echo "=== $(date -Is) Pair bootstrap (100x, checkpointed) ==="
 "$PYTHON" pair_bootstrap_se.py --scope all --n-bootstrap 100

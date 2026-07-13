@@ -292,6 +292,10 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
 
     print("Computing covariates …")
     model_df = _build_covariates(intervals, timelines)
+    # Free peak memory before the parquet write (OOM was killing jobs here).
+    del intervals, all_times, boundaries, answer_boundaries, event_times
+    import gc
+    gc.collect()
     model_df.to_parquet(interval_cache)
     with open(desc_cache, "wb") as f:
         pickle.dump(descriptives, f)

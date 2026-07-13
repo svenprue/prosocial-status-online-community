@@ -864,11 +864,16 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
         r"\midrule",
     ]
     for _, r in df.iterrows():
+        n_q = r.get("n_questions", np.nan)
+        if pd.isna(n_q) or n_q == "":
+            n_q_txt = "—"
+        else:
+            n_q_txt = f"{int(n_q):,}"
         lines.append(
             rf"{_latex_bucket(str(r['scope']))} & {r['base_hr']:.2f} "
             rf"& [{r['bootstrap_hr_ci_lo']:.2f}, {r['bootstrap_hr_ci_hi']:.2f}] "
             rf"& {int(r['n_bootstrap_success'])}/{int(r['n_bootstrap_requested'])} "
-            rf"& {int(r['n_questions']):,} \\"
+            rf"& {n_q_txt} \\"
         )
     lines += [
         r"\bottomrule",

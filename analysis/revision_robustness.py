@@ -120,6 +120,13 @@ def run_answer_quality(input_folder: str, use_cache: bool) -> pd.DataFrame:
                          COVARIATES_SPEED + ["firstAnswerBodyLenChars"], use_cache)
     if length:
         rows.append({**length, "spec": "speed_length_only"})
+    # Score ≈ upvote count (Posts.Score corr with upvotes = 0.9998; VoteTypeId=2 has no
+    # UserId in the dump, so asker votes cannot be stripped). Isolates community approval
+    # without the asker-return acceptance control.
+    score = _fit_subset(model_df, "ModelB_AllData_ScoreOnly",
+                        COVARIATES_SPEED + ["firstAnswerScore"], use_cache)
+    if score:
+        rows.append({**score, "spec": "speed_score_only"})
     qual = _fit_subset(model_df, "ModelB_AllData_QualityControls", COVARIATES_SPEED_QUALITY, use_cache)
     if qual:
         rows.append({**qual, "spec": "speed_quality_controls"})
@@ -311,6 +318,7 @@ def run_newcomer_bucket_checks(input_folder: str, use_cache: bool) -> pd.DataFra
         ("ModelA_Newcomer_Observable", COVARIATES_MAIN_OBSERVABLE),
         ("ModelB_Newcomer_Baseline", COVARIATES_SPEED),
         ("ModelB_Newcomer_LengthOnly", COVARIATES_SPEED + ["firstAnswerBodyLenChars"]),
+        ("ModelB_Newcomer_ScoreOnly", COVARIATES_SPEED + ["firstAnswerScore"]),
         ("ModelB_Newcomer_Quality", COVARIATES_SPEED_QUALITY),
     ]:
         row = _fit_subset(sub, name, covs, use_cache)
