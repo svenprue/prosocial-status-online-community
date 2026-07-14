@@ -33,9 +33,18 @@ PLOT_LOVE = _SCRIPT_DIR / "love_plot.pdf"
 # regenerate diagnostics against exactly the data/covariates matching used.
 PREMATCH_POOL_PATH = _BASE_DIR / "data" / "input" / "prematch_pool.parquet"
 PREMATCH_COVS_PATH = _BASE_DIR / "data" / "input" / "prematch_covariates.json"
+# Cross-node Stage-4 sharding: prepare writes year parquets + z-stats; shards match;
+# merge concatenates and writes the final matched_questions.parquet + diagnostics.
+PREMATCH_YEARS_DIR = _BASE_DIR / "data" / "input" / "prematch_years"
+PREMATCH_META_PATH = _BASE_DIR / "data" / "input" / "prematch_meta.json"
+MATCH_SHARDS_DIR = _BASE_DIR / "data" / "input" / "match_shards"
 
 TOP_K_TAGS = 50  # used only for tie-break / reference; PSM uses tag accept-share summary
 MAX_NEIGHBORS_FOR_TIEBREAK = 100  # number of nearest controls to consider for Jaccard tie-break
+# Hard constraint on numTags within the PS caliper: |numTags_t - numTags_c| <= TOL.
+# TOL=0 → exact match on tag count (fixes matched |SMD| blow-up on numTags).
+# Matching still happens inside year×mainTag strata; this only restricts the control pool.
+NUMTAGS_MATCH_TOL = 0
 # Parallel matching: strata per batch (each worker gets this many strata per pickled job to reduce overhead)
 PSM_STRATA_BATCH_SIZE = 200
 
@@ -115,19 +124,24 @@ def _jaccard_tag_overlap(a, b):
 
 
 def match_single_year_group(year, year_data, treatment_col, z_covariates, caliper,
-                            tag_ids_col=None, max_neighbors_for_tiebreak=100):
+                            tag_ids_col=None, max_neighbors_for_tiebreak=100,
+                            numtags_tol=NUMTAGS_MATCH_TOL):
     """
     Worker function to perform PSM (nearest-neighbor, WITH replacement).
     Each treated unit is paired with its best control within the caliper: highest
     Jaccard tag overlap to the treated unit (if tag_ids_col is set), then nearest
     propensity score. A control may be matched to more than one treated unit; the
     reuse count (M_i) is summarized and recorded downstream (control_reuse_count).
+
+    When numTags is present, candidates are restricted to controls with
+    |numTags_t - numTags_c| <= numtags_tol (exact count if tol=0). Search is over
+    that restricted pool (batched by tag-count), so same-count controls further down
+    the unrestricted PS ranking are not missed.
     Returns a list of dicts mapping global_index to a match_id.
     """
     if year_data[treatment_col].nunique() < 2:
         return []
 
-    # Propensity Score Estimation (sklearn to avoid statsmodels/scipy compatibility issues)
     try:
         X = year_data[z_covariates].astype(np.float64)
         y = year_data[treatment_col]
@@ -147,49 +161,94 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
     if len(control) < 1 or len(treated) < 1:
         return []
 
-    # Matching: get enough neighbors so we can apply caliper + tie-break
-    n_neighbors = min(len(control), max_neighbors_for_tiebreak)
-    nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree').fit(
-        control[['propensity_score']]
+    use_numtags = (
+        numtags_tol is not None
+        and 'numTags' in treated.columns
+        and 'numTags' in control.columns
     )
-    distances, indices = nbrs.kneighbors(treated[['propensity_score']])
+
+    # Build list of (treated_row_pos, distance_array, control_pos_array) queries
+    # so we can batch NearestNeighbors within each numTags pool.
+    queries = []  # each: (t_pos, dist_i, ind_i) with ind_i = positional indices into control
+
+    if use_numtags:
+        treated = treated.copy()
+        control = control.copy()
+        treated['_numTags'] = pd.to_numeric(treated['numTags'], errors='coerce')
+        control['_numTags'] = pd.to_numeric(control['numTags'], errors='coerce')
+        ctrl_nt = control['_numTags'].to_numpy()
+        # positional index lists by integer tag count
+        ctrl_by_nt = {}
+        for nt_val in np.unique(ctrl_nt[~np.isnan(ctrl_nt)]):
+            nt_i = int(nt_val)
+            ctrl_by_nt[nt_i] = np.flatnonzero(ctrl_nt == nt_val)
+
+        treated_nt = treated['_numTags'].to_numpy()
+        # Group treated positions by their integer numTags
+        treated_by_nt = {}
+        for t_pos, nt_val in enumerate(treated_nt):
+            if np.isnan(nt_val):
+                continue
+            treated_by_nt.setdefault(int(nt_val), []).append(t_pos)
+
+        for nt_i, t_positions in treated_by_nt.items():
+            if numtags_tol == 0:
+                pool_pos = ctrl_by_nt.get(nt_i)
+            else:
+                # Union of control counts within tolerance
+                pool_chunks = [
+                    ctrl_by_nt[c]
+                    for c in range(nt_i - numtags_tol, nt_i + numtags_tol + 1)
+                    if c in ctrl_by_nt
+                ]
+                pool_pos = np.concatenate(pool_chunks) if pool_chunks else None
+            if pool_pos is None or len(pool_pos) == 0:
+                continue
+            pool = control.iloc[pool_pos]
+            n_neighbors = min(len(pool), max_neighbors_for_tiebreak)
+            nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree').fit(
+                pool[['propensity_score']]
+            )
+            t_block = treated.iloc[t_positions]
+            distances, local_idx = nbrs.kneighbors(t_block[['propensity_score']])
+            for row, t_pos in enumerate(t_positions):
+                queries.append((t_pos, distances[row], pool_pos[local_idx[row]]))
+    else:
+        n_neighbors = min(len(control), max_neighbors_for_tiebreak)
+        nbrs = NearestNeighbors(n_neighbors=n_neighbors, algorithm='ball_tree').fit(
+            control[['propensity_score']]
+        )
+        distances, indices = nbrs.kneighbors(treated[['propensity_score']])
+        for t_pos in range(len(treated)):
+            queries.append((t_pos, distances[t_pos], indices[t_pos]))
 
     match_records = []
     pair_counter = 0
+    use_jaccard = (
+        tag_ids_col and tag_ids_col in treated.columns and tag_ids_col in control.columns
+    )
 
-    for i in range(len(treated)):
-        dist_i = distances[i]
-        ind_i = indices[i]
-        # Candidates: controls within caliper (by propensity distance). Matching is
-        # WITH replacement: a control may be matched to more than one treated unit, so
-        # already-used controls are NOT excluded — each treated unit gets its
-        # closest/best control. This lowers bias and keeps every treated unit that has
-        # any within-caliper control (important here, where controls are the minority).
-        # Reuse (M_i) is recorded downstream as control_reuse_count for weighting/SEs.
+    for t_pos, dist_i, ind_i in queries:
         if caliper is not None:
             within = np.where(dist_i <= caliper)[0]
         else:
             within = np.arange(len(ind_i))
         if len(within) == 0:
-            # No control within caliper for this treated unit: leave it unmatched.
             continue
 
-        # Choose the best control: highest Jaccard tag overlap, then nearest PS distance.
-        if tag_ids_col and tag_ids_col in treated.columns and tag_ids_col in control.columns:
-            t_tags = treated.iloc[i][tag_ids_col]
-            # (control_df_position, jaccard, ps_distance)
+        if use_jaccard:
+            t_tags = treated.iloc[t_pos][tag_ids_col]
             candidates_with_j = [
                 (ind_i[j], _jaccard_tag_overlap(t_tags, control.iloc[ind_i[j]][tag_ids_col]), dist_i[j])
                 for j in within
             ]
             candidates_with_j.sort(key=lambda x: (-x[1], x[2]))
-            c_pos_in_control = candidates_with_j[0][0]
+            c_pos_in_control = int(candidates_with_j[0][0])
         else:
-            # No tie-breaker: nearest control within caliper (within is ordered by distance)
-            c_pos_in_control = ind_i[within[0]]
+            c_pos_in_control = int(ind_i[within[0]])
 
         match_id = f"{year}_{pair_counter}"
-        t_indices = treated.iloc[i]['all_indices']
+        t_indices = treated.iloc[t_pos]['all_indices']
         c_indices = control.iloc[c_pos_in_control]['all_indices']
         for idx in t_indices:
             match_records.append({'global_index': idx, 'match_id': match_id})
@@ -200,7 +259,8 @@ def match_single_year_group(year, year_data, treatment_col, z_covariates, calipe
 
 
 def match_batch_of_strata(batch_of_groups, exact_match_col, treatment_col, z_covariates, caliper,
-                          tag_ids_col=None, max_neighbors_for_tiebreak=100):
+                          tag_ids_col=None, max_neighbors_for_tiebreak=100,
+                          numtags_tol=NUMTAGS_MATCH_TOL):
     """
     Run match_single_year_group on each stratum in the batch; return flattened list of match records.
     Reduces parallel overhead by processing many strata per worker task.
@@ -217,21 +277,53 @@ def match_batch_of_strata(batch_of_groups, exact_match_col, treatment_col, z_cov
                 caliper=caliper,
                 tag_ids_col=tag_ids_col,
                 max_neighbors_for_tiebreak=max_neighbors_for_tiebreak,
+                numtags_tol=numtags_tol,
             )
         )
     return out
+
+
+def annotate_control_reuse(final_matched_df, treatment_col='hasAnswer'):
+    """Attach control_reuse_count (M_i) and print the with-replacement reuse summary."""
+    final_matched_df = final_matched_df.copy()
+    final_matched_df['control_reuse_count'] = 1
+    ctrl_mask = final_matched_df[treatment_col] == 0
+    n_pairs = int(final_matched_df['match_id'].nunique()) if 'match_id' in final_matched_df.columns else 0
+    if ctrl_mask.any() and 'questionId' in final_matched_df.columns:
+        reuse = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].transform('nunique')
+        final_matched_df.loc[reuse.index, 'control_reuse_count'] = reuse
+        mi = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].nunique()
+        n_distinct_controls = int(mi.shape[0])
+        sq = float(mi.pow(2).sum())
+        eff = float(mi.sum() ** 2 / sq) if sq > 0 else float('nan')
+        print(f"  Control reuse (with replacement): {n_distinct_controls:,} distinct controls across "
+              f"{n_pairs:,} pairs; max M_i={int(mi.max())}, mean={mi.mean():.2f}, "
+              f"reused>1x={(mi > 1).mean() * 100:.1f}%; effective #controls (Kish)≈{eff:,.0f}")
+    return final_matched_df
+
+
+def compute_z_stats(df, continuous_covariates):
+    """Global mean/std for propensity z-scoring (must be shared across Slurm shards)."""
+    stats = {}
+    for col in continuous_covariates:
+        s = pd.to_numeric(df[col], errors='coerce')
+        stats[col] = {"mu": float(s.mean()), "sigma": float(s.std(ddof=1) if s.notna().sum() > 1 else 0.0)}
+    return stats
 
 
 def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
                                      exact_match_col='exact_match_group', group_col='questionId',
                                      caliper=0.05, n_jobs=-1,
                                      tag_covariates=None, tag_ids_col='tag_ids',
-                                     max_neighbors_for_tiebreak=MAX_NEIGHBORS_FOR_TIEBREAK):
+                                     max_neighbors_for_tiebreak=MAX_NEIGHBORS_FOR_TIEBREAK,
+                                     z_stats=None, annotate_reuse=True):
     print(f"\n--- Starting PSM at question level on {exact_match_col} ---")
     if tag_covariates:
         print(f"    Propensity model includes {len(tag_covariates)} tag dummies.")
     if tag_ids_col and tag_ids_col in data.columns:
         print(f"    Tie-breaker: Jaccard tag overlap (max_neighbors={max_neighbors_for_tiebreak}).")
+    if z_stats:
+        print(f"    Using shared global z-stats for {len(z_stats)} covariates (cross-node consistent).")
 
     work_df = data.copy().reset_index(drop=True)
     work_df['global_index'] = work_df.index
@@ -251,11 +343,14 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     n_groups_psm = unique_data[exact_match_col].nunique()
     print(f"  Unique questions (for PS estimation): {n_questions:,}; strata (exact-match groups): {n_groups_psm:,}")
 
-    # Standardization of continuous covariates
+    # Standardization of continuous covariates (global z_stats when sharding)
     z_covariates = []
     for col in continuous_covariates:
         unique_data[col] = pd.to_numeric(unique_data[col], errors='coerce')
-        mu, sigma = unique_data[col].mean(), unique_data[col].std()
+        if z_stats and col in z_stats:
+            mu, sigma = z_stats[col]["mu"], z_stats[col]["sigma"]
+        else:
+            mu, sigma = unique_data[col].mean(), unique_data[col].std()
         z_col = f"z_{col}"
         z_covariates.append(z_col)
         unique_data[z_col] = (unique_data[col] - mu) / sigma if sigma != 0 else 0.0
@@ -276,6 +371,10 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     batch_size = max(1, min(PSM_STRATA_BATCH_SIZE, n_strata // max(1, n_workers * 4)))
     batches = [grouped_data[i : i + batch_size] for i in range(0, n_strata, batch_size)]
     tag_col = tag_ids_col if (tag_ids_col and tag_ids_col in unique_data.columns) else None
+    if NUMTAGS_MATCH_TOL is not None and 'numTags' in unique_data.columns:
+        print(f"  Hard constraint: |numTags_t - numTags_c| <= {NUMTAGS_MATCH_TOL} "
+              f"(exact tag-count match)" if NUMTAGS_MATCH_TOL == 0 else
+              f"  Hard constraint: |numTags_t - numTags_c| <= {NUMTAGS_MATCH_TOL}")
     print(f"  Fitting propensity and matching within {n_strata:,} strata in {len(batches):,} batches (n_jobs={n_jobs}, batch_size={batch_size})...")
     results = Parallel(n_jobs=n_jobs, verbose=10, pre_dispatch="2*n_jobs")(
         delayed(match_batch_of_strata)(
@@ -286,6 +385,7 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
             caliper=caliper,
             tag_ids_col=tag_col,
             max_neighbors_for_tiebreak=max_neighbors_for_tiebreak,
+            numtags_tol=NUMTAGS_MATCH_TOL,
         )
         for batch in batches
     )
@@ -312,23 +412,9 @@ def perform_psm_matching_phase1_only(data, treatment_col, continuous_covariates,
     n_c_matched = (final_matched_df[treatment_col] == 0).sum()
     print(f"  Matched sample: treated (hasAnswer=1) {n_t_matched:,}, control (hasAnswer=0) {n_c_matched:,}")
 
-    # With-replacement reuse weight M_i: number of pairs each control question is in.
-    # Treated rows get 1. A control reused in M_i pairs already appears in M_i rows, so
-    # the row-duplicated matched sample IS the M_i-weighted ATT sample (no extra weight
-    # needed for the point estimate/balance); this column exposes M_i for optional
-    # control-clustered SEs and for reporting the reuse distribution.
-    final_matched_df['control_reuse_count'] = 1
-    ctrl_mask = final_matched_df[treatment_col] == 0
-    if ctrl_mask.any() and 'questionId' in final_matched_df.columns:
-        reuse = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].transform('nunique')
-        final_matched_df.loc[reuse.index, 'control_reuse_count'] = reuse
-        mi = final_matched_df.loc[ctrl_mask].groupby('questionId')['match_id'].nunique()
-        n_distinct_controls = int(mi.shape[0])
-        sq = float(mi.pow(2).sum())
-        eff = float(mi.sum() ** 2 / sq) if sq > 0 else float('nan')
-        print(f"  Control reuse (with replacement): {n_distinct_controls:,} distinct controls across "
-              f"{n_pairs:,} pairs; max M_i={int(mi.max())}, mean={mi.mean():.2f}, "
-              f"reused>1x={(mi > 1).mean() * 100:.1f}%; effective #controls (Kish)≈{eff:,.0f}")
+    # With-replacement reuse: annotate here for single-node runs; shard mode defers to merge.
+    if annotate_reuse:
+        final_matched_df = annotate_control_reuse(final_matched_df, treatment_col=treatment_col)
 
     gc.collect()
     return final_matched_df
@@ -661,7 +747,8 @@ def add_tag_accept_share_covariates(df, tag_accept_share_by_id, tag_ids_col='tag
     return df
 
 
-def main():
+def build_prematch_frame():
+    """Load processed parquet through exact-match strata filter; return (df, continuous_covariates, tag_covariates)."""
     data_path = str(DATA_PATH)
     print(f"\n{'='*60}")
     print("MATCHING PIPELINE: Question-centered PSM (hasAnswer)")
@@ -670,7 +757,6 @@ def main():
     if not os.path.exists(data_path):
         print(f"Error: file not found: {data_path}")
         sys.exit(1)
-    # Request columns that exist (parquet may use mainTagId or main_tag_id)
     import pyarrow.parquet as pq
     parquet_names = set(pq.read_schema(data_path).names)
     available_optional = [c for c in OPTIONAL_COLUMNS if c in parquet_names and c not in REQUIRED_COLUMNS]
@@ -710,10 +796,6 @@ def main():
     n_control = (df['hasAnswer'] == 0).sum()
     print(f"  Treatment: hasAnswer=1 → {n_treated:,}, hasAnswer=0 → {n_control:,} (total {len(df):,})")
 
-    # Observable-selection covariates (R1 Q3): posting time enters cyclically /
-    # binned, question length as log. ViewCount is deliberately NOT a propensity
-    # covariate (it accrues after treatment); it is only carried through for the
-    # placebo analysis. Only covariates present in the parquet are used.
     extra_matching_covs = []
     if 'postHour' in df.columns:
         hours = pd.to_numeric(df['postHour'], errors='coerce')
@@ -724,9 +806,6 @@ def main():
         df['isWeekend'] = (pd.to_numeric(df['postDayOfWeek'], errors='coerce') >= 5).astype(float)
         extra_matching_covs.append('isWeekend')
     if 'numTags' in df.columns:
-        # numTags is already in CONTINUOUS_COVS — coerce to numeric but do NOT append
-        # it here (appending duplicated it in the propensity model as a collinear
-        # z-column and produced a doubled row in every balance/love diagnostic).
         df['numTags'] = pd.to_numeric(df['numTags'], errors='coerce')
     if 'bodyLenChars' in df.columns:
         df['logBodyLenChars'] = np.log1p(pd.to_numeric(df['bodyLenChars'], errors='coerce'))
@@ -736,7 +815,6 @@ def main():
     else:
         print("  No additional observable-selection covariates available in input parquet.")
 
-    # Tag-related covariates for propensity score
     print(f"\n--- Tag covariates ---")
     tag_dict_path = str(TAG_DICTIONARY_PATH)
     if not os.path.exists(tag_dict_path):
@@ -753,7 +831,6 @@ def main():
     print(f"  Tag dictionary: {len(tag_dict):,} tags; using top-{len(top_tag_ids)} for tie-break.")
 
     if USE_TAG_ACCEPT_SHARE:
-        # Replace 50 one-hot tag dummies with 1–2 continuous vars: share of questions with accepted answer per tag.
         cache_path = str(TAG_ACCEPT_SHARES_CACHE_PATH)
         tag_accept_share_by_id, tag_accept_share_per_year = _load_tag_accept_shares_cache(
             cache_path, data_path, TAG_ACCEPT_SHARE_PER_YEAR, MIN_TAG_COUNT_FOR_SHARE
@@ -799,7 +876,6 @@ def main():
             per_year=tag_accept_share_per_year,
             avg_only=TAG_ACCEPT_SHARE_AVG_ONLY
         )
-        # Validate: print first few rows with tag_ids, hasAcceptedAnswer, tag_accept_share_avg
         if 'tag_accept_share_avg' in df.columns:
             cols_show = ['tag_ids', 'hasAcceptedAnswer', 'tag_accept_share_avg']
             if 'year' in df.columns:
@@ -813,7 +889,6 @@ def main():
                 acc = row.get('hasAcceptedAnswer')
                 avg = row.get('tag_accept_share_avg')
                 print(f"    year={yr} tag_ids={tag_ids_str}... hasAcceptedAnswer={acc} tag_accept_share_avg={avg}")
-        # Impute missing (no tags or no data for that year/tag) with overall accept rate
         for col in ['tag_accept_share_avg', 'tag_accept_share_max']:
             if col in df.columns and df[col].isna().any():
                 n_missing = df[col].isna().sum()
@@ -832,7 +907,6 @@ def main():
         time_scope = "within same calendar year" if tag_accept_share_per_year else "all years"
         print(f"  PSM tag covariates: {tag_share_cols} (share with accepted answer per tag, {time_scope})")
     else:
-        # Legacy: top-K one-hot tag dummies
         for i, tid in tqdm(enumerate(top_tag_ids), total=len(top_tag_ids), desc="Tag dummies", unit="tag"):
             df[f'tag_{i}'] = df['tag_ids'].apply(
                 lambda x, t=tid: 1 if t in _safe_tag_list(x) else 0
@@ -841,11 +915,8 @@ def main():
         continuous_covariates = CONTINUOUS_COVS
         print(f"PSM tag covariates: {len(tag_covariates)} tag dummies (legacy)")
 
-    # Observable-selection covariates (R1 Q3) enter the propensity model alongside
-    # the activity-history covariates
     continuous_covariates = continuous_covariates + extra_matching_covs
 
-    # Exact-match: same year AND same main tag (treated and controls only matched within stratum)
     main_tag_str = df['mainTagId'].astype("Int64").astype(str).replace("<NA>", "NA").replace("nan", "NA").fillna("NA")
     df['exact_match_group'] = df['year'].astype(str) + "_" + main_tag_str
     n_groups = df['exact_match_group'].nunique()
@@ -857,29 +928,170 @@ def main():
     if n_main_tags == 0 and len(df) > 0:
         print(f"  Warning: no questions have non-null mainTagId — matching is effectively by year only. Re-run preprocessing/processing_reciprocity_dataset.py to populate mainTagId from tag_ids.")
 
-    # Exclude year-tag strata with fewer than MIN_QUESTIONS_PER_STRATUM questions from matching
     stratum_counts = df.groupby('exact_match_group').size()
     strata_kept = stratum_counts[stratum_counts >= MIN_QUESTIONS_PER_STRATUM].index
     strata_dropped = stratum_counts[stratum_counts < MIN_QUESTIONS_PER_STRATUM]
     n_strata_dropped = len(strata_dropped)
-    n_questions_dropped = strata_dropped.sum()
+    n_questions_dropped = int(strata_dropped.sum()) if n_strata_dropped else 0
     df = df[df['exact_match_group'].isin(strata_kept)].reset_index(drop=True)
     if n_strata_dropped > 0:
         print(f"  Excluded {n_strata_dropped:,} year-tag strata with < {MIN_QUESTIONS_PER_STRATUM} questions ({n_questions_dropped:,} rows removed). Remaining: {len(strata_kept):,} strata, {len(df):,} rows.")
     else:
         print(f"  All year-tag strata have ≥ {MIN_QUESTIONS_PER_STRATUM} questions; none excluded.")
 
-    # Persist the exact pre-match pool (slim: treatment + phase + covariates) and the
-    # covariate list, so refresh_matching_plots.py regenerates diagnostics against the
-    # same data/covariates matching used instead of re-deriving a different set.
+    return df, continuous_covariates, tag_covariates
+
+
+def write_prematch_artifacts(df, continuous_covariates, tag_covariates):
+    """Write slim pool, year parquets, covariate list, and global z-stats for sharded matching."""
     _pool_cols = list(dict.fromkeys(
         [c for c in ['phase', 'hasAnswer'] + continuous_covariates if c in df.columns]
     ))
     PREMATCH_POOL_PATH.parent.mkdir(parents=True, exist_ok=True)
     df[_pool_cols].to_parquet(str(PREMATCH_POOL_PATH))
     with open(PREMATCH_COVS_PATH, "w") as _f:
-        json.dump({"continuous_covariates": continuous_covariates}, _f)
+        json.dump({"continuous_covariates": continuous_covariates, "tag_covariates": tag_covariates}, _f)
     print(f"  Wrote pre-match pool ({len(df):,} rows, {len(_pool_cols)} cols) to {PREMATCH_POOL_PATH}")
+
+    z_stats = compute_z_stats(df, continuous_covariates)
+    years = sorted(int(y) for y in df['year'].dropna().unique().tolist())
+    n_treated = int((df['hasAnswer'] == 1).sum())
+    n_control = int((df['hasAnswer'] == 0).sum())
+
+    if PREMATCH_YEARS_DIR.exists():
+        for p in PREMATCH_YEARS_DIR.glob("*.parquet"):
+            p.unlink()
+    PREMATCH_YEARS_DIR.mkdir(parents=True, exist_ok=True)
+    for y in years:
+        part = df[df['year'] == y]
+        out = PREMATCH_YEARS_DIR / f"{y}.parquet"
+        part.to_parquet(str(out))
+        print(f"  Wrote {out.name}: {len(part):,} rows")
+
+    meta = {
+        "years": years,
+        "continuous_covariates": continuous_covariates,
+        "tag_covariates": tag_covariates,
+        "z_stats": z_stats,
+        "n_rows": int(len(df)),
+        "n_treated": n_treated,
+        "n_control": n_control,
+        "n_strata": int(df['exact_match_group'].nunique()),
+    }
+    with open(PREMATCH_META_PATH, "w") as f:
+        json.dump(meta, f)
+    print(f"  Wrote prematch meta ({len(years)} years) to {PREMATCH_META_PATH}")
+    return meta
+
+
+def write_matched_outputs(df_unmatched, matched_df, continuous_covariates):
+    """Write matched parquet + balance / common-support / love diagnostics."""
+    print(f"\n--- Writing output ---")
+    OUTPUT_MATCHED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    matched_df.to_parquet(str(OUTPUT_MATCHED_PATH))
+    print(f"  Matched data: {OUTPUT_MATCHED_PATH} ({len(matched_df):,} rows, {matched_df['match_id'].nunique():,} pairs)")
+    save_balance_latex(df_unmatched, matched_df, 'hasAnswer', continuous_covariates, filename=str(BALANCE_TEX_PATH))
+    print(f"  Balance table (SMD): {BALANCE_TEX_PATH}")
+    plot_psm_diagnostics_phase1(df_unmatched, matched_df, 'hasAnswer', continuous_covariates)
+    print(f"  Common-support plot: {PLOT_COMMON_SUPPORT}")
+    generate_love_plot(df_unmatched, matched_df, 'hasAnswer', continuous_covariates, str(PLOT_LOVE))
+    print(f"\nDone. Pair examples:\n{matched_df[['match_id', 'hasAnswer', 'questionId']].drop_duplicates('match_id').head()}")
+
+
+def cmd_prepare():
+    df, continuous_covariates, tag_covariates = build_prematch_frame()
+    write_prematch_artifacts(df, continuous_covariates, tag_covariates)
+    print("=== prepare done (ready for --match-shard) ===")
+
+
+def cmd_match_shard(shard_id: int, n_shards: int, n_jobs: int = -1):
+    if not PREMATCH_META_PATH.exists():
+        raise FileNotFoundError(f"Missing {PREMATCH_META_PATH}; run --prepare first.")
+    with open(PREMATCH_META_PATH) as f:
+        meta = json.load(f)
+    years = meta["years"]
+    continuous_covariates = meta["continuous_covariates"]
+    tag_covariates = meta.get("tag_covariates") or []
+    z_stats = meta["z_stats"]
+    my_years = [y for i, y in enumerate(years) if i % n_shards == shard_id]
+    print(f"=== match shard {shard_id}/{n_shards}: years={my_years} ===")
+    if not my_years:
+        print("  No years assigned to this shard; writing empty shard.")
+        MATCH_SHARDS_DIR.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame().to_parquet(str(MATCH_SHARDS_DIR / f"matched_shard_{shard_id:02d}.parquet"))
+        return
+
+    parts = []
+    for y in my_years:
+        path = PREMATCH_YEARS_DIR / f"{y}.parquet"
+        if not path.exists():
+            raise FileNotFoundError(f"Missing year parquet {path}")
+        parts.append(pd.read_parquet(path))
+    df = pd.concat(parts, ignore_index=True)
+    print(f"  Loaded {len(df):,} rows for {len(my_years)} years")
+
+    matched_df = perform_psm_matching_phase1_only(
+        df, treatment_col='hasAnswer', continuous_covariates=continuous_covariates,
+        exact_match_col='exact_match_group', caliper=0.05,
+        tag_covariates=tag_covariates, tag_ids_col='tag_ids',
+        max_neighbors_for_tiebreak=MAX_NEIGHBORS_FOR_TIEBREAK,
+        z_stats=z_stats, annotate_reuse=False, n_jobs=n_jobs,
+    )
+    MATCH_SHARDS_DIR.mkdir(parents=True, exist_ok=True)
+    out = MATCH_SHARDS_DIR / f"matched_shard_{shard_id:02d}.parquet"
+    if matched_df is None or matched_df.empty:
+        pd.DataFrame().to_parquet(str(out))
+        print(f"  Wrote empty shard {out}")
+    else:
+        matched_df.to_parquet(str(out))
+        print(f"  Wrote {out} ({len(matched_df):,} rows, {matched_df['match_id'].nunique():,} pairs)")
+    print(f"=== match shard {shard_id} done ===")
+
+
+def cmd_merge_shards(n_shards: int):
+    if not PREMATCH_META_PATH.exists():
+        raise FileNotFoundError(f"Missing {PREMATCH_META_PATH}; run --prepare first.")
+    with open(PREMATCH_META_PATH) as f:
+        meta = json.load(f)
+    continuous_covariates = meta["continuous_covariates"]
+    n_treated_available = int(meta.get("n_treated", 0))
+
+    parts = []
+    for i in range(n_shards):
+        path = MATCH_SHARDS_DIR / f"matched_shard_{i:02d}.parquet"
+        if not path.exists():
+            raise FileNotFoundError(f"Missing shard {path}")
+        part = pd.read_parquet(path)
+        if len(part) == 0:
+            print(f"  Shard {i}: empty")
+            continue
+        print(f"  Shard {i}: {len(part):,} rows, {part['match_id'].nunique():,} pairs")
+        parts.append(part)
+    if not parts:
+        print("No matched pairs in any shard; aborting.")
+        sys.exit(1)
+
+    matched_df = pd.concat(parts, ignore_index=True)
+    n_pairs = int(matched_df['match_id'].nunique())
+    n_unmatched = max(0, n_treated_available - n_pairs)
+    print(f"  Treated questions matched: {n_pairs:,} / {n_treated_available:,} eligible "
+          f"({n_unmatched:,} left unmatched — no control within caliper).")
+    matched_df = annotate_control_reuse(matched_df, treatment_col='hasAnswer')
+
+    if PREMATCH_POOL_PATH.exists():
+        df_unmatched = pd.read_parquet(str(PREMATCH_POOL_PATH))
+    else:
+        year_parts = [pd.read_parquet(PREMATCH_YEARS_DIR / f"{y}.parquet") for y in meta["years"]]
+        df_unmatched = pd.concat(year_parts, ignore_index=True)
+
+    write_matched_outputs(df_unmatched, matched_df, continuous_covariates)
+    print("=== merge-shards done ===")
+
+
+def main():
+    """Single-node full pipeline (prepare + match + diagnostics). Default CLI entry."""
+    df, continuous_covariates, tag_covariates = build_prematch_frame()
+    write_prematch_artifacts(df, continuous_covariates, tag_covariates)
 
     print(f"\n--- PSM matching ---")
     matched_df = perform_psm_matching_phase1_only(
@@ -890,18 +1102,31 @@ def main():
     )
 
     if not matched_df.empty:
-        print(f"\n--- Writing output ---")
-        OUTPUT_MATCHED_PATH.parent.mkdir(parents=True, exist_ok=True)
-        matched_df.to_parquet(str(OUTPUT_MATCHED_PATH))
-        print(f"  Matched data: {OUTPUT_MATCHED_PATH} ({len(matched_df):,} rows, {matched_df['match_id'].nunique():,} pairs)")
-        save_balance_latex(df, matched_df, 'hasAnswer', continuous_covariates, filename=str(BALANCE_TEX_PATH))
-        print(f"  Balance table (SMD): {BALANCE_TEX_PATH}")
-        plot_psm_diagnostics_phase1(df, matched_df, 'hasAnswer', continuous_covariates)
-        print(f"  Common-support plot: {PLOT_COMMON_SUPPORT}")
-        generate_love_plot(df, matched_df, 'hasAnswer', continuous_covariates, str(PLOT_LOVE))
-        print(f"\nDone. Pair examples:\n{matched_df[['match_id', 'hasAnswer', 'questionId']].drop_duplicates('match_id').head()}")
+        write_matched_outputs(df, matched_df, continuous_covariates)
     else:
         print("\nNo matched pairs produced; skipping output.")
 
+
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description="Question-centered PSM matching")
+    parser.add_argument("--prepare", action="store_true",
+                        help="Build prematch year parquets + global z-stats (no matching)")
+    parser.add_argument("--match-shard", type=int, default=None, metavar="I",
+                        help="Match years where year_index %% N == I")
+    parser.add_argument("--n-shards", type=int, default=6,
+                        help="Number of Slurm shards (default 6)")
+    parser.add_argument("--merge-shards", action="store_true",
+                        help="Concatenate match shards → matched_questions.parquet + diagnostics")
+    parser.add_argument("--n-jobs", type=int, default=-1,
+                        help="joblib workers for within-shard matching (default: all CPUs)")
+    args = parser.parse_args()
+
+    if args.prepare:
+        cmd_prepare()
+    elif args.match_shard is not None:
+        cmd_match_shard(args.match_shard, args.n_shards, n_jobs=args.n_jobs)
+    elif args.merge_shards:
+        cmd_merge_shards(args.n_shards)
+    else:
+        main()
