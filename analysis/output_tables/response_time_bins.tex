@@ -7,20 +7,21 @@
 \toprule
 \textbf{Response time} & \textbf{HR} & \textbf{95\% CI} & \textbf{N} & \textbf{Events} \\
 \midrule
-0-15 min & 0.99* & [0.98, 1.00] & 17,536,008 & 668,826 \\
-15-30 min & 0.99 & [0.98, 1.00] & 14,034,514 & 604,325 \\
-30-60 min & 1.02* & [1.00, 1.03] & 13,647,991 & 574,415 \\
-1-2 hr & 1.03** & [1.01, 1.05] & 13,307,658 & 576,250 \\
-2-4 hr & 1.05*** & [1.03, 1.07] & 13,054,275 & 581,309 \\
-4-8 hr & 1.06*** & [1.04, 1.09] & 12,856,408 & 585,139 \\
-8-12 hr & 1.08*** & [1.04, 1.11] & 12,556,056 & 582,483 \\
-12-24 hr & 1.11*** & [1.08, 1.14] & 12,739,418 & 580,049 \\
-1-3 days & 1.27*** & [1.23, 1.30] & 12,686,043 & 587,084 \\
-$>$3 days & 1.30*** & [1.25, 1.35] & 12,482,727 & 597,094 \\
+0-15 min & 0.99 & [0.97, 1.01] & 17,412,740 & 3,598,284 \\
+15-30 min & 0.99 & [0.96, 1.02] & 13,934,456 & 2,655,887 \\
+30-60 min & 1.22*** & [1.19, 1.25] & 13,549,736 & 2,559,608 \\
+1-2 hr & 1.03* & [1.00, 1.06] & 13,211,144 & 2,491,230 \\
+2-4 hr & 1.03 & [0.99, 1.06] & 12,958,927 & 2,439,543 \\
+4-8 hr & 1.00 & [0.97, 1.03] & 12,762,008 & 2,403,607 \\
+8-12 hr & 0.97 & [0.93, 1.01] & 12,464,162 & 2,346,654 \\
+12-24 hr & 1.04* & [1.00, 1.07] & 12,645,932 & 2,384,160 \\
+1-3 days & 1.04** & [1.01, 1.08] & 12,592,667 & 2,400,019 \\
+$>$3 days & 1.01 & [0.98, 1.05] & 12,391,574 & 2,390,995 \\
 \bottomrule
-\multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\
+\multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.} \\
+\multicolumn{5}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\
 \multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\
-\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD contrast (post-answer vs.\ pre-question, treated vs.\ control); comparable across bins.} \\
+\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables.} \\
 \multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\
 \end{tabular}
 \end{table}

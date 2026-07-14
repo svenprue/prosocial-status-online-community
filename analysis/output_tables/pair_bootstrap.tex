@@ -1,5 +1,5 @@
 \begin{table}[H]
-\caption{Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect (Model A)}
+\caption{Matched-Pair Bootstrap Uncertainty for the Summed DiD Treatment Effect (upper bound; Model A)}
 \label{tab:pair_bootstrap}
 \centering
 \footnotesize
@@ -7,8 +7,9 @@
 \toprule
 \textbf{Scope} & \textbf{HR} & \textbf{Bootstrap 95\% CI} & \textbf{Replicates} & \textbf{N} \\
 \midrule
-all & 1.03 & [1.02, 1.04] & 100/100 & 24,527,534 \\
+all & 1.01 & [1.01, 1.03] & 100/100 & 24,349,760 \\
 \bottomrule
 \multicolumn{5}{@{}l}{\footnotesize Replicates resample whole matched pairs with replacement.} \\
+\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD ($\exp(\beta_2+\beta_4)$, upper bound); the headline treatment effect elsewhere is the answer-arrival increment ($\beta_4$).} \\
 \end{tabular}
 \end{table}

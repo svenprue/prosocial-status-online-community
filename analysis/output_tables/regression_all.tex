@@ -7,23 +7,25 @@
 \toprule
  & \textbf{Main} & \textbf{Main + Speed} \\
 \midrule
-\multicolumn{3}{@{}l}{\textit{Treatment Effect (DiD): post-answer vs.\ pre-question}} \\
-\hspace{1em} Received Answer (net post-answer effect) & 0.0492*** & 0.1059*** \\
- & (0.0045) & (0.0048) \\
-\hspace{1em} Hazard Ratio [95\% CI] & [1.04, 1.06] & [1.10, 1.12] \\[4pt]
-\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & [1.02, 1.04] & — \\[4pt]
-\multicolumn{3}{@{}l}{\textit{\quad Decomposition (nested time-varying terms)}} \\
-\hspace{2em} Waiting period: Received Answer $\times$ Post-Question & 0.0064 & 0.0311*** \\
-\hspace{2em} Answer arrival: $\times$ Post-Answer Received & 0.0428*** & 0.0748*** \\
- & (0.0066) & (0.0059) \\
+\multicolumn{3}{@{}l}{\textit{Treatment effect: increment at answer arrival ($\beta_4$)}} \\
+\hspace{1em} Answer arrival ($\times$ Post-Answer Received) & 0.0024 & 0.0269*** \\
+ & (0.0067) & (0.0058) \\
+\hspace{1em} Hazard Ratio [95\% CI] & [0.99, 1.02] & [1.02, 1.04] \\[4pt]
+\multicolumn{3}{@{}l}{\textit{Total elevation (summed DiD, upper bound)}} \\
+\hspace{1em} Received Answer (net post-answer effect) & 0.0081\textdagger & 0.0239*** \\
+ & (0.0048) & (0.0045) \\
+\hspace{1em} Hazard Ratio [95\% CI] & [1.00, 1.02] & [1.02, 1.03] \\[4pt]
+\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & [1.01, 1.03] & — \\[4pt]
+\multicolumn{3}{@{}l}{\textit{\quad Pre-trend diagnostic (nested time-varying terms)}} \\
+\hspace{2em} Waiting period ($\beta_2$): Received Answer $\times$ Post-Question & 0.0056 & -0.0030 \\
 \multicolumn{3}{@{}l}{\textit{Response Time Interaction}} \\
-\hspace{1em} Net: Treatment $\times$ log(RT), summed & — & -0.0135*** \\
- & — & (0.0021) \\[2pt]
-\hspace{1em} Component: Post-Answer $\times$ log(RT) & — & -0.0440*** \\
- & — & (0.0018) \\[4pt]
+\hspace{1em} Net: Treatment $\times$ log(RT), summed & — & 0.0014 \\
+ & — & (0.0036) \\[2pt]
+\hspace{1em} Component: Post-Answer $\times$ log(RT) & — & -0.0780*** \\
+ & — & (0.0038) \\[4pt]
 \midrule
-N & 24,527,534 & 24,527,534 \\
-Events & 5,157,805 & 5,157,805 \\
+N & 24,349,760 & 24,349,760 \\
+Events & 5,025,482 & 5,025,482 \\
 \bottomrule
 \multicolumn{3}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.} \\
 \multicolumn{3}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\

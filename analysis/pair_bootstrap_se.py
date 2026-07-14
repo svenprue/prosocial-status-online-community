@@ -347,6 +347,16 @@ def merge_pair_bootstrap_checkpoints(
             except Exception as exc:
                 print(f"  ⚠ Could not read {name}: {exc}")
 
+    if not np.isfinite(base_coef) and os.path.exists(pooled):
+        # Fall back to pooled Cox summed-DiD point estimate (same estimand as bootstrap).
+        try:
+            pall = pd.read_csv(pooled)
+            if not pall.empty and "did_coef" in pall.columns and pd.notna(pall.iloc[0]["did_coef"]):
+                base_coef = float(pall.iloc[0]["did_coef"])
+                print(f"  ✓ Recovered base_coef={base_coef:.6f} from results_main_all.csv did_coef")
+        except Exception as exc:
+            print(f"  ⚠ Could not read results_main_all.csv for base_coef: {exc}")
+
     row = {
         "scope": scope,
         "n_questions": n_questions,
