@@ -25,7 +25,7 @@ from cox_config import (
     PRIMARY_HELP_TYPES,
 )
 from cox_data import load_and_prepare, create_tenure_buckets
-from cox_fit import fit_cox_cached, _linear_combo, DID_TERMS
+from cox_fit import fit_cox_cached, fit_response_time_bin_quality_models, _linear_combo, DID_TERMS
 
 
 def _default_input_folder() -> str:
@@ -337,25 +337,60 @@ def run_newcomer_bucket_checks(input_folder: str, use_cache: bool) -> pd.DataFra
     return out
 
 
+def run_rt_bins_quality(
+    input_folder: str, use_cache: bool, n_jobs: int | None = None
+) -> pd.DataFrame:
+    """ISS-06 / #27: Model A + answer-quality controls per response-time bin."""
+    print("\n=== ISS-06/#27: Response-time bins with answer-quality controls ===")
+    model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
+    out = fit_response_time_bin_quality_models(
+        model_df, use_cache=use_cache, n_jobs=n_jobs
+    )
+    return out
+
+
 def main():
     parser = argparse.ArgumentParser(description="Revision-data robustness analyses")
     parser.add_argument("--input", default=_default_input_folder())
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument(
+        "--only",
+        choices=[
+            "observable",
+            "quality",
+            "composite",
+            "placebo",
+            "newcomer",
+            "rt_bins_quality",
+            "all",
+        ],
+        default="all",
+        help="Run a single step (default: all except rt_bins_quality, which is opt-in).",
+    )
+    parser.add_argument("--n-jobs", type=int, default=None)
     args = parser.parse_args()
     os.makedirs(CACHE_DIR, exist_ok=True)
     use_cache = not args.no_cache
 
-    run_observable_controls(args.input, use_cache)
-    run_answer_quality(args.input, use_cache)
-    run_composite_outcome(args.input, use_cache)
-    run_viewcount_placebo(args.input, use_cache)
-    run_newcomer_bucket_checks(args.input, use_cache)
+    if args.only in ("observable", "all"):
+        run_observable_controls(args.input, use_cache)
+    if args.only in ("quality", "all"):
+        run_answer_quality(args.input, use_cache)
+    if args.only in ("composite", "all"):
+        run_composite_outcome(args.input, use_cache)
+    if args.only in ("placebo", "all"):
+        run_viewcount_placebo(args.input, use_cache)
+    if args.only in ("newcomer", "all"):
+        run_newcomer_bucket_checks(args.input, use_cache)
+    if args.only == "rt_bins_quality":
+        run_rt_bins_quality(args.input, use_cache, n_jobs=args.n_jobs)
 
-    try:
-        from cohort_robustness import run_cohort_robustness
-        run_cohort_robustness(args.input, use_cache=use_cache)
-    except Exception as e:
-        print(f"⚠ Cohort robustness skipped: {e}")
+    if args.only == "all":
+        try:
+            from cohort_robustness import run_cohort_robustness
+            run_cohort_robustness(args.input, use_cache=use_cache)
+        except Exception as e:
+            print(f"⚠ Cohort robustness skipped: {e}")
 
     print("\nDone. Results in analysis/model_cache/results_*.csv")
 

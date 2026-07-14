@@ -21,6 +21,7 @@ from cox_config import (
     MAX_FIT_WORKERS,
     SUBSAMPLE_SEED,
     COVARIATES_MAIN,
+    COVARIATES_MAIN_QUALITY,
     COVARIATES_SPEED,
     RT_BIN_EDGES_HOURS,
     RT_BIN_LABELS,
@@ -363,12 +364,18 @@ def fit_cox_cached(
 
 
 def _fit_one_rt_bin(args):
-    label, subset, cache_name, use_cache = args
+    label, subset, cache_name, use_cache, covariates = args
     n_events = int(subset["event_occurred"].sum())
     n_questions = int(subset["unique_id"].nunique())
     if len(subset) < 100 or n_events < 10:
         return (label, None)
-    res = fit_cox_cached(subset, cache_name, COVARIATES_MAIN, use_cache=use_cache, round_to_hours=ROUND_TO_HOURS)
+    missing = [c for c in covariates if c not in subset.columns]
+    if missing:
+        print(f"  ⚠ {cache_name}: skipping — missing covariates {missing}")
+        return (label, None)
+    res = fit_cox_cached(
+        subset, cache_name, covariates, use_cache=use_cache, round_to_hours=ROUND_TO_HOURS
+    )
     if res is None:
         return (label, None)
     s = res.summary_df
@@ -396,9 +403,16 @@ def _fit_one_rt_bin(args):
     return (label, row)
 
 
-def _rt_bin_task(model_df: pd.DataFrame, bin_idx: int, use_cache: bool):
+def _rt_bin_task(
+    model_df: pd.DataFrame,
+    bin_idx: int,
+    use_cache: bool,
+    covariates: list | None = None,
+    cache_prefix: str = "ModelA_AllData_RTbin",
+):
     lo, hi = RT_BIN_EDGES_HOURS[bin_idx], RT_BIN_EDGES_HOURS[bin_idx + 1]
     label = RT_BIN_LABELS[bin_idx]
+    covariates = list(covariates) if covariates is not None else list(COVARIATES_MAIN)
     drop_cols = [
         c for c in ["tenure_bucket", "response_time_bin", "treated_bin2", "treated_bin3"]
         if c in model_df.columns
@@ -413,28 +427,43 @@ def _rt_bin_task(model_df: pd.DataFrame, bin_idx: int, use_cache: bool):
         )
     )
     subset = model_df.loc[mask].drop(columns=drop_cols + ["response_time_hours"], errors="ignore").copy()
-    cache_name = f"ModelA_AllData_RTbin_{lo}_{hi}".replace(".", "_")
-    return (label, subset, cache_name, use_cache)
+    cache_name = f"{cache_prefix}_{lo}_{hi}".replace(".", "_")
+    return (label, subset, cache_name, use_cache, covariates)
 
 
-def fit_response_time_bin_models(model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None):
-    """Fit Model A per response-time bin (pooled)."""
+def fit_response_time_bin_models(
+    model_df: pd.DataFrame,
+    use_cache: bool = True,
+    n_jobs: int = None,
+    covariates: list | None = None,
+    cache_prefix: str = "ModelA_AllData_RTbin",
+    results_csv: str = "results_response_time_bins.csv",
+    title: str = "Response time bin models (Model A per bin)",
+):
+    """Fit Cox per response-time bin (pooled controls + treated in that RT window)."""
     if "response_time_hours" not in model_df.columns:
         print("  ⚠ response_time_hours not in model_df; skipping response-time bin models.")
         return pd.DataFrame()
+    covariates = list(covariates) if covariates is not None else list(COVARIATES_MAIN)
     n_bins = len(RT_BIN_EDGES_HOURS) - 1
     n_workers = _parallel_workers(n_bins, n_jobs)
-    print("\n" + "=" * 60 + "\n  Response time bin models (Model A per bin)\n" + "=" * 60)
+    print("\n" + "=" * 60 + f"\n  {title}\n" + "=" * 60)
+    print(f"  covariates={covariates}")
     print(f"  (n_jobs={n_workers}, MAX_FIT_WORKERS={MAX_FIT_WORKERS})")
     if n_workers > 1:
-        tasks = [_rt_bin_task(model_df, i, use_cache) for i in range(n_bins)]
+        tasks = [
+            _rt_bin_task(model_df, i, use_cache, covariates=covariates, cache_prefix=cache_prefix)
+            for i in range(n_bins)
+        ]
         with Pool(n_workers) as pool:
             results = pool.map(_fit_one_rt_bin, tasks)
     else:
         import gc
         results = []
         for i in range(n_bins):
-            task = _rt_bin_task(model_df, i, use_cache)
+            task = _rt_bin_task(
+                model_df, i, use_cache, covariates=covariates, cache_prefix=cache_prefix
+            )
             results.append(_fit_one_rt_bin(task))
             del task
             gc.collect()
@@ -444,9 +473,25 @@ def fit_response_time_bin_models(model_df: pd.DataFrame, use_cache: bool = True,
         return pd.DataFrame()
     df_bins = pd.DataFrame(results)
     os.makedirs(CACHE_DIR, exist_ok=True)
-    df_bins.to_csv(os.path.join(CACHE_DIR, "results_response_time_bins.csv"), index=False)
-    print(f"✓ Saved results_response_time_bins.csv ({len(df_bins)} bins) to {CACHE_DIR}/")
+    out_path = os.path.join(CACHE_DIR, results_csv)
+    df_bins.to_csv(out_path, index=False)
+    print(f"✓ Saved {results_csv} ({len(df_bins)} bins) to {CACHE_DIR}/")
     return df_bins
+
+
+def fit_response_time_bin_quality_models(
+    model_df: pd.DataFrame, use_cache: bool = True, n_jobs: int = None
+) -> pd.DataFrame:
+    """ISS-06 extension (#27): Model A + answer-quality controls per RT bin."""
+    return fit_response_time_bin_models(
+        model_df,
+        use_cache=use_cache,
+        n_jobs=n_jobs,
+        covariates=COVARIATES_MAIN_QUALITY,
+        cache_prefix="ModelA_AllData_RTbinQuality",
+        results_csv="results_response_time_bins_quality.csv",
+        title="Response time bin models with answer-quality controls",
+    )
 
 
 def _fit_one_tenure_bucket(args):

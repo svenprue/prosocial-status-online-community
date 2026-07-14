@@ -978,6 +978,68 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
     return "\n".join(lines)
 
 
+def generate_response_time_bins_quality_table(
+    df_base: pd.DataFrame,
+    df_qual: pd.DataFrame,
+    bootstrap_available: bool = False,
+) -> str:
+    """Side-by-side baseline vs answer-quality-controlled RT-bin arrival HRs (appendix)."""
+    if df_base is None or df_base.empty or df_qual is None or df_qual.empty:
+        return ""
+    if "treat_hr" not in df_base.columns or "treat_hr" not in df_qual.columns:
+        return ""
+
+    order = {label: i for i, label in enumerate(RT_BIN_LABELS)}
+    base = df_base.copy()
+    qual = df_qual.copy()
+    base["bucket_order"] = base["bucket"].map(order).fillna(999)
+    qual["bucket_order"] = qual["bucket"].map(order).fillna(999)
+    merged = base.merge(
+        qual,
+        on="bucket",
+        how="inner",
+        suffixes=("_base", "_qual"),
+    )
+    if merged.empty:
+        return ""
+    merged["bucket_order"] = merged["bucket"].map(order).fillna(999)
+    merged = merged.sort_values("bucket_order")
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Treatment Effect by Response-Time Bin, With and Without Answer-Quality Controls}",
+        r"\label{tab:response_time_bins_quality}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Response time} & \textbf{Baseline HR} & \textbf{95\% CI} & \textbf{Quality HR} & \textbf{95\% CI} \\",
+        r"\midrule",
+    ]
+    for _, r in merged.iterrows():
+        p_b = r.get("treat_p_base", np.nan)
+        p_q = r.get("treat_p_qual", np.nan)
+        stars_b = _sig_stars(p_b) if pd.notna(p_b) else ""
+        stars_q = _sig_stars(p_q) if pd.notna(p_q) else ""
+        hr_b, lo_b, hi_b = r.get("treat_hr_base"), r.get("treat_ci_lo_base"), r.get("treat_ci_hi_base")
+        hr_q, lo_q, hi_q = r.get("treat_hr_qual"), r.get("treat_ci_lo_qual"), r.get("treat_ci_hi_qual")
+        lines.append(
+            rf"{_latex_bucket(str(r['bucket']))} & "
+            rf"{hr_b:.2f}{stars_b} & [{lo_b:.2f}, {hi_b:.2f}] & "
+            rf"{hr_q:.2f}{stars_q} & [{lo_q:.2f}, {hi_q:.2f}] \\"
+        )
+    lines += [
+        r"\bottomrule",
+        _standard_error_note(5, bootstrap_available=bootstrap_available),
+        r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
+        r"\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$). Quality columns add acceptance, first-answer score, and length.} \\",
+        r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
+        r"\end{tabular}",
+        r"\end{table}",
+    ]
+    return "\n".join(lines)
+
+
 def generate_selection_bounds_table(df: pd.DataFrame) -> str:
     """Generate a compact table from selection_sensitivity.py outputs."""
     if df.empty or "adjusted_event_rate_rr_proxy" not in df.columns:
@@ -1393,6 +1455,7 @@ def main():
     main_all_path = os.path.join(CACHE_DIR, "results_main_all.csv")
     speed_all_path = os.path.join(CACHE_DIR, "results_speed_all.csv")
     rt_bins_path = os.path.join(CACHE_DIR, "results_response_time_bins.csv")
+    rt_bins_quality_path = os.path.join(CACHE_DIR, "results_response_time_bins_quality.csv")
     selection_bounds_path = os.path.join(CACHE_DIR, "results_selection_bounds.csv")
     pair_bootstrap_path = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
@@ -1407,6 +1470,9 @@ def main():
     df_main_all = pd.read_csv(main_all_path) if os.path.exists(main_all_path) else pd.DataFrame()
     df_speed_all = pd.read_csv(speed_all_path) if os.path.exists(speed_all_path) else pd.DataFrame()
     df_rt_bins = pd.read_csv(rt_bins_path) if os.path.exists(rt_bins_path) else pd.DataFrame()
+    df_rt_bins_quality = (
+        pd.read_csv(rt_bins_quality_path) if os.path.exists(rt_bins_quality_path) else pd.DataFrame()
+    )
     df_selection_bounds = pd.read_csv(selection_bounds_path) if os.path.exists(selection_bounds_path) else pd.DataFrame()
     df_pair_bootstrap = pd.read_csv(pair_bootstrap_path) if os.path.exists(pair_bootstrap_path) else pd.DataFrame()
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
@@ -1473,6 +1539,17 @@ def main():
         with open(out, "w") as f:
             f.write(tex)
         print(f"✓ {out}")
+
+    # Appendix: baseline vs quality-controlled RT bins (#27)
+    if not df_rt_bins.empty and not df_rt_bins_quality.empty:
+        tex = generate_response_time_bins_quality_table(
+            df_rt_bins, df_rt_bins_quality, bootstrap_available=bootstrap_available
+        )
+        if tex:
+            out = os.path.join(TABLE_DIR, "response_time_bins_quality.tex")
+            with open(out, "w") as f:
+                f.write(tex)
+            print(f"✓ {out}")
 
     if not df_selection_bounds.empty:
         tex = generate_selection_bounds_table(df_selection_bounds)

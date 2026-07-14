@@ -78,6 +78,10 @@ COVARIATES_MAIN_OBSERVABLE = COVARIATES_MAIN + OBSERVABLE_CONTROL_COVARIATES
 # ISS-06: answer-quality robustness (speed spec extension)
 QUALITY_COVARIATES = ["hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars"]
 COVARIATES_SPEED_QUALITY = COVARIATES_SPEED + QUALITY_COVARIATES
+# Discrete RT bins already condition on response-time window, so quality controls
+# attach to Model A (no continuous log-RT interactions within bin).
+COVARIATES_MAIN_QUALITY = COVARIATES_MAIN + QUALITY_COVARIATES
+
 
 CONTINUOUS_COVARIATES_EXTENDED = CONTINUOUS_COVARIATES + OBSERVABLE_CONTROL_COVARIATES + [
     "firstAnswerScore", "firstAnswerBodyLenChars",

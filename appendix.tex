@@ -91,6 +91,12 @@ Table~\ref{tab:newcomer_robustness} reports the newcomer ($<$\,1 week) bucket un
 
 \input{analysis/output_tables/newcomer_robustness.tex}
 
+Table~\ref{tab:response_time_bins_quality} revisits the discrete response-time bins after adding the same three answer-quality controls used in the pooled speed specification (acceptance, first-answer score, and length). Because each row already conditions on a response-time window, the quality-controlled fits use Model~A covariates plus those three signals rather than continuous log-response-time interactions. Comparing columns shows how much of the bin-wise arrival pattern survives once observable quality is held fixed.
+
+\IfFileExists{analysis/output_tables/response_time_bins_quality.tex}{%
+\input{analysis/output_tables/response_time_bins_quality.tex}%
+}{}
+
 \section{Analysis of Life-Time Contributions}
 \label{sec:lt-contributions}
 What remains unclear is whether users who become contributors through generalized reciprocity continue to contribute consistently and become valuable community members. To explore this, we compare the contributions of reciprocity-activated users with those of all contributors selected for Study 1. Specifically, we examine the number of times users from each group provided and received help up to July 14, 2024. The results are presented in Table \ref{tab:quartile_statistics}. Across all quartiles and at the median, reciprocity-activated users ask and provide more help than their counterparts.
