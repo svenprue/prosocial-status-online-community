@@ -246,7 +246,7 @@ Table~\ref{tab:variables} provides an overview of the variables used in our anal
 
 Because the receipt of an answer (the treatment) is correlated with user characteristics (more experienced users, for instance, might tend to ask higher-quality questions that are more likely to receive answers), we employ propensity score matching \citep{rosenbaum_rubin_1983} to improve the comparability of the treatment and control groups. Importantly, matching is performed \textit{across different users}: each treated question (from a user who received an answer) is matched to a control question (from a different user whose question did not receive an answer) that has a similar propensity to receive an answer based on observable pre-treatment characteristics. This cross-user matching ensures that treated and control observations are independent conditional on the matched covariates, while the DiD structure within each pair absorbs residual differences.
 
-We estimate the propensity score using the following pre-treatment covariates, which jointly capture user experience, recent activity, and question characteristics as depicted in Table \ref{tab:covariates}. It should be noted that \textit{tagAnswerRateAvg} is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low answer rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
+We estimate the propensity score using the following pre-treatment covariates, which jointly capture user experience, recent activity, and question characteristics as depicted in Table \ref{tab:covariates}. It should be noted that \textit{tagAcceptShareAvg} is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low accepted-answer rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
 Matching on the tag-level answer rate is particularly important for our response time analysis, as it mitigates the concern that slower response times simply proxy for differently sized sub-communities with lower throughput. We use nearest-neighbor matching \emph{with replacement} and a caliper of 0.05 on the propensity score, requiring in addition an exact match on the calendar year, the question's primary tag, and the number of tags. Because the pool of unanswered questions is smaller than the pool of answered questions, some control questions are matched to more than one treated question; the matched file therefore contains more rows than unique question pairs (12.2 million pairs, 24.3 million rows). Each row enters the Cox analysis as an independent observation window; standard errors are discussed in the robustness appendix.
 
 \begin{table}
@@ -276,7 +276,7 @@ numQuestionsAsked7D & Number of questions asked in the 7 days preceding the obse
 
 numHelpProvided7D & Number of answers provided in the 7 days preceding the observation window. \\
 
-tagAnswerRateAvg & Average share of questions that receive an answer within the question's tags, capturing topic-specific difficulty. \\
+tagAcceptShareAvg & Average share of questions that receive an \emph{accepted} answer within the question's tags, capturing topic-specific difficulty. \\
 
 \multicolumn{2}{l}{\textit{Observable question and author characteristics (propensity score matching)}}\\
 postHour & Hour of day at which the question was posted, capturing diurnal variation in who is online to answer. \\
@@ -294,7 +294,7 @@ ownerReputation & Asker's reputation score at posting, capturing standing and ex
     \item \textit{Cumulative activity}: total questions asked and total answers provided before the observation window.
     \item \textit{Recent activity}: questions asked and answers provided in the 30 days and 7 days before the observation window, capturing current engagement intensity.
     \item \textit{Pre-question helping}: whether the user provided any help during the pre-question phase, capturing baseline helping propensity.
-    \item \textit{Tag-level answer rate}: the average share of questions that receive an answer within the question's tags, capturing topic-specific difficulty and demand. This variable is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low answer rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
+    \item \textit{Tag-level accepted-answer rate}: the average share of questions that receive an accepted answer within the question's tags, capturing topic-specific difficulty and demand. This variable is critical for addressing the concern that question complexity may confound the treatment: questions in tags with low acceptance rates are inherently more difficult, and matching on this rate ensures that treated and control questions come from similarly tractable topic areas.
     \item \textit{Calendar year}: to account for secular trends in platform activity and answer rates.
 \end{itemize}
 \fi
@@ -316,7 +316,7 @@ Table~\ref{tab:balance} displays the covariate balance before and after matching
  numHelpProvided30D & 0.81 & 0.46 & 0.068 & 0.76 & 0.62 & 0.028 \\
  numQuestionsAsked7D & 0.57 & 0.34 & 0.174 & 0.56 & 0.53 & 0.023 \\
  numHelpProvided7D & 0.22 & 0.12 & 0.063 & 0.20 & 0.16 & 0.026 \\
- tagAnswerRateAvg & 0.51 & 0.44 & 0.695 & 0.51 & 0.51 & $-$0.003 \\
+ tagAcceptShareAvg & 0.51 & 0.44 & 0.695 & 0.51 & 0.51 & $-$0.003 \\
  \midrule
  numTags & 2.83 & 3.04 & $-$0.173 & 2.83 & 2.83 & 0.000 \\
  bodyLenChars & 1289.10 & 1658.54 & $-$0.183 & 1286.37 & 1338.86 & $-$0.026 \\
@@ -369,7 +369,7 @@ h(t \mid \mathbf{X}(t)) = h_0(t) \exp\Big(\boldsymbol{\beta}' \mathbf{X}(t) \\
 \subsection{Descriptive Statistics}
 %----------------------------------------------------------------------
 
-The Cox analytic sample spans 24,349,760 question-level observations from 3,732,706 unique users on Stack Overflow, with 50\% of questions receiving at least one answer. Help-event counts are right-skewed: the mean is 0.37 events per observation window (SD\,=\,3.08; median 0), consistent with helping being a relatively rare behavior for any individual user in any given window. Among treated users, the median response time from question to first answer is 0.34 hours, though the distribution is heavily right-skewed (mean 5.08 hours, SD\,=\,17.06), reflecting a minority of questions that wait many hours or days for a response. The sample spans all levels of platform experience, with the largest stratum being established users (1--3 years: $n=6{,}424{,}968$), followed closely by the 1--6-month ($n=4{,}045{,}952$) and $<$\,1-week ($n=4{,}029{,}008$) groups.
+The Cox analytic sample spans 24,349,760 question-level observations from 3,732,706 unique users on Stack Overflow, with 50\% of questions receiving at least one answer. Help-event counts (answers and comments the focal user posts to others within the window) are right-skewed: the mean is 0.31 events per observation window (SD\,=\,2.20; median 0), consistent with helping being a relatively rare behavior for any individual user in any given window. Among treated users, the median response time from question to first answer is 0.34 hours, though the distribution is heavily right-skewed (mean 5.08 hours, SD\,=\,17.06), reflecting a minority of questions that wait many hours or days for a response. The sample spans all levels of platform experience, with the largest stratum being established users (1--3 years: $n=6{,}424{,}968$), followed closely by the 1--6-month ($n=4{,}045{,}952$) and $<$\,1-week ($n=4{,}029{,}008$) groups.
 
 \input{analysis/output_tables/desc_stats}
 

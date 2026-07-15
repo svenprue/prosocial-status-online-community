@@ -241,7 +241,7 @@ def generate_desc_stats_table(desc: dict, df_main: pd.DataFrame = None) -> str:
         rf"Unique users & & & & {_f(n_u)} \\",
         rf"\% questions with answer & {_f(pct_ans)}\% & & & \\",
         r"\midrule",
-        rf"Help events per window & {_f(he_mean)} & {_f(he_std)} & {_f(he_med)} & \\",
+        rf"Help events per window (answers + comments) & {_f(he_mean)} & {_f(he_std)} & {_f(he_med)} & \\",
         rf"User tenure (days) & {_f(t_mean)} & {_f(t_std)} & {_f(t_med)} & \\",
         rf"Response time (hours, treated) & {_f(rt_mean)} & {_f(rt_std)} & {_f(rt_med)} & \\",
         r"\midrule",
@@ -1599,24 +1599,12 @@ def main():
                     f.write(tex)
                 print(f"✓ {out}")
 
-    placebo_path = os.path.join(CACHE_DIR, "results_viewcount_placebo.csv")
-    if os.path.exists(placebo_path) and os.path.getsize(placebo_path) > 1:
-        try:
-            df_placebo = pd.read_csv(placebo_path)
-        except pd.errors.EmptyDataError:
-            print(f"⚠ Skipping viewcount placebo table — empty file: {placebo_path}")
-            df_placebo = pd.DataFrame()
-        if not df_placebo.empty:
-            tex = generate_viewcount_placebo_table(df_placebo)
-            if tex:
-                out = os.path.join(TABLE_DIR, "viewcount_placebo.tex")
-                with open(out, "w") as f:
-                    f.write(tex)
-                print(f"✓ {out}")
-        else:
-            print("⚠ Skipping viewcount placebo table — no rows in CSV.")
-    elif os.path.exists(placebo_path):
-        print(f"⚠ Skipping viewcount placebo table — empty file: {placebo_path}")
+    # ViewCount placebo is deprecated for the manuscript (cumulative dump ViewCount
+    # is not a valid contemporaneous exposure placebo). Do not regenerate tex.
+    placebo_tex = os.path.join(TABLE_DIR, "viewcount_placebo.tex")
+    if os.path.exists(placebo_tex):
+        os.remove(placebo_tex)
+        print(f"✓ Removed deprecated {placebo_tex}")
 
     # Conservative absolute-effect and NNT proxies
     df_absolute = build_absolute_effects()

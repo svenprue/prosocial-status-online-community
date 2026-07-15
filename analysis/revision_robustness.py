@@ -97,12 +97,15 @@ def _fit_subset(model_df: pd.DataFrame, model_name: str, covariates: list, use_c
 
 def run_observable_controls(input_folder: str, use_cache: bool) -> pd.DataFrame:
     print("\n=== ISS-02: Observable selection controls ===")
-    model_df, _ = load_and_prepare(input_folder)
+    model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
     rows = []
     base = _fit_subset(model_df, "ModelA_AllData_Baseline", COVARIATES_MAIN, use_cache)
     if base:
         rows.append({**base, "spec": "baseline"})
-    ext = _fit_subset(model_df, "ModelA_AllData_ObservableControls", COVARIATES_MAIN_OBSERVABLE, use_cache)
+    # Cache name bumps when the observable covariate list changes (e.g. viewCount drop).
+    ext = _fit_subset(
+        model_df, "ModelA_AllData_ObservableControls_novc", COVARIATES_MAIN_OBSERVABLE, use_cache
+    )
     if ext:
         rows.append({**ext, "spec": "observable_controls"})
     out = pd.DataFrame(rows)
@@ -208,8 +211,18 @@ def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
 
 
 def run_viewcount_placebo(input_folder: str, use_cache: bool) -> pd.DataFrame:
-    """ISS-16: among no-answer questions, high vs low ViewCount post-pseudo-window helping."""
-    print("\n=== ISS-16: ViewCount exposure placebo (no-answer questions) ===")
+    """ISS-16 (deprecated): ViewCount high-vs-low helping among unanswered questions.
+
+    Cumulative dump ``ViewCount`` conflates age, topic popularity, and years of
+    post-window search traffic with contemporaneous exposure, so this is *not* a
+    valid identification check. Kept as an opt-in diagnostic (``--only placebo``);
+    it is no longer part of the default revision pipeline or manuscript package.
+    """
+    print("\n=== ISS-16: ViewCount exposure placebo (no-answer questions) [OPT-IN ONLY] ===")
+    print(
+        "  ⚠ Cumulative dump ViewCount is not identified for a contemporaneous "
+        "exposure placebo; this run is diagnostic-only and not manuscript output."
+    )
     timelines = pd.read_parquet(os.path.join(input_folder, "study_timelines.parquet"))
     events = pd.read_parquet(os.path.join(input_folder, "study_events.parquet"))
     if "viewCount" not in timelines.columns:
@@ -321,7 +334,7 @@ def run_newcomer_bucket_checks(input_folder: str, use_cache: bool) -> pd.DataFra
     rows = []
     for name, covs in [
         ("ModelA_Newcomer_Baseline", COVARIATES_MAIN),
-        ("ModelA_Newcomer_Observable", COVARIATES_MAIN_OBSERVABLE),
+        ("ModelA_Newcomer_Observable_novc", COVARIATES_MAIN_OBSERVABLE),
         ("ModelB_Newcomer_Baseline", COVARIATES_SPEED),
         ("ModelB_Newcomer_LengthOnly", COVARIATES_SPEED + ["firstAnswerBodyLenChars"]),
         ("ModelB_Newcomer_ScoreOnly", COVARIATES_SPEED + ["firstAnswerScore"]),
@@ -329,7 +342,9 @@ def run_newcomer_bucket_checks(input_folder: str, use_cache: bool) -> pd.DataFra
     ]:
         row = _fit_subset(sub, name, covs, use_cache)
         if row:
-            rows.append({**row, "tenure_bucket": bucket})
+            # Display name without the cache-busting suffix.
+            display = name.replace("_novc", "")
+            rows.append({**row, "model": display, "tenure_bucket": bucket})
     out = pd.DataFrame(rows)
     path = os.path.join(CACHE_DIR, "results_newcomer_robustness.csv")
     out.to_csv(path, index=False)
@@ -365,7 +380,10 @@ def main():
             "all",
         ],
         default="all",
-        help="Run a single step (default: all except rt_bins_quality, which is opt-in).",
+        help=(
+            "Run a single step. Default 'all' skips the ViewCount placebo "
+            "(opt-in via --only placebo; not manuscript-ready)."
+        ),
     )
     parser.add_argument("--n-jobs", type=int, default=None)
     args = parser.parse_args()
@@ -378,7 +396,7 @@ def main():
         run_answer_quality(args.input, use_cache)
     if args.only in ("composite", "all"):
         run_composite_outcome(args.input, use_cache)
-    if args.only in ("placebo", "all"):
+    if args.only == "placebo":
         run_viewcount_placebo(args.input, use_cache)
     if args.only in ("newcomer", "all"):
         run_newcomer_bucket_checks(args.input, use_cache)

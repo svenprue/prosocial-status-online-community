@@ -87,7 +87,11 @@ Table~\ref{tab:cohort_robustness} addresses the concern that pooling entry cohor
 
 \input{analysis/output_tables/cohort_robustness.tex}
 
-Table~\ref{tab:newcomer_robustness} reports the newcomer ($<$\,1 week) bucket under several specifications. The baseline arrival increment is 1.06 (summed upper bound 1.11); adding observable pre-treatment selection controls leaves it stable --- indeed slightly amplifies it (arrival 1.10; summed 1.20). Adding answer-quality controls, by contrast, pushes the newcomer increment below one (arrival 0.94; summed 0.88), the same reversal seen in the pooled effect and reinforcing that answer quality --- not observable selection --- is the most consequential confound the design does not resolve.
+Table~\ref{tab:observable_controls} reports the pooled Model~A after adding pre-treatment observable selection controls (posting hour and weekday, number of tags, body and title length, and asker reputation). View count is \emph{not} included: it accrues after posting and is higher for answered questions, so conditioning on it would open a post-treatment / collider channel already excluded from the propensity score. The pooled arrival increment remains near null and essentially unchanged once these pre-treatment observables are held fixed.
+
+\input{analysis/output_tables/observable_controls.tex}
+
+Table~\ref{tab:newcomer_robustness} reports the newcomer ($<$\,1 week) bucket under several specifications. The baseline arrival increment is 1.06 (summed upper bound 1.11); the adjacent row adds the same pre-treatment observable controls (again without view count). Adding answer-quality controls, by contrast, pushes the newcomer increment below one (arrival 0.94; summed 0.88), the same reversal seen in the pooled effect and reinforcing that answer quality --- not observable selection --- is the most consequential confound the design does not resolve.
 
 \input{analysis/output_tables/newcomer_robustness.tex}
 

@@ -262,6 +262,11 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
             ids = np.random.choice(timelines["match_id"].unique(), sample_size, replace=False)
             timelines = timelines[timelines["match_id"].isin(ids)].copy()
             events = events[events["match_id"].isin(ids)].copy()
+        # Match the analysis outcome: filter before descriptives when a help-type
+        # subset was requested (interval cache path previously counted all types).
+        if event_help_types and "help_type" in events.columns:
+            events = events[events["help_type"].isin(event_help_types)].copy()
+            print(f"Filtered events to help_type in {event_help_types}: {len(events):,} rows")
         descriptives = _compute_descriptives(timelines, events)
         with open(desc_cache, "wb") as f:
             pickle.dump(descriptives, f)

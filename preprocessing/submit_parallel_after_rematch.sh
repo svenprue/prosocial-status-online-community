@@ -57,8 +57,8 @@ J_ISS02=$(submit_rev observable rev_iss02)
 echo "rev observable (ISS-02):          $J_ISS02"
 J_ISS06=$(submit_rev quality rev_iss06)
 echo "rev quality (ISS-06):             $J_ISS06"
-J_ISS16=$(submit_rev placebo rev_iss16)
-echo "rev placebo (ISS-16):             $J_ISS16"
+# ISS-16 ViewCount placebo is opt-in only (cumulative dump ViewCount not identified).
+# J_ISS16=$(submit_rev placebo rev_iss16)
 J_NEW=$(submit_rev newcomer rev_newcom)
 echo "rev newcomer:                     $J_NEW"
 
@@ -84,7 +84,7 @@ echo "iss10_cohort:                     $J_COHORT (afterok:$J_COX)"
 
 # Final: merge bootstrap + figures/PDF once everything is in
 J_MERGE=$(sbatch --parsable \
-  --dependency="afterok:${J_BOOT},afterok:${J_ISS04},afterok:${J_COX},afterok:${J_ISS02},afterok:${J_ISS06},afterok:${J_ISS16},afterok:${J_NEW},afterok:${J_SEL},afterok:${J_COHORT},afterok:${J_QLOSS}" \
+  --dependency="afterok:${J_BOOT},afterok:${J_ISS04},afterok:${J_COX},afterok:${J_ISS02},afterok:${J_ISS06},afterok:${J_NEW},afterok:${J_SEL},afterok:${J_COHORT},afterok:${J_QLOSS}" \
   --export=ALL,N_BOOTSTRAP,SCOPE,SEED \
   preprocessing/slurm_pair_bootstrap_merge_and_rest.sbatch)
 echo "boot_merge+figures+PDF:           $J_MERGE"
@@ -95,12 +95,13 @@ DAG summary:
   rematch(${AFTER_REMATCH:-done})
     ├─ eh_default($J_EH) ──┬─ cox($J_COX) ──┬─ sel($J_SEL)
     │                      │               └─ cohort($J_COHORT)
-    │                      ├─ iss02($J_ISS02) iss06($J_ISS06) iss16($J_ISS16) newcomer($J_NEW)
+    │                      ├─ iss02($J_ISS02) iss06($J_ISS06) newcomer($J_NEW)
     │                      └─ boot($J_BOOT)
     ├─ eh_alltypes($J_ALL) ── iss04($J_ISS04)  [also waits eh_default/clear]
     └─ q_loss($J_QLOSS)
   merge($J_MERGE) waits on all analysis + boot
+  (ISS-16 ViewCount placebo is opt-in only; not in this DAG)
 
 Monitor:
-  squeue -u \$USER -j ${J_EH},${J_ALL},${J_COX},${J_ISS02},${J_ISS06},${J_ISS16},${J_NEW},${J_ISS04},${J_BOOT},${J_SEL},${J_COHORT},${J_QLOSS},${J_MERGE}
+  squeue -u \$USER -j ${J_EH},${J_ALL},${J_COX},${J_ISS02},${J_ISS06},${J_NEW},${J_ISS04},${J_BOOT},${J_SEL},${J_COHORT},${J_QLOSS},${J_MERGE}
 EOF

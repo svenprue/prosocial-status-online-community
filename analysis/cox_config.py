@@ -69,9 +69,12 @@ COVARIATES_SPEED = COVARIATES_MAIN + [
 ]
 
 # ISS-02: observable selection controls (robustness spec)
+# viewCount is intentionally excluded: matching treats it as post-treatment /
+# collider (answered questions attract more views). Conditioning on it in the
+# Cox robustness specs would reopen that channel.
 OBSERVABLE_CONTROL_COVARIATES = [
     "postHour", "postDayOfWeek", "numTags",
-    "viewCount", "bodyLenChars", "titleLenChars", "ownerReputation",
+    "bodyLenChars", "titleLenChars", "ownerReputation",
 ]
 COVARIATES_MAIN_OBSERVABLE = COVARIATES_MAIN + OBSERVABLE_CONTROL_COVARIATES
 
