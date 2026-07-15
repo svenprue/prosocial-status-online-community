@@ -99,9 +99,11 @@ def run_observable_controls(input_folder: str, use_cache: bool) -> pd.DataFrame:
     print("\n=== ISS-02: Observable selection controls ===")
     model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
     rows = []
-    base = _fit_subset(model_df, "ModelA_AllData_Baseline", COVARIATES_MAIN, use_cache)
+    # Cache name must stay tied to PRIMARY_HELP_TYPES; the old ModelA_AllData_Baseline
+    # pickle can be from answers+comments+edits and would corrupt this comparison.
+    base = _fit_subset(model_df, "ModelA_AllData_Baseline_primary", COVARIATES_MAIN, use_cache)
     if base:
-        rows.append({**base, "spec": "baseline"})
+        rows.append({**base, "model": "ModelA_AllData_Baseline", "spec": "baseline"})
     # Cache name bumps when the observable covariate list changes (e.g. viewCount drop).
     ext = _fit_subset(
         model_df, "ModelA_AllData_ObservableControls_novc", COVARIATES_MAIN_OBSERVABLE, use_cache
