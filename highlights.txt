@@ -1,4 +1,4 @@
 Receiving help is weakly associated with later helping on Stack Overflow
 Matched diff-in-differences on 21M questions addresses reciprocity confounding
 Effect is concentrated among newcomers and absent among long-tenured users
-Pooled association is null once self-directed accept events are excluded
+Pooled association is small and fades once answer quality is controlled
