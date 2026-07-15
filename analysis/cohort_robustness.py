@@ -219,6 +219,19 @@ def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use
     if pooled is not None:
         rows.append(pooled)
 
+    # Full-sample newcomer for side-by-side with the pre-2020 newcomer row (supports
+    # abstract/conclusion claims that the tenure gradient, not only the pooled effect,
+    # predates the generative-AI era). Prefer the existing newcomer-baseline cache name
+    # so this row does not trigger a redundant fit after ISS-02/06 newcomer checks.
+    if "tenure_bucket" in model_df.columns:
+        newcomer = model_df[model_df["tenure_bucket"] == "< 1 Week"].copy()
+        if len(newcomer) > 0:
+            nc_row = _fit_main_model(newcomer, "ModelA_Newcomer_Baseline", use_cache=use_cache)
+            if nc_row is not None:
+                # Rename for a clearer cohort-table label.
+                nc_row = {**nc_row, "model": "ModelA_Newcomer"}
+                rows.append(nc_row)
+
     cohort_series, cohort_source = _cohort_series_from_model_df(model_df)
     if cohort_series is None:
         cohort_series, cohort_source = _cohort_series_from_timelines(model_df, input_folder)
@@ -241,6 +254,18 @@ def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use
             pre_row = _fit_main_model(pre_2020, "ModelA_Pre2020", use_cache=use_cache)
             if pre_row is not None:
                 rows.append(pre_row)
+            if "tenure_bucket" in pre_2020.columns:
+                pre_newcomer = pre_2020[pre_2020["tenure_bucket"] == "< 1 Week"].copy()
+                print(
+                    f"  Pre-2020 newcomer (< 1 Week): "
+                    f"{int(pre_newcomer['unique_id'].nunique()):,} questions / "
+                    f"{int(pre_newcomer['event_occurred'].sum()):,} events"
+                )
+                pre_nc = _fit_main_model(
+                    pre_newcomer, "ModelA_Pre2020_Newcomer", use_cache=use_cache
+                )
+                if pre_nc is not None:
+                    rows.append(pre_nc)
 
     results = pd.DataFrame(rows, columns=[
         "model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p", "HR_increment_only",
