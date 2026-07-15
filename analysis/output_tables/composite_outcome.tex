@@ -1,5 +1,5 @@
 \begin{table}[H]
-\caption{Reciprocity Effect Decomposed by Help Type (ISS-04)}
+\caption{Reciprocity Effect Decomposed by Help Type}
 \label{tab:outcome_decomposition}
 \centering
 \footnotesize
@@ -10,18 +10,15 @@
 Answers only & 1.03\,[1.02, 1.05] & 1.03\,[1.02, 1.04] & -0.00 & 3,435,973 \\
 Comments only & 1.00\,[0.98, 1.01] & 1.01\,[1.00, 1.03] & +0.02 & 2,170,711 \\
 Edits only & 1.14\,[1.12, 1.16] & 1.23\,[1.21, 1.25] & +0.07 & 992,369 \\
-Accepts only$^{a}$ & 0.26\,[0.26, 0.26] & 1.23\,[1.20, 1.25] & +1.56 & 3,048,320 \\
 Answers $+$ comments & 1.00\,[0.99, 1.02] & 1.01\,[1.00, 1.02] & +0.01 & 5,025,482 \\
 Answers $+$ comments $+$ edits & 1.02\,[1.01, 1.03] & 1.03\,[1.02, 1.04] & +0.01 & 5,679,602 \\
-All types$^{a}$ & 0.24\,[0.24, 0.24] & 1.19\,[1.18, 1.20] & +1.60 & 8,713,279 \\
 \bottomrule
 \end{tabular}
 \vspace{0.35em}
 \begin{minipage}{\linewidth}
 \footnotesize
 \raggedright
-Arrival HR is the answer-arrival increment $\exp(\beta_4)$ (primary); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound); $\beta_2$ is the waiting-period (anticipatory-engagement) pre-trend.\\
-$^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.\\
+Arrival HR is the answer-arrival increment $\exp(\beta_4)$ (primary); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound); $\beta_2$ is the waiting-period (anticipatory-engagement) pre-trend. Accepting an answer is excluded from the decomposition: it is a self-directed act available only to treated users (a control never receives an answer to accept), so the matched difference-in-differences contrast is degenerate for it.\\
 Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.\\
 Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.
 \end{minipage}

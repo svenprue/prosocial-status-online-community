@@ -57,7 +57,7 @@ Figure~\ref{fig:help_rate_by_tenure} shows that the post-question lift in treate
 \section{Selection Sensitivity and Absolute Effects}
 \label{sec:selection_absolute}
 
-Table~\ref{tab:selection_bounds} reports transparent bounds on the reciprocity contrast under alternative assumptions about zero-event controls. Table~\ref{tab:absolute_effects} translates the tenure-bucket hazard ratios into absolute-risk-difference proxies using observed baseline event rates. Table~\ref{tab:pair_bootstrap} reports matched-pair bootstrap 95\% confidence intervals for the pooled Model~A DiD treatment effect (100 replicates).
+Table~\ref{tab:selection_bounds} reports transparent bounds on the reciprocity contrast under alternative assumptions about zero-event controls. Table~\ref{tab:absolute_effects} translates the tenure-bucket hazard ratios into absolute-risk-difference proxies using observed baseline event rates. Table~\ref{tab:pair_bootstrap} reports matched-pair bootstrap 95\% confidence intervals for the pooled Model~A treatment effect --- the difference-in-differences increment at answer arrival ($\beta_4$) --- based on 100 replicates.
 
 \input{analysis/output_tables/selection_bounds.tex}
 
@@ -70,7 +70,7 @@ Table~\ref{tab:selection_bounds} reports transparent bounds on the reciprocity c
 \section{Robustness: Cohort Heterogeneity, Observable Selection, and Answer Quality}
 \label{sec:robustness_revision}
 
-Table~\ref{tab:cohort_robustness} addresses the concern that pooling entry cohorts from 2008 through 2025 conflates structurally different eras of the platform (reputation inflation, tag evolution, and the post-2022 generative-AI disruption). Because calendar year enters the matching design only as an exact stratum, treated and control questions within a pair always share a year; to probe heterogeneity \emph{across} years we re-estimate Model~A on the pre-2020 subsample, both pooled and in the newcomer ($<$\,1 week) stratum. The pooled pre-2020 arrival hazard ratio is 1.014 (versus 1.002 in the full sample; summed upper bound $\approx$1.01 in both), and the newcomer association is essentially unchanged (arrival HR\,$=$\,1.056 pre-2020 versus 1.059 in the full sample), indicating that the tenure gradient was already present before the generative-AI era.
+Table~\ref{tab:cohort_robustness} addresses the concern that pooling entry cohorts from 2008 through 2025 conflates structurally different eras of the platform (reputation inflation, tag evolution, and the post-2022 generative-AI disruption). Because calendar year enters the matching design only as an exact stratum, treated and control questions within a pair always share a year; to probe heterogeneity \emph{across} years we re-estimate Model~A on the pre-2020 subsample, both pooled and in the newcomer ($<$\,1 week) stratum. The pooled pre-2020 arrival hazard ratio is 1.014 (versus 1.002 in the full sample), and the newcomer association is essentially unchanged (arrival HR\,$=$\,1.056 pre-2020 versus 1.059 in the full sample), indicating that the tenure gradient was already present before the generative-AI era.
 
 \input{analysis/output_tables/cohort_robustness.tex}
 
@@ -78,7 +78,7 @@ Table~\ref{tab:observable_controls} reports the pooled Model~A after adding pre-
 
 \input{analysis/output_tables/observable_controls.tex}
 
-Table~\ref{tab:newcomer_robustness} reports the newcomer ($<$\,1 week) bucket under several specifications. The baseline arrival increment is 1.06 (summed upper bound 1.11). Adding the same pre-treatment observable controls --- still \emph{without} view count --- leaves the newcomer association positive and, if anything, slightly larger (arrival 1.10; summed 1.22), so the earlier ``amplification'' under observables is not an artifact of conditioning on that collider. Adding answer-quality controls, by contrast, pushes the newcomer increment below one (arrival 0.94; summed 0.88), the same reversal seen in the pooled effect and reinforcing that answer quality --- not observable selection --- is the most consequential confound the design does not resolve.
+Table~\ref{tab:newcomer_robustness} reports the newcomer ($<$\,1 week) bucket under several specifications. The baseline arrival increment is 1.06. Adding the same pre-treatment observable controls --- still \emph{without} view count --- leaves the newcomer association positive and, if anything, slightly larger (arrival 1.10), so the earlier ``amplification'' under observables is not an artifact of conditioning on that collider. Adding answer-quality controls, by contrast, pushes the newcomer increment below one (arrival 0.94), the same reversal seen in the pooled effect and reinforcing that answer quality --- not observable selection --- is the most consequential confound the design does not resolve.
 
 \input{analysis/output_tables/newcomer_robustness.tex}
 
