@@ -95,6 +95,7 @@ def _tenure_table_col_spec(n_buckets: int) -> str:
 
 
 def _tenure_table_preamble(caption: str, label: str) -> list[str]:
+    """Open a page-width tenure table: resize only the tabular, keep notes outside."""
     return [
         r"\begin{table}",
         rf"\caption{{{caption}}}",
@@ -106,12 +107,16 @@ def _tenure_table_preamble(caption: str, label: str) -> list[str]:
     ]
 
 
-def _tenure_table_postamble() -> list[str]:
-    return [
+def _tenure_table_postamble(notes: list[str] | None = None) -> list[str]:
+    """Close resizebox+tabular, then emit wrapping footnotes at page width."""
+    lines = [
         r"\end{tabular}%",
         r"}",
-        r"\end{table}",
     ]
+    if notes:
+        lines += _table_notes_block(notes)
+    lines.append(r"\end{table}")
+    return lines
 
 
 def _latex_bucket(label: str) -> str:
@@ -119,24 +124,60 @@ def _latex_bucket(label: str) -> str:
     return label.replace("<", r"$<$").replace(">", r"$>$")
 
 
-def _standard_error_note(n_cols: int, bootstrap_available: bool = False) -> str:
+def _table_notes_block(notes: list[str]) -> list[str]:
+    """Footnotes as a wrapping minipage (avoids clipped \multicolumn{@{}l} notes)."""
+    lines = [
+        r"\vspace{0.35em}",
+        r"\begin{minipage}{\linewidth}",
+        r"\footnotesize",
+        r"\raggedright",
+    ]
+    for i, note in enumerate(notes):
+        sep = r"\\" if i < len(notes) - 1 else ""
+        lines.append(note + sep)
+    lines.append(r"\end{minipage}")
+    return lines
+
+
+def _standard_error_note_text(bootstrap_available: bool = False) -> str:
     if bootstrap_available:
         return (
-            rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Cox-table standard errors are "
-            r"model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in "
-            r"Table~\ref{tab:pair_bootstrap}.} \\"
+            r"Cox-table standard errors are model-based; matched-pair bootstrap "
+            r"95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}."
         )
     return (
-        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Cox-table standard errors are "
-        r"model-based; matched-pair bootstrap uncertainty is reported separately when generated.} \\"
+        r"Cox-table standard errors are model-based; matched-pair bootstrap "
+        r"uncertainty is reported separately when generated."
+    )
+
+
+def _events_note_text() -> str:
+    return (
+        r"Events = helping events in the full analysis sample (after time rounding). "
+        r"When interval rows exceed the fit cap, estimation uses a matched-pair "
+        r"subsample, but Events still refer to the full sample."
+    )
+
+
+def _sig_note_text() -> str:
+    return r"$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$"
+
+
+def _standard_error_note(n_cols: int, bootstrap_available: bool = False) -> str:
+    """Legacy in-tabular note; prefer `_table_notes_block` so footnotes wrap."""
+    return (
+        rf"\multicolumn{{{n_cols}}}{{@{{}}p{{\linewidth}}@{{}}}}{{\footnotesize "
+        + _standard_error_note_text(bootstrap_available)
+        + r"}} \\"
     )
 
 
 def _events_note(n_cols: int) -> str:
+    """Legacy in-tabular note; prefer `_table_notes_block` so footnotes wrap."""
     return (
-        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Events = helping events in the "
-        r"full analysis sample (after time rounding); when interval rows exceed the fit cap, "
-        r"estimation uses a matched-pair subsample but Events still refer to the full sample.} \\"
+        rf"\multicolumn{{{n_cols}}}{{@{{}}p{{\linewidth}}@{{}}}}{{\footnotesize "
+        + _events_note_text()
+        + r"}} \\"
     )
 
 
@@ -433,12 +474,14 @@ def generate_regression_all_table(
 
     lines += [
         r"\bottomrule",
-        _standard_error_note(n_cols + 1, bootstrap_available=bootstrap_available),
-        _events_note(n_cols + 1),
-        rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\footnotesize $^{{***}}p<0.001$; $^{{**}}p<0.01$; $^{{*}}p<0.05$; $^{{\dagger}}p<0.1$}} \\",
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        _standard_error_note_text(bootstrap_available=bootstrap_available),
+        _events_note_text(),
+        _sig_note_text(),
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 
@@ -505,12 +548,14 @@ def generate_revision_robustness_table(
             )
         lines += [
             r"\bottomrule",
-            r"\multicolumn{6}{@{}l}{\footnotesize Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.} \\",
-            _standard_error_note(6),
-            _events_note(6),
             r"\end{tabular}",
-            r"\end{table}",
         ]
+        lines += _table_notes_block([
+            r"Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.",
+            _standard_error_note_text(),
+            _events_note_text(),
+        ])
+        lines.append(r"\end{table}")
         return "\n".join(lines)
 
     lines = [
@@ -534,11 +579,13 @@ def generate_revision_robustness_table(
         )
     lines += [
         r"\bottomrule",
-        _standard_error_note(5),
-        _events_note(5),
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        _standard_error_note_text(),
+        _events_note_text(),
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 
@@ -607,19 +654,21 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
             primary_cell, secondary_cell = summed_txt, (f"{arr_hr:.2f}" if pd.notna(arr_hr) else "—")
         lines.append(rf"{name} & {primary_cell} & {secondary_cell} & {b2_txt} & {events:,} \\")
     foot_primary = (
-        r"\multicolumn{5}{@{}l}{\footnotesize Arrival HR is the answer-arrival increment $\exp(\beta_4)$ (primary); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound); $\beta_2$ is the waiting-period (anticipatory-engagement) pre-trend.} \\"
+        r"Arrival HR is the answer-arrival increment $\exp(\beta_4)$ (primary); Summed HR is the DiD $\exp(\beta_2+\beta_4)$ (upper bound); $\beta_2$ is the waiting-period (anticipatory-engagement) pre-trend."
         if arrival_primary
-        else r"\multicolumn{5}{@{}l}{\footnotesize Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment.} \\"
+        else r"Treatment HR is the summed DiD, $\exp(\beta_2+\beta_4)$; $\beta_2$ is the waiting-period (anticipatory-engagement) term and $\beta_4$ the answer-arrival increment."
     )
     lines += [
         r"\bottomrule",
-        foot_primary,
-        r"\multicolumn{5}{@{}l}{\footnotesize $^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.} \\",
-        _standard_error_note(5),
-        _events_note(5),
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        foot_primary,
+        r"$^{a}$ Accept events are treated-only by construction (a control never receives an answer to accept); rows including them are degenerate and shown for reference.",
+        _standard_error_note_text(),
+        _events_note_text(),
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 
@@ -791,14 +840,14 @@ def generate_main_results_table(df: pd.DataFrame, bootstrap_available: bool = Fa
     lines.append(rf"N & " + " & ".join(n_cells) + r" \\")
     lines.append(rf"Events & " + " & ".join(evt_cells) + r" \\")
 
-    lines += [
-        r"\bottomrule",
-        r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.} \\",
-        _standard_error_note(n_buckets + 1, bootstrap_available=bootstrap_available),
-        _events_note(n_buckets + 1),
-        r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
+    lines.append(r"\bottomrule")
+    notes = [
+        r"N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.",
+        _standard_error_note_text(bootstrap_available=bootstrap_available),
+        _events_note_text(),
+        _sig_note_text(),
     ]
-    lines += _tenure_table_postamble()
+    lines += _tenure_table_postamble(notes)
     return "\n".join(lines)
 
 
@@ -900,13 +949,13 @@ def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) ->
     lines.append(rf"N & " + " & ".join(n_cells) + r" \\")
     lines.append(rf"Events & " + " & ".join(evt_cells) + r" \\")
 
-    lines += [
-        r"\bottomrule",
-        _standard_error_note(n_buckets + 1, bootstrap_available=bootstrap_available),
-        _events_note(n_buckets + 1),
-        r"\multicolumn{" + str(n_buckets + 1) + r"}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
+    lines.append(r"\bottomrule")
+    notes = [
+        _standard_error_note_text(bootstrap_available=bootstrap_available),
+        _events_note_text(),
+        _sig_note_text(),
     ]
-    lines += _tenure_table_postamble()
+    lines += _tenure_table_postamble(notes)
     return "\n".join(lines)
 
 
@@ -961,20 +1010,22 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
             rf"& {n:,} & {events:,} \\"
         )
     detail_note = (
-        r"\multicolumn{5}{@{}l}{\footnotesize HR is the summed DiD contrast (post-answer vs.\ pre-question, treated vs.\ control); comparable across bins.} \\"
+        r"HR is the summed DiD contrast (post-answer vs.\ pre-question, treated vs.\ control); comparable across bins."
         if use_did
-        else r"\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables.} \\"
+        else r"HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables."
     )
     lines += [
         r"\bottomrule",
-        _standard_error_note(5, bootstrap_available=bootstrap_available),
-        _events_note(5),
-        r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
-        detail_note,
-        r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        _standard_error_note_text(bootstrap_available=bootstrap_available),
+        _events_note_text(),
+        r"Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.",
+        detail_note,
+        _sig_note_text(),
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 
@@ -1030,13 +1081,15 @@ def generate_response_time_bins_quality_table(
         )
     lines += [
         r"\bottomrule",
-        _standard_error_note(5, bootstrap_available=bootstrap_available),
-        r"\multicolumn{5}{@{}l}{\footnotesize Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool.} \\",
-        r"\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$). Quality columns add acceptance, first-answer score, and length.} \\",
-        r"\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\",
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        _standard_error_note_text(bootstrap_available=bootstrap_available),
+        r"Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool.",
+        r"HR is the answer-arrival increment ($\beta_4$). Quality columns add acceptance, first-answer score, and length.",
+        _sig_note_text(),
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 

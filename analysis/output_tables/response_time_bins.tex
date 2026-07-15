@@ -18,10 +18,15 @@
 1-3 days & 1.04** & [1.01, 1.08] & 12,592,667 & 2,400,019 \\
 $>$3 days & 1.01 & [0.98, 1.05] & 12,391,574 & 2,390,995 \\
 \bottomrule
-\multicolumn{5}{@{}l}{\footnotesize Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.} \\
-\multicolumn{5}{@{}l}{\footnotesize Events = helping events in the full analysis sample (after time rounding); when interval rows exceed the fit cap, estimation uses a matched-pair subsample but Events still refer to the full sample.} \\
-\multicolumn{5}{@{}l}{\footnotesize Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.} \\
-\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables.} \\
-\multicolumn{5}{@{}l}{\footnotesize $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$} \\
 \end{tabular}
+\vspace{0.35em}
+\begin{minipage}{\linewidth}
+\footnotesize
+\raggedright
+Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.\\
+Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.\\
+Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.\\
+HR is the answer-arrival increment ($\beta_4$, is\_treated\_active) at answer arrival; the summed DiD contrast is reported in the pooled regression tables.\\
+$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
+\end{minipage}
 \end{table}
