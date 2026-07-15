@@ -1,4 +1,4 @@
 Receiving help is weakly associated with later helping on Stack Overflow
-Matched diff-in-differences on 21M questions addresses reciprocity confounding
+Matched difference-in-differences on 21M questions addresses reciprocity confounding
 Effect is concentrated among newcomers and absent among long-tenured users
 Pooled association is small and fades once answer quality is controlled

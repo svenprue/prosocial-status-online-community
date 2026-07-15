@@ -1,0 +1,163 @@
+%% =========================================================
+%% Point-by-point response to reviewers -- CHB-D-26-04350
+%% Standalone; compile from the repo root AFTER manuscript.tex has been
+%% compiled (this file imports manuscript.aux via \externaldocument so that
+%% \ref{tab:...}/\ref{sec:...} resolve to the manuscript's own numbers).
+%%   pdflatex response_to_reviewers && pdflatex response_to_reviewers
+%%
+%% AUTHOR TODO before submission: the left-hand "Reviewer comment" cells are
+%% summarised from the review record. Replace each with the reviewer's
+%% VERBATIM wording, and reconcile the R1 Q# / R2 P# labels with the actual
+%% review letter (the internal issue mapping overlaps in places).
+%% =========================================================
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{array}              % \newcolumntype, \arraybackslash
+\usepackage{booktabs}
+\usepackage{longtable}          % tables that break across pages
+\usepackage{amsmath}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xr}                 % cross-reference the manuscript's labels
+\externaldocument{manuscript}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.15}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}p{0.30\textwidth}}
+\newcolumntype{R}{>{\raggedright\arraybackslash}p{0.62\textwidth}}
+
+\begin{document}
+
+\begin{center}
+{\large\bfseries Response to Reviewers}\\[2pt]
+Manuscript CHB-D-26-04350\\
+\emph{Receiving Help and Short-Run Contribution on Stack Overflow: A Newcomer-Concentrated Association}
+\end{center}
+
+We thank the editor and both reviewers for their careful and constructive reading of the manuscript. In preparing this revision we substantially re-analysed the data: we re-matched treated and control questions using nearest-neighbor propensity-score matching \emph{with replacement} (caliper 0.05), with exact strata on calendar year, primary tag, and the number of tags, and re-fit every Cox model on the resulting sample, so that all reported estimates derive from a single, consistent pipeline run. The principal changes are: (i) matched-pair bootstrap confidence intervals for the pooled treatment effect, replacing the earlier claim that clustering was unnecessary; (ii) a broadened helping outcome (answers plus comments the focal user posts to others), reported alongside a full decomposition by help type; (iii) a flexible, non-parametric response-time specification (discrete bins), re-estimated with observable answer-quality controls; (iv) new robustness analyses for observable selection, entry-cohort heterogeneity, and left-truncation/churn; (v) a more modest, tenure-focused framing throughout, under which the pooled association is small and statistically marginal, the newcomer gradient is the most robust pattern, the response-time result is offered as qualified support for an immediacy account, and the quality-controlled estimates are treated as a post-treatment lower bound; (vi) a shortened Theory section that is linked directly to the empirical design, with interpretation-relevant appendix material promoted into the main text; and (vii) a full language and consistency edit of the revised manuscript. Analysis code and step-by-step instructions to reproduce every table and figure are provided in the replication package described in the Data availability statement.
+
+For each point below we restate the reviewer's comment (in the left column) and describe our response and the corresponding changes to the manuscript (right column), with explicit references to the revised sections and tables.
+
+%% ------------------------------------------------------------------
+\section*{Response to Reviewer 1}
+
+\begin{longtable}{@{}L R@{}}
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\footnotesize\itshape Reviewer 1 (continued)}\\
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r@{}}{\footnotesize\itshape continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textit{(Q1, Q5, Q7) Keep the empirical question --- does helping rise after a user receives an answer? --- distinct from the proposed psychological mechanisms (gratitude, moral obligation, incentive displacement), which the data do not measure; present the re-engagement/session-dynamics reading as a possible rather than an established mechanism.} &
+We reframed the manuscript so the estimand is stated plainly while every psychological and session mechanism is marked as a \emph{proposed}, unmeasured interpretation; no models were re-fit for this change. The abstract states that ``the data identify short-run behavioral associations, not the psychological mechanisms (gratitude, moral obligation, incentive displacement) that theory proposes,'' and the Introduction closes that we ``test only the behavioral consequence those mechanisms predict.'' In the Theory section (``Generalized Reciprocity''; ``Reciprocity and the User Trajectory'') gratitude, moral obligation, and norm displacement are relabelled as proposed mechanisms the design cannot adjudicate. The retitled discussion subsection ``The Response-Time Pattern and Its Interpretation'' and the consolidated Limitations paragraph (Section~\ref{sec:limitations}) present the session-dynamics account as one conjecture among several. \\
+\midrule
+
+\textit{(Q1, Q6) Frame the contribution more modestly --- a short-run behavioral test on one platform, not a resolution of the general theory --- give more weight to the tenure heterogeneity, and lead the conclusion with the narrower finding.} &
+We revised the title, abstract, introduction, and conclusion without changing any estimate. The paper is retitled ``\ldots A Newcomer-Concentrated Association,'' dropping the causal verb; the abstract's object is now ``a better-identified short-run behavioral test of generalized reciprocity in one large technical Q\&A community'' with ``tentative, newcomer-focused design implications.'' The three-contribution paragraph makes the tenure gradient the headline (``the most robust and informative pattern in the data''), and the Conclusion (Section~\ref{sec:conclusion}) leads with the small pooled effect (summed-DiD HR 1.01, upper bound; arrival increment near 1.00), concentrated among newcomers (arrival HR 1.06; summed 1.11, upper bound) and undetectable or slightly negative among veterans (arrival HR 0.98). \\
+\midrule
+
+\textit{(Q2, Q8) Make the estimation sample transparent: distinguish questions vs.\ matched observations vs.\ users vs.\ help events, reconcile counts across text and tables, explain control reuse and repeated observations per user, and report the estimation sample for each table.} &
+We rewrote the ``Data'' subsection as an explicit filtering-and-matching chain: from the full non-deleted question set we removed 1{,}080 pre-launch and 8{,}029 post-cutoff cases and 2{,}671{,}121 self-answered questions, yielding 21{,}033{,}429 pre-matching questions from 4{,}764{,}048 users; after matching, the analytic file comprises 24{,}349{,}760 question-level rows (12{,}174{,}880 matched pairs) from 3{,}732{,}706 users, 50\% treated by construction, with 5{,}025{,}482 pooled helping events. The ``Propensity Score Matching'' subsection explains that matching is with replacement, so some control questions match more than one treated question --- hence more rows than unique pairs. Every table was regenerated from one pipeline run, so counts agree across the Data prose, Table~\ref{tab:desc_stats}, Table~\ref{tab:pooled_experienced} (N~$=$~24{,}349{,}760; Events~$=$~5{,}025{,}482), and Table~\ref{tab:main_results} (per-bucket N and events summing to the pooled totals). The appendix ``Implementation Details'' documents that pooled models fit a $\sim$8-million-row matched subsample (pair integrity preserved) when the interval frame exceeds the fit cap, while tenure-bucket models use all intervals. All code and reproduction instructions are in the replication package (Data availability statement). \\
+\midrule
+
+\textit{(Q3, overall) Inference may be too optimistic: the Cox model treats every interval as independent despite repeated observations per user, reused control questions, matched pairs, and recurrent events. Report robust/clustered standard errors, or a bootstrap that preserves the matched structure, and remove the appendix claim that clustering was unnecessary.} &
+The installed estimator cannot deliver native clustered variances (\texttt{lifelines}' \texttt{CoxTimeVaryingFitter} raises \texttt{NotImplementedError} for \texttt{robust=True} and exposes no cluster column for time-varying fits), so we implemented the reviewer's suggested fallback: a matched-pair bootstrap that resamples whole matched pairs with replacement, refits Model~A, and takes percentile confidence intervals. Because the two nested time-varying terms make the arrival increment ($\beta_4$) and the summed difference-in-differences numerically coupled, we bootstrapped the summed-DiD contrast, which is the more conservative (larger) quantity and therefore a stringent stand-in for the headline arrival increment. Table~\ref{tab:pair_bootstrap} reports it (summed-DiD upper bound, Model~A): HR 1.01, bootstrap 95\% CI [1.01, 1.03], 100 replicates. We deleted the assertion that clustering was unnecessary and rewrote the ``Implementation Details'' paragraph to state that the Cox-table standard errors are model-based (inverse-Hessian), \emph{not} cluster-robust, and can be too narrow given matched pairs, reused controls, and repeated intervals, cross-referencing the bootstrap table. The bootstrap CI closely tracks the model-based CI [1.00, 1.02] and leaves the point estimate unchanged, so no headline number changed. \\
+\midrule
+
+\textit{(Q3, Q7) Answered and unanswered questions may differ in unobserved quality, posting time, asker reputation, and topic; add explicit controls for posting hour/day, question length, number of tags, and reputation, and acknowledge that answer receipt is not random.} &
+We re-extracted fields dropped from the processed pipeline and added the requested observable pre-treatment covariates to the propensity model --- posting hour-of-day and day-of-week, question body and title length (characters), and owner reputation --- and now match pairs \emph{exactly} on the number of tags in addition to the primary tag. Table~\ref{tab:covariates} lists these in a new ``Observable question and author characteristics'' block, and Table~\ref{tab:balance} shows they are well balanced after matching (largest residual $|$SMD$|$ 0.041, owner reputation; all below 0.05; the largest pre-matching imbalance is the tag-level answer rate, 0.695). In the newcomer stratum (Table~\ref{tab:newcomer_robustness}) the arrival increment is stable to slightly amplified when these controls are added (1.06 to 1.10; summed upper bound 1.11 to 1.20). Limitations (Section~\ref{sec:limitations}) now states that answer receipt is non-random and that the design ``cannot cleanly separate a reciprocal response to receiving help from selection into being answered.'' \\
+\midrule
+
+\textit{(Q3, Q5) The response-time analysis should be modeled more flexibly; the pattern looks closer to an inverted-U than to ``faster is stronger,'' with the strongest effect in the 30--60-minute bin rather than among the fastest responses. Rewrite/tone down H3 and treat the figure as evidence of a non-linear pattern.} &
+We replaced the single continuous log-response-time interaction with a flexible, non-parametric specification: ten discrete response-time bins, each fit as a separate Model~A (Table~\ref{tab:response_time_bins}, Figure~\ref{fig:interaction_effect}). The pattern is non-linear and single-peaked --- the arrival increment is near-null under 30 minutes, peaks at 30--60 minutes (HR 1.22, 95\% CI [1.19, 1.25]), and is modest thereafter --- an early ``sweet spot,'' not a monotone gradient. We rewrote the ``Response Time Moderation (H3)'' subsection around this specification and retitled the discussion subsection, presenting H3 as \emph{qualified} support for an immediacy account rather than confirmation. The peak survives answer-quality controls as an attenuated, post-treatment lower bound (1.06; Table~\ref{tab:response_time_bins_quality}; see R2 below). \\
+\midrule
+
+\textit{(Q4) Report hazard ratios and 95\% confidence intervals for both specifications in the pooled table (main model and main-plus-response-time model), rather than an em-dash for the speed specification's interval.} &
+We traced the missing interval to the table generator, not the model: the CI bounds for the speed specification's treatment term were computed but dropped before the table was written. We added the read-out and regenerated the table. Table~\ref{tab:pooled_experienced} now reports HR and 95\% CI in both columns for both the arrival-increment ($\beta_4$) and summed-DiD (upper bound) rows. The only remaining em-dash is the Main+Speed bootstrap-CI cell, because the matched-pair bootstrap (Table~\ref{tab:pair_bootstrap}) was run for Model~A alone. \\
+\midrule
+
+\textit{(Q4; see also Reviewer 2) Relative hazard ratios can overstate practical importance; express the effect in absolute terms with a number-needed-to-treat / absolute-risk framing, and temper the design implications accordingly.} &
+We added an absolute-effect derivation translating each tenure-bucket hazard ratio into an absolute risk difference (ARD), number-needed-to-treat (NNT), and CI-derived NNT bounds using the observed baseline event rate (Table~\ref{tab:absolute_effects}). The newcomer arrival increment (HR 1.06) corresponds to an ARD of about 0.7 percentage points (roughly 7 additional helping events per 1{,}000 answered newcomer questions), NNT 143.5 (95\% CI 112.6--196.9); the pooled effect is far smaller (ARD 0.0005; NNT $\approx$ 2{,}000). We rewrote ``Implications for Platform Design'' to foreground this modest magnitude, restricting the practical leverage to a targeted, fragile newcomer onboarding channel rather than a platform-wide multiplier. \\
+\midrule
+
+\textit{(Q7) Results drawn from Stack Overflow --- a highly specific technical Q\&A community --- may not generalize to other online communities.} &
+Addressed jointly with Reviewer 2's external-validity points below. The external-validity paragraph in Limitations (Section~\ref{sec:limitations}) now leads with Stack Overflow's distinctiveness (large, relatively anonymous, gamified, technical) and refrains from claiming generalized reciprocity ``likely operates'' elsewhere, naming enterprise Slack channels, academic peer review, and intimate hobby forums as contrasting settings. \\
+\midrule
+
+\textit{(Q8) Generally readable but could be tightened: the Theory section should be shortened and more directly connected to the empirical design, and implementation details currently in the appendix that affect interpretation should be moved or summarized in the main text.} &
+We shortened the Theory section by roughly one-sixth (from about 1{,}550 to about 1{,}290 words), condensing the two-mechanism exposition of generalized reciprocity into a single paragraph and compressing the empirical-challenges discussion, which now motivates the matched difference-in-differences design and cross-references the Methods section directly (Section~\ref{sec:methods}). A new paragraph after Hypothesis~2 carries the design stakes forward: it states that a newcomer-concentrated association would recast reciprocity as a contributor-recruitment channel and points to the design-implications subsection (Section~\ref{sec:design_implications}). We also promoted the tenure-stratified adoption figure from the appendix into the Results section (now Figure~\ref{fig:help_rate_adoption_by_tenure}), together with its interpretive paragraph, so the disaggregated evidence bearing on the session-dynamics interpretation appears in the main text. The sample-construction and event-counting sub-point is addressed under Q2/Q8 above. One transparency note: the original appendix's lifetime-contributions table was removed rather than promoted, because it derived from a superseded sample with an inconsistent data cutoff and constructs not defined in the current pipeline; no claim in the revised manuscript relies on it. \\
+\midrule
+
+\textit{(Q9) Would you recommend language editing? --- Yes.} &
+A full language and consistency edit was applied to the revised manuscript after the substantive revisions were complete. Grammatical errors and typos were corrected; terminology and formatting were standardized throughout (``difference-in-differences,'' ``propensity score matching,'' ``response-time'' as a modifier, ``hazard ratio'' defined at first use in both the abstract and the text); cross-reference formatting was made uniform; the abstract was made self-contained; and the title page and preprint front matter were aligned with the revised title. \\
+
+\end{longtable}
+
+%% ------------------------------------------------------------------
+\section*{Response to Reviewer 2}
+
+\begin{longtable}{@{}L R@{}}
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\footnotesize\itshape Reviewer 2 (continued)}\\
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r@{}}{\footnotesize\itshape continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textit{(Overall, P2, P9; see also R1 Q7) The topic risks feeling dated in the era of generative AI; the paper over-generalizes while Stack Overflow is uniquely technical, relatively anonymous, and status-driven, and its ecosystem has been disrupted by LLM substitution since 2023. State explicitly that the findings are a historical snapshot rather than a prescriptive guide for contemporary design.} &
+We revised ``Empirical Setting: Stack Overflow'' (Section~\ref{sec:empirical_setting}) to remove the broad-generalization claim and to state that the platform's active question-and-answer volume ``has declined sharply since the release of generative AI tools in late 2022,'' that the sample spans inception through 1 April 2025 (a period that includes but predates the steepest LLM-driven decline), and that the findings should be read as ``a historical snapshot of one large, technical, relatively anonymous, status-driven platform.'' A dedicated GAI-era paragraph in Limitations states the window is a historical snapshot, not a prescriptive guide, and cross-references the pre-2020 robustness (Table~\ref{tab:cohort_robustness}): the pooled effect is essentially unchanged (arrival HR 1.01 pre-2020 vs.\ 1.00 full sample; summed 1.01, upper bound, in both), so the association predates rather than depends on the generative-AI era. \\
+\midrule
+
+\textit{(P1, P3; also R1 Q7) The sample may retain only users who stayed active long enough to be observed, excluding askers who received no answer and immediately churned --- an exclusion correlated with both treatment and outcome that would bias the effect downward. Implement a Heckman-type correction or, at minimum, explicitly bound the possible bias.} &
+As a point of clarification about the sampling frame: the pipeline imposes no minimum-activity, minimum-tenure, or re-observation filter, so asked-but-never-answered users are \emph{retained} as the control pool, and because each matched pair shares a fixed, pair-equalized observation window, an immediate churner simply contributes zero help events over a fully observed window. We did not implement a Heckman correction (no matching covariate provides a credible exclusion restriction, and the recurrent-event time-varying Cox is not natively Heckman-compatible); instead we added a selection-sensitivity analysis reporting transparent bounds under adversarial assumptions about zero-event controls (Table~\ref{tab:selection_bounds}): the pooled effect stays modest even under optimistic bounds, while the newcomer contrast is more churn-sensitive. The first, most-emphasized Limitations paragraph (Section~\ref{sec:limitations}) reframes the threat as right-truncation/churn and flags the newcomer sensitivity explicitly. \\
+\midrule
+
+\textit{(P1, P4) Measuring reciprocal helping as answers only is too narrow and may understate reciprocity, especially for newcomers who may reciprocate through lower-cost acts (comments, upvotes, edits). Broaden the outcome to a composite, or rigorously justify why answers alone capture the construct.} &
+We did both. We broadened the default outcome to a composite of answers plus comments the focal user posts to others (self-directed accepts excluded; ``Outcome.'' paragraph), re-fit every Cox model, and report a full decomposition by help type in Table~\ref{tab:outcome_decomposition}: answers-only arrival HR 1.03 [1.02, 1.05]; comments-only 1.00 [0.98, 1.01]; edits-only 1.14 [1.12, 1.16]; answers$+$comments (default) 1.00 [0.99, 1.02]; answers$+$comments$+$edits 1.02 [1.01, 1.03]. The signal is carried by answers, and adding comments \emph{dilutes} rather than amplifies it --- the opposite of a mechanical newcomer-undercount. We also parsed post-edit events and include them in the decomposition. The one channel that remains unobservable is up-votes: Stack Exchange suppresses voter identity in the public dump (the voter \texttt{UserId} is null for essentially all up-vote records), so an ``up-votes given'' signal cannot be attributed to an actor on any Stack Overflow data --- a data-source limitation, not a pipeline gap. We added a construct-validity justification (``Why answers anchor the construct,'' citing Greiner 2005, Stanca 2009, Mujcic 2018, Molm 2007) and, in Limitations, read the answers-anchored estimate as a lower bound given the unobserved up-vote channel. \\
+\midrule
+
+\textit{(P5, P1; also R1 Q5) The 30--60-minute peak may be confounded by answer quality rather than timing or gratitude: fast answers are disproportionately terse, slower answers fuller. Control directly for observable quality (length, vote score, acceptance) and tone down the ``session dynamics'' causal language.} &
+We re-extracted three observable quality signals (first-answer length in characters, vote score, and acceptance) and re-estimated the pooled speed specification, adding them one at a time as a graded decomposition (Table~\ref{tab:answer_quality_robustness}). Controlling for \emph{answer length} alone --- the reviewer's terse-versus-detailed variable, and the signal least entangled with the asker's own behavior --- barely moves the estimate (arrival 1.03 to 1.02); vote score alone brings it to about 1.00; and the full specification, which additionally conditions on acceptance, pushes it below one (0.98; summed 0.93, upper bound), with the same pattern in the newcomer stratum. Because vote score and, especially, acceptance are realized only for answered questions and are endogenous to the outcome (accepting requires the asker to return to the site), we frame the full-control reversal as a post-treatment bad-control bound in ``Answer quality as an alternative explanation.'' and recast the session-dynamics reading as one conjecture among several (quality, session dynamics, selection). \\
+\midrule
+
+\textit{(P5) Test the answer-quality confound at the level of the discrete response-time bins, not only the pooled speed model, before drawing a structural interpretation.} &
+We re-estimated each of the ten discrete response-time bins with the same three observable quality controls, fitting Model~A plus those signals per bin so the baseline and quality columns are directly comparable (Table~\ref{tab:response_time_bins_quality}). The 30--60-minute peak attenuates but remains the clear early-window maximum and stays highly significant --- arrival HR 1.22 [1.19, 1.25] to 1.06 [1.04, 1.09], $p<.001$ --- so it is not merely an artifact of fast answers being better answers. ``Response Time Moderation (H3)'' reports the surviving peak as a conservative lower bound and H3 as qualified support for an immediacy account; a weaker secondary elevation in the multi-day tail is left uninterpreted because the controls are post-treatment. \\
+\midrule
+
+\textit{(P6, P2, P9) Pooling entry cohorts from 2008--2025 conflates structurally different platform eras (reputation inflation, tag evolution, post-2022 disruption), so the effect could be an artifact of recent cohorts; check whether it holds across cohorts (year-of-entry fixed effects or a pre-2020 subsample).} &
+A year-of-entry fixed-effects specification would be collinear with our matched design --- calendar year already enters as an exact-matching stratum, so registration cohort is absorbed once question-year is matched --- so we instead pursued the pre-2020 subsample the reviewer also proposed. Re-estimating the pooled Model~A before 2020 (Table~\ref{tab:cohort_robustness}) leaves the arrival increment essentially unchanged, if marginally larger (pre-2020 arrival HR 1.01 [1.00, 1.03]; summed 1.01, upper bound; N~$=$~19{,}187{,}320) versus the full sample (1.00 [0.99, 1.02]). We report this in the ``Experience Moderation of Reciprocity (H2)'' subsection and frame the findings as a pre-/early-generative-AI snapshot. \\
+\midrule
+
+\textit{(P7) Provide a number-needed-to-treat / absolute-risk framing so readers can judge practical significance; the design implications were pitched too strongly relative to the absolute magnitude.} &
+Addressed jointly with Reviewer 1's absolute-effects request above. Table~\ref{tab:absolute_effects} reports ARD, NNT, and NNT confidence bounds by tenure bucket (newcomer NNT 143.5, 95\% CI 112.6--196.9; pooled NNT $\approx$ 2{,}000), and ``Implications for Platform Design'' foregrounds the modest absolute magnitude. \\
+\midrule
+
+\textit{(P8) Posting a question raises the asker's profile visibility, which can create reputation concern or social-obligation pressure distinct from gratitude yet operating after the answer arrives and not separately identified; the waiting-period covariate absorbs the act of asking but not residual post-answer visibility. Consider a placebo test on unanswered, high-view questions.} &
+We added a dedicated exposure/profile-visibility paragraph to Limitations (Section~\ref{sec:limitations}) that names the confound, states the waiting-period term (\textit{treatedPostQuestion}) absorbs the act of asking but not residual post-answer visibility, and frames the issue as a threat to mechanism \emph{attribution} rather than to the existence of the behavioral pattern. We explain why the suggested view-count placebo is not identified with the archival data available to us: the dump records \textit{ViewCount} only as a single cumulative snapshot at the dump date, conflating a question's age, topic popularity, and years of later search-engine traffic with the contemporaneous exposure the placebo would require. We softened the attribution language in the ``Identification.'' paragraph and in the H1 decomposition (the near-zero pooled waiting-period coefficient, $\beta_2\approx +0.006$, n.s., is stated to rule out only the act of asking, with a forward pointer to Limitations). \\
+\midrule
+
+\textit{(Q9) Would you recommend language editing? --- Yes.} &
+Addressed jointly with Reviewer 1's Q9 above: a full language and consistency edit was applied to the revised manuscript after the substantive revisions were complete. \\
+
+\end{longtable}
+
+We hope these revisions address the reviewers' concerns. We are grateful for feedback that materially improved the identification, the transparency of the sample and inference, and the calibration of our claims, and we are happy to provide any further analyses the reviewers consider useful.
+
+\end{document}

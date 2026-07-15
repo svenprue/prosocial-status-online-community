@@ -24,7 +24,7 @@ Analysis code and instructions to reproduce all tables and figures are available
 
 \section{Matching Diagnostics}
 \label{sec:balance_plot}
-Figure \ref{fig:common_support} shows that there is sufficient common support between the treatment and the control group. The propensity score distribution between the original treated and control groups is similar. The distribution of the matched control is nearly identical to the treated group. 
+Figure~\ref{fig:common_support} shows sufficient common support between the treatment and control groups: the propensity-score distributions of the original treated and control groups are similar, and the distribution of the matched control group is nearly identical to that of the treated group.
 
 \begin{figure}[!htbp]
     \centering
@@ -33,7 +33,7 @@ Figure \ref{fig:common_support} shows that there is sufficient common support be
     \label{fig:common_support}
 \end{figure}
 
-Figure \ref{fig:love_plot} displays the standardized mean differences (SMD) between the matching variables before and after matching. While there are noticeable differences before the matching, all SMDs are very close to zero after the matching. 
+Figure~\ref{fig:love_plot} displays the standardized mean differences (SMDs) for the matching covariates before and after matching. Several covariates show noticeable imbalance before matching; after matching, all SMDs are close to zero.
 
 \begin{figure}[!htbp]
     \centering
@@ -52,25 +52,12 @@ Figure \ref{fig:love_plot} displays the standardized mean differences (SMD) betw
 \label{fig:help_rate_by_tenure}
 \end{figure}
 
-Figure \ref{fig:help_rate_by_tenure} shows that the post-question lift in treated users' help rate is visible across all tenure buckets and is most pronounced among newcomers (tenure $<$ 1 week), consistent with the pattern reported in Table~\ref{tab:main_results} and Figure~\ref{fig:strength_rec}.
-
-\section{Help Rate by Adoption Status and Tenure Bucket}
-\label{sec:help_rate_adoption_by_tenure}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=.9\textwidth]{analysis/output_figures/help_rate_adoption_by_tenure.pdf}
-\caption{Help rate in the post-question window by answer-receipt status, separately by tenure bucket. %Dark blue dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (``No answer yet''). Red: treated users who have already received an answer (``Answer received''). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour.
-}
-\label{fig:help_rate_adoption_by_tenure}
-\end{figure}
-
-Figure \ref{fig:help_rate_adoption_by_tenure} shows that for experienced users (all panels beyond $<$\,1 Week), the help rate of users still waiting (blue) exceeds that of users who have already received an answer (red), and both exceed the control baseline (grey dashed), up to approximately 1--2 hours post-question. One reading of this pattern is a session-dynamics account, in which the pending-question state temporarily elevates engagement and answer receipt discharges it; we advance this only as a conjecture, since the design does not observe session boundaries and answer quality offers a competing explanation (Section~\ref{sec:limitations}). The newcomer panel ($<$\,1 Week) shows the reverse ordering.
+Figure~\ref{fig:help_rate_by_tenure} shows that the post-question lift in treated users' help rate is visible across all tenure buckets and is most pronounced among newcomers (tenure $<$ 1 week), consistent with the pattern reported in Table~\ref{tab:main_results} and Figure~\ref{fig:strength_rec}.
 
 \section{Selection Sensitivity and Absolute Effects}
 \label{sec:selection_absolute}
 
-Table~\ref{tab:selection_bounds} reports transparent bounds on the reciprocity contrast under alternative assumptions about zero-event controls. Table~\ref{tab:absolute_effects} translates the tenure-bucket hazard ratios into absolute-risk-difference proxies using observed baseline event rates. Table~\ref{tab:pair_bootstrap} reports matched-pair bootstrap 95\% confidence intervals for the pooled Model~A DiD treatment effect (ISS-01; 100 replicates).
+Table~\ref{tab:selection_bounds} reports transparent bounds on the reciprocity contrast under alternative assumptions about zero-event controls. Table~\ref{tab:absolute_effects} translates the tenure-bucket hazard ratios into absolute-risk-difference proxies using observed baseline event rates. Table~\ref{tab:pair_bootstrap} reports matched-pair bootstrap 95\% confidence intervals for the pooled Model~A DiD treatment effect (100 replicates).
 
 \input{analysis/output_tables/selection_bounds.tex}
 
