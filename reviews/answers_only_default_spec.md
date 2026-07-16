@@ -99,7 +99,7 @@ Files: `body.tex` (18), `manuscript.tex` (1), `main.tex` (1), `appendix.tex` (8)
 2. Newcomer (<1 wk) arrival HR > pooled HR, positive, p<.001, and the largest bucket estimate (expected ≈ 1.07).
 3. Arrival HR reaches zero in the >6-year bucket (n.s.); 3–6 years remains positive and significant (≈1.02).
 4. γ < 0 in every bucket, significant in all but >6 years (where ≈ 0, n.s.).
-5. RT bins: <30-min bins ≈ null; 30–60-min bin is the early-window maximum and significant; survives quality controls as attenuated early maximum.
+5. RT bins (baseline fits CONFIRMED from regenerated interaction_effect, 2026-07-16): <30-min ≈ 1.00 n.s.; 30–60-min ≈ 1.18*** (early maximum); 1 hr–1 day ≈ 0.98–1.05; multi-day secondary elevation now significant at BASELINE (12–24h ≈ 1.05*, 1–3d ≈ 1.08***, >3d ≈ 1.05*) — prose already rewritten to introduce it at baseline. Remaining to verify: whether the 30–60 peak survives quality controls (A7) and whether the late bump persists/attenuates there ([[AO:late-bump-quality]]).
 6. Quality controls attenuate the pooled effect, with length-only ≈ baseline and full spec the strongest attenuation ("graded story"; the bad-control ordering length < score < full).
 7. Pre-2020 newcomer HR ≈ full-sample newcomer HR ("essentially unchanged").
 8. Observable controls leave pooled and newcomer estimates essentially unchanged/positive.
