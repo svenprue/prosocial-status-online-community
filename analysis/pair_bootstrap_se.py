@@ -74,7 +74,12 @@ DROP_FOR_MODEL_A = [
 ]
 
 # Sampler id in checkpoint meta — bump if draw logic changes incompatibly.
-_SAMPLER_ID = "seed_sequence_parallel_v1"
+# v2_pairaware (2026-07-16): _bootstrap_sample_by_match no longer drops match_id, so
+# replicates get the same pair-aware MAX_FIT_ROWS subsample as the base fit (see its
+# docstring). Bumping this invalidates prior checkpoints, which were fit on a
+# non-pair-aware subsample and produced a bootstrap distribution systematically shifted
+# above the base point estimate (base HR 1.031 sat entirely below the [1.036, 1.065] CI).
+_SAMPLER_ID = "seed_sequence_parallel_v2_pairaware"
 
 # Bumped 2026-07-14: checkpoints now hold the beta_4 (is_treated_active) coefficient
 # alone, not the summed treated_post_question + is_treated_active contrast. Bumped
@@ -444,14 +449,18 @@ def _bootstrap_sample_by_match(
 ) -> pd.DataFrame:
     """Resample whole pairs; prefix unique_id so with-replacement draws stay distinct.
 
-    ISS-24 fix(subsample) interaction: fit_cox_cached now RETAINS match_id through its
-    MAX_FIT_ROWS downsample so real matched pairs stay together. But a bootstrap replicate
-    deliberately draws the SAME match_id multiple times (distinctness is carried by the
-    draw-prefixed unique_id, not match_id). If we handed the duplicated match_id to
-    fit_cox_cached, its matched-pair subsample would collapse those repeated draws. So we
-    DROP match_id here: the replicate's resampling unit is the prefixed unique_id, and
-    fit_cox_cached(robust=False) does not need match_id (it would drop it before the fit
-    anyway). This keeps the replicate on the unique_id downsample path, as before.
+    KEEPS match_id (2026-07-16 fix). fit_cox_cached's MAX_FIT_ROWS subsample, when
+    match_id is present, decides inclusion per DISTINCT match_id: a match_id drawn 3x
+    by this resample is either kept (all 3 duplicate copies survive together) or
+    dropped (all 3 go together) — the with-replacement multiplicity is preserved, not
+    collapsed. match_id itself is still dropped before the actual ctv.fit() call
+    (fit_cox_cached always does this when robust=False), so it is never fit as a
+    covariate. Retaining it here only through the subsample step makes each replicate's
+    MAX_FIT_ROWS subsample pair-aware, matching the base fit's own subsample (which also
+    keeps match_id present) instead of falling back to a non-pair-aware per-unique_id
+    subsample. The prior (dropped-match_id) version produced a bootstrap distribution
+    systematically shifted above the base point estimate — 99/100 replicates exceeded
+    it, and the resulting 95% CI sat entirely above the base HR.
     """
     sampled = _draw_match_ids(unique_ids, rng, max_pairs=max_pairs)
     n_pairs = len(sampled)
@@ -459,7 +468,7 @@ def _bootstrap_sample_by_match(
     boot = draws.merge(df, on="match_id", how="left", sort=False)
     draw_prefix = boot["_boot_draw"].astype(str)
     boot["unique_id"] = draw_prefix + "_" + boot["unique_id"].astype(str)
-    return boot.drop(columns=["_boot_draw", "match_id"])
+    return boot.drop(columns=["_boot_draw"])
 
 
 def _coefs_from_result(result) -> tuple[float | None, float | None]:
