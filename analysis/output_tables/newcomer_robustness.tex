@@ -5,21 +5,21 @@
 \footnotesize
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
-\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Summed HR (upper bnd)} & \textbf{N} & \textbf{Events} \\
+\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\
 \midrule
-ModelA\_Newcomer\_Baseline (< 1 Week) & 1.059 & [1.043, 1.075] & 1.107 [1.09, 1.12] & 4,029,008 & 475,633 \\
-ModelA\_Newcomer\_Observable (< 1 Week) & 1.102 & [1.089, 1.115] & 1.217 [1.20, 1.23] & 4,029,008 & 475,633 \\
-ModelB\_Newcomer\_Baseline (< 1 Week) & 0.987 & [0.975, 0.999] & 0.976 [0.97, 0.99] & 4,029,008 & 475,633 \\
-ModelB\_Newcomer\_LengthOnly (< 1 Week) & 0.980 & [0.968, 0.992] & 0.961 [0.95, 0.97] & 4,029,008 & 475,633 \\
-ModelB\_Newcomer\_ScoreOnly (< 1 Week) & 0.960 & [0.948, 0.972] & 0.923 [0.91, 0.93] & 4,029,008 & 475,633 \\
-ModelB\_Newcomer\_Quality (< 1 Week) & 0.935 & [0.924, 0.947] & 0.877 [0.87, 0.89] & 4,029,008 & 475,633 \\
+ModelA\_Newcomer\_Baseline (< 1 Week) & 1.072 & [1.055, 1.089] & +0.048*** & 4,029,008 & 368,780 \\
+ModelA\_Newcomer\_Observable (< 1 Week) & 1.129 & [1.116, 1.143] & +0.121*** & 4,029,008 & 368,780 \\
+ModelB\_Newcomer\_Baseline (< 1 Week) & 1.010 & [0.998, 1.023] & +0.007 & 4,029,008 & 368,780 \\
+ModelB\_Newcomer\_LengthOnly (< 1 Week) & 1.003 & [0.991, 1.016] & -0.001 & 4,029,008 & 368,780 \\
+ModelB\_Newcomer\_ScoreOnly (< 1 Week) & 0.979 & [0.967, 0.992] & -0.023*** & 4,029,008 & 368,780 \\
+ModelB\_Newcomer\_Quality (< 1 Week) & 0.950 & [0.938, 0.962] & -0.054*** & 4,029,008 & 368,780 \\
 \bottomrule
 \end{tabular}
 \vspace{0.35em}
 \begin{minipage}{\linewidth}
 \footnotesize
 \raggedright
-Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.\\
+$\beta_4$ (the answer-arrival increment) is the difference-in-differences treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends diagnostic and is not added to the effect.\\
 Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.\\
 Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.
 \end{minipage}

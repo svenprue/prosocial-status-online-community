@@ -5,19 +5,19 @@
 \footnotesize
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
-\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Summed HR (upper bnd)} & \textbf{N} & \textbf{Events} \\
+\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\
 \midrule
-speed\_baseline & 1.027 & [1.016, 1.039] & 1.024 [1.02, 1.03] & 24,349,760 & 5,025,482 \\
-speed\_length\_only & 1.022 & [1.010, 1.033] & 1.010 [1.00, 1.02] & 24,349,760 & 5,025,482 \\
-speed\_score\_only & 1.004 & [0.993, 1.016] & 0.978 [0.97, 0.99] & 24,349,760 & 5,025,482 \\
-speed\_quality\_controls & 0.982 & [0.970, 0.993] & 0.930 [0.92, 0.94] & 24,349,760 & 5,025,482 \\
+speed\_baseline & 1.032 & [1.020, 1.045] & +0.011\textdagger & 24,349,760 & 3,435,973 \\
+speed\_length\_only & 1.026 & [1.014, 1.038] & +0.002 & 24,349,760 & 3,435,973 \\
+speed\_score\_only & 1.005 & [0.993, 1.017] & -0.019** & 24,349,760 & 3,435,973 \\
+speed\_quality\_controls & 0.977 & [0.965, 0.988] & -0.050*** & 24,349,760 & 3,435,973 \\
 \bottomrule
 \end{tabular}
 \vspace{0.35em}
 \begin{minipage}{\linewidth}
 \footnotesize
 \raggedright
-Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.\\
+$\beta_4$ (the answer-arrival increment) is the difference-in-differences treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends diagnostic and is not added to the effect.\\
 Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.\\
 Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.
 \end{minipage}

@@ -293,7 +293,7 @@ def generate_desc_stats_table(desc: dict, df_main: pd.DataFrame = None) -> str:
         rf"Unique users & & & & {_f(n_u)} \\",
         rf"\% questions with answer & {_f(pct_ans)}\% & & & \\",
         r"\midrule",
-        rf"Help events per window (answers + comments) & {_f(he_mean)} & {_f(he_std)} & {_f(he_med)} & \\",
+        rf"Help events per window (answers to others) & {_f(he_mean)} & {_f(he_std)} & {_f(he_med)} & \\",
         rf"User tenure (days) & {_f(t_mean)} & {_f(t_std)} & {_f(t_med)} & \\",
         rf"Response time (hours, treated) & {_f(rt_mean)} & {_f(rt_std)} & {_f(rt_med)} & \\",
         r"\midrule",

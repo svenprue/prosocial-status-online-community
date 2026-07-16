@@ -10,18 +10,15 @@
  & \shortstack[c]{$<$ 1\\Week} & \shortstack[c]{1 Wk--\\1 Mo} & \shortstack[c]{1--6\\Mo} & \shortstack[c]{6--12\\Mo} & \shortstack[c]{1--3\\Yr} & \shortstack[c]{3--6\\Yr} & \shortstack[c]{$>$ 6\\Yrs} \\
 \midrule
 \multicolumn{8}{@{}l}{\textit{Treatment effect: increment at answer arrival ($\beta_4$)}} \\
-\hspace{1em}Answer arrival ($\times$ Post-Answer Received) & 0.0573*** & 0.0206* & 0.0419*** & 0.0412*** & 0.0268*** & 0.0078 & -0.0191* \\
- & (0.0078) & (0.0100) & (0.0068) & (0.0066) & (0.0064) & (0.0065) & (0.0090) \\
-\hspace{1em}\textit{Hazard Ratio [95\% CI]} & [1.04, 1.08] & [1.00, 1.04] & [1.03, 1.06] & [1.03, 1.06] & [1.01, 1.04] & [0.99, 1.02] & [0.96, 1.00] \\[4pt]
-\multicolumn{8}{@{}l}{\textit{Total elevation (summed DiD, upper bound)}} \\
-\hspace{1em}Received Answer (net post-answer) & 0.1018*** & -0.0121\textdagger & 0.0215*** & 0.0258*** & 0.0272*** & 0.0032 & -0.0066 \\
- & (0.0062) & (0.0068) & (0.0045) & (0.0044) & (0.0045) & (0.0050) & (0.0076) \\
-\hspace{1em}\textit{Hazard Ratio [95\% CI]} & [1.09, 1.12] & [0.97, 1.00] & [1.01, 1.03] & [1.02, 1.04] & [1.02, 1.04] & [0.99, 1.01] & [0.98, 1.01] \\[4pt]
-\multicolumn{8}{@{}l}{\textit{\quad Pre-trend diagnostic (nested time-varying terms)}} \\
-\hspace{2em}Waiting period ($\beta_2$, $\times$ Post-Question) & 0.0445*** & -0.0327** & -0.0204** & -0.0154* & 0.0004 & -0.0046 & 0.0125 \\[4pt]
+\hspace{1em}Answer arrival ($\times$ Post-Answer Received) & 0.0695*** & 0.0309** & 0.0515*** & 0.0494*** & 0.0453*** & 0.0241*** & -0.0008 \\
+ & (0.0079) & (0.0105) & (0.0071) & (0.0071) & (0.0070) & (0.0072) & (0.0103) \\
+\hspace{1em}\textit{Hazard Ratio [95\% CI]} & [1.06, 1.09] & [1.01, 1.05] & [1.04, 1.07] & [1.04, 1.07] & [1.03, 1.06] & [1.01, 1.04] & [0.98, 1.02] \\[4pt]
+\multicolumn{8}{@{}l}{\textit{Waiting period ($\beta_2$, parallel-trends diagnostic)}} \\
+\hspace{1em}Received Answer $\times$ Post-Question & 0.0484*** & -0.0266* & -0.0162* & -0.0062 & -0.0033 & -0.0107 & -0.0167\textdagger \\
+ & (0.0078) & (0.0105) & (0.0072) & (0.0072) & (0.0070) & (0.0072) & (0.0101) \\
 \midrule
 N & 4,029,008 & 1,551,586 & 4,045,952 & 2,983,180 & 6,424,968 & 3,614,184 & 1,700,882 \\
-Events & 475,633 & 310,464 & 947,070 & 760,087 & 1,571,611 & 717,699 & 242,918 \\
+Events & 368,780 & 238,189 & 694,001 & 537,263 & 1,037,470 & 428,036 & 132,234 \\
 \bottomrule
 \end{tabular}%
 }
@@ -30,7 +27,8 @@ Events & 475,633 & 310,464 & 947,070 & 760,087 & 1,571,611 & 717,699 & 242,918 \
 \footnotesize
 \raggedright
 N = unique questions (treated + control) in the Cox sample. Within each column, treated vs.\ control counts can differ because tenure is defined per question.\\
-Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled DiD are in Table~\ref{tab:pair_bootstrap}.\\
+$\beta_4$ (the answer-arrival increment) is the difference-in-differences treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends diagnostic and is not added to the effect.\\
+Cox-table standard errors are model-based; matched-pair bootstrap 95\% CIs for the pooled arrival increment ($\beta_4$) are in Table~\ref{tab:pair_bootstrap}.\\
 Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.\\
 $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
 \end{minipage}

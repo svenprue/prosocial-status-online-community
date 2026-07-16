@@ -650,6 +650,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "treat_ci_hi": np.exp(s_b.loc["is_treated_active", "coef upper 95%"]),
         "treat_p": s_b.loc["is_treated_active", "p"],
         "gap_coef": s_b.loc["treated_post_question", "coef"],
+        "gap_se": s_b.loc["treated_post_question", "se(coef)"],
         "gap_p": s_b.loc["treated_post_question", "p"],
         "speed_coef": s_b.loc["treated_response_time_interaction", "coef"],
         "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],

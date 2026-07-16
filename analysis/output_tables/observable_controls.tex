@@ -5,17 +5,17 @@
 \footnotesize
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
-\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Summed HR (upper bnd)} & \textbf{N} & \textbf{Events} \\
+\textbf{Specification} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\
 \midrule
-baseline & 1.002 & [0.989, 1.016] & 1.008 [1.00, 1.02] & 24,349,760 & 5,025,482 \\
-observable\_controls & 1.010 & [0.999, 1.020] & 1.012 [1.00, 1.02] & 24,349,760 & 5,025,482 \\
+baseline & 1.031 & [1.017, 1.046] & -0.001 & 24,349,760 & 3,435,973 \\
+observable\_controls & 1.029 & [1.017, 1.040] & +0.003 & 24,349,760 & 3,435,973 \\
 \bottomrule
 \end{tabular}
 \vspace{0.35em}
 \begin{minipage}{\linewidth}
 \footnotesize
 \raggedright
-Primary HR is the answer-arrival increment ($\beta_4$); the summed DiD ($\exp(\beta_2+\beta_4)$) is shown as an upper bound.\\
+$\beta_4$ (the answer-arrival increment) is the difference-in-differences treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends diagnostic and is not added to the effect.\\
 Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.\\
 Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.
 \end{minipage}
