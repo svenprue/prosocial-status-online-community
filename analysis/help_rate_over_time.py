@@ -30,6 +30,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from cox_config import PRIMARY_HELP_TYPES
+
 # =====================================================================
 # Configuration
 # =====================================================================
@@ -73,8 +75,13 @@ def load_timelines_and_events(input_folder: str, sample_size: int = None):
         "t_start", "t_question", "t_answer", "t_end",
     ]
     event_cols = ["match_id", "question_id", "t_event"]
+    if PRIMARY_HELP_TYPES:
+        event_cols.append("help_type")
     timelines = pd.read_parquet(timelines_path, columns=timeline_cols)
     events = pd.read_parquet(events_path, columns=event_cols)
+    if PRIMARY_HELP_TYPES and "help_type" in events.columns:
+        events = events[events["help_type"].isin(PRIMARY_HELP_TYPES)].drop(columns=["help_type"])
+        print(f"Filtered events to help_type in {PRIMARY_HELP_TYPES}: {len(events):,} rows")
 
     for col in ["t_start", "t_question", "t_answer", "t_end", "user_tenure_days"]:
         if col in timelines.columns:
