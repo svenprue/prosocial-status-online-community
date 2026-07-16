@@ -137,8 +137,10 @@ def _extract_model_row(result, model_name: str, n_questions: int) -> dict | None
         print(f"⚠ {model_name}: missing is_treated_active in fitted summary; skipping row.")
         return None
 
-    # Report the SUMMED DiD (treated_post_question + is_treated_active), the treatment
-    # effect, rather than the is_treated_active increment over the waiting-period term.
+    # beta_4 (is_treated_active) ALONE is the DiD treatment effect; the summed
+    # combo (beta_2 + beta_4) below is a CSV-only diagnostic (see cox_fit.DID_TERMS) —
+    # never rendered into a .tex table. beta_2 (treated_post_question) is reported
+    # separately as a parallel-trends diagnostic.
     try:
         from cox_fit import _linear_combo, DID_TERMS
         combo = _linear_combo(result, DID_TERMS)
@@ -153,6 +155,10 @@ def _extract_model_row(result, model_name: str, n_questions: int) -> dict | None
             "se": float(inc["se(coef)"]),
             "p": float(inc["p"]),
         }
+    have_waiting = "treated_post_question" in summary.index
+    waiting_coef = float(summary.loc["treated_post_question", "coef"]) if have_waiting else float("nan")
+    waiting_se = float(summary.loc["treated_post_question", "se(coef)"]) if have_waiting else float("nan")
+    waiting_p = float(summary.loc["treated_post_question", "p"]) if have_waiting else float("nan")
     return {
         "model": model_name,
         "N": int(n_questions),
@@ -163,13 +169,16 @@ def _extract_model_row(result, model_name: str, n_questions: int) -> dict | None
         "SE": combo["se"],
         "p": combo["p"],
         "HR_increment_only": float(np.exp(inc["coef"])),
-        # ISS-24 re-headline: arrival increment (beta_4) uncertainty for the arrival-primary
-        # column in create_figures.generate_revision_robustness_table.
+        # Arrival increment (beta_4) uncertainty for its own HR/CI in
+        # create_figures.generate_revision_robustness_table.
         "arrival_coef": float(inc["coef"]),
         "arrival_se": float(inc["se(coef)"]),
         "arrival_p": float(inc["p"]),
         "arrival_ci_lo": float(np.exp(inc["coef lower 95%"])),
         "arrival_ci_hi": float(np.exp(inc["coef upper 95%"])),
+        "waiting_coef": waiting_coef,     # beta_2 (parallel-trends diagnostic)
+        "waiting_se": waiting_se,
+        "waiting_p": waiting_p,
     }
 
 
@@ -270,6 +279,7 @@ def run_cohort_robustness(input_folder: str, sample_size: int | None = None, use
     results = pd.DataFrame(rows, columns=[
         "model", "N", "events", "HR", "CI_low", "CI_high", "SE", "p", "HR_increment_only",
         "arrival_coef", "arrival_se", "arrival_p", "arrival_ci_lo", "arrival_ci_hi",
+        "waiting_coef", "waiting_se", "waiting_p",
     ])
     out_path = os.path.join(CACHE_DIR, "results_cohort_robustness.csv")
     results.to_csv(out_path, index=False)

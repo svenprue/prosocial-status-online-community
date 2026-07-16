@@ -112,10 +112,10 @@ def _ard_nnt(baseline: float, hr, hr_ci_lo, hr_ci_hi) -> dict:
 def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict:
     baseline = _baseline_event_rate(row, descriptives)
 
-    # ISS-24 re-headline: base the PRIMARY absolute effect (HR/ARD/NNT) on the answer-arrival
-    # increment (beta_4 = is_treated_active) when HEADLINE_ESTIMAND=="arrival". Keep the
-    # SUMMED DiD (exp(beta_2+beta_4)) as a labeled secondary set of columns. Under "summed"
-    # the primary reverts to the summed DiD (the prior behavior).
+    # The PRIMARY absolute effect (HR/ARD/NNT) is based on the answer-arrival increment
+    # (beta_4 = is_treated_active), the DiD treatment effect, when HEADLINE_ESTIMAND==
+    # "arrival". The summed contrast (exp(beta_2+beta_4)) below is a CSV-only diagnostic —
+    # per the 2026-07-14 estimand decision it is never rendered into the .tex table.
     summed_hr = (
         float(row["did_hr"]) if pd.notna(row.get("did_hr"))
         else (float(np.exp(float(row["did_coef"]))) if pd.notna(row.get("did_coef")) else np.nan)
@@ -164,7 +164,7 @@ def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict
         "nnt": primary["nnt"],
         "nnt_ci_lo": primary["nnt_ci_lo"],
         "nnt_ci_hi": primary["nnt_ci_hi"],
-        # Secondary (summed DiD, upper bound) — kept visible per ISS-24.
+        # CSV-only diagnostic (summed contrast) — never rendered into the .tex table.
         "summed_hr": summed_hr,
         "summed_ci_lo": summed_ci_lo,
         "summed_ci_hi": summed_ci_hi,
@@ -226,14 +226,14 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
         r"\label{tab:absolute_effects}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lrrrrrr@{}}",
+        r"\begin{tabular}{@{}lrrrrr@{}}",
         r"\toprule",
-        r"\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} & \textbf{Summed HR} \\",
+        r"\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} \\",
         r"\midrule",
     ]
 
-    # ISS-24 re-headline: primary HR/ARD/NNT are the answer-arrival increment (when
-    # HEADLINE_ESTIMAND=="arrival"); the summed DiD HR is shown as a labeled upper bound.
+    # HR/ARD/NNT are based on the answer-arrival increment (beta_4, the DiD treatment
+    # effect) when HEADLINE_ESTIMAND=="arrival".
     for _, row in df.iterrows():
         nnt_ci = "—"
         if pd.notna(row.get("nnt_ci_lo")) and pd.notna(row.get("nnt_ci_hi")):
@@ -247,7 +247,6 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
                     _fmt_num(row.get("absolute_risk_difference_proxy"), 5),
                     _fmt_num(row.get("nnt"), 1),
                     nnt_ci,
-                    _fmt_num(row.get("summed_hr"), 3),
                 ]
             )
             + r" \\"
@@ -255,7 +254,7 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
 
     lines += [
         r"\bottomrule",
-        r"\multicolumn{7}{@{}l}{\footnotesize HR/ARD/NNT are the primary (headline) estimand; ``Summed HR'' is the summed DiD ($\exp(\beta_2+\beta_4)$, upper bound).} \\",
+        r"\multicolumn{6}{@{}l}{\footnotesize HR/ARD/NNT are based on the answer-arrival increment ($\beta_4$), the primary (headline) estimand.} \\",
         r"\end{tabular}",
         r"\end{table}",
     ]

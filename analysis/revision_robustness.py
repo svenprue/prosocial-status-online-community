@@ -38,14 +38,12 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
     summary = result.summary_df
     if "is_treated_active" not in summary.index:
         return None
-    # Report the SUMMED DiD (treated_post_question + is_treated_active) — the treatment
-    # effect (post-answer vs. pre-question baseline, treated vs. control) — not the raw
-    # is_treated_active coefficient, which is only the post-answer increment over the
-    # (potentially large) waiting-period term. We also return the decomposition:
-    # beta_2 (waiting-period / "anticipatory engagement" pre-trend) and beta_4 (the
-    # increment at answer arrival, net of that pre-trend).
+    # beta_4 (is_treated_active) ALONE is the DiD treatment effect (answer-arrival
+    # increment); beta_2 (treated_post_question, waiting-period) is a parallel-trends
+    # diagnostic reported alongside it, never added in. The summed did_* fields below
+    # are CSV-only diagnostics (see cox_fit.DID_TERMS) — never rendered into a .tex table.
     inc = summary.loc["is_treated_active"]                       # beta_4
-    combo = _linear_combo(result, DID_TERMS)                     # beta_2 + beta_4
+    combo = _linear_combo(result, DID_TERMS)                     # beta_2 + beta_4 (diagnostic)
     if combo is None:
         combo = {
             "coef": float(inc["coef"]),
@@ -55,10 +53,10 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
             "se": float(inc["se(coef)"]),
             "p": float(inc["p"]),
         }
-    waiting_coef = (
-        float(summary.loc["treated_post_question", "coef"])
-        if "treated_post_question" in summary.index else float("nan")
-    )
+    have_waiting = "treated_post_question" in summary.index
+    waiting_coef = float(summary.loc["treated_post_question", "coef"]) if have_waiting else float("nan")
+    waiting_se = float(summary.loc["treated_post_question", "se(coef)"]) if have_waiting else float("nan")
+    waiting_p = float(summary.loc["treated_post_question", "p"]) if have_waiting else float("nan")
     return {
         "model": model_name,
         "N_questions": int(n_questions),
@@ -68,13 +66,15 @@ def _extract_treatment_row(result, model_name: str, n_questions: int) -> dict | 
         "CI_high": combo["ci_hi"],
         "SE": combo["se"],
         "p": combo["p"],
-        "did_coef": combo.get("coef", float("nan")),      # beta_2 + beta_4
-        "waiting_coef": waiting_coef,                       # beta_2 (pre-trend)
+        "did_coef": combo.get("coef", float("nan")),      # beta_2 + beta_4 (CSV diagnostic only)
+        "waiting_coef": waiting_coef,                       # beta_2 (parallel-trends diagnostic)
+        "waiting_se": waiting_se,
+        "waiting_p": waiting_p,
         "HR_waiting": float(np.exp(waiting_coef)) if np.isfinite(waiting_coef) else float("nan"),
         "arrival_coef": float(inc["coef"]),                 # beta_4 (arrival increment)
-        "HR_increment_only": float(np.exp(inc["coef"])),   # exp(beta_4), reference
-        # ISS-24 re-headline: full arrival uncertainty so create_figures can lead with the
-        # arrival increment (primary) and show the summed DiD as a labeled secondary column.
+        "HR_increment_only": float(np.exp(inc["coef"])),   # exp(beta_4), the DiD treatment effect
+        # Full arrival uncertainty so create_figures can render the arrival increment's
+        # own HR/CI; the summed did_* fields above are CSV-only diagnostics.
         "arrival_se": float(inc["se(coef)"]),
         "arrival_p": float(inc["p"]),
         "arrival_ci_lo": float(np.exp(inc["coef lower 95%"])),
@@ -152,11 +152,12 @@ def run_composite_outcome(input_folder: str, use_cache: bool) -> pd.DataFrame:
     """ISS-04: decompose the reciprocity outcome by help type.
 
     Fits the same Model A on each help-type subset so the treatment effect can be
-    read component-by-component. Each row reports the summed DiD (HR) together with
-    its decomposition into the waiting-period coefficient (beta_2, "anticipatory
-    engagement" pre-trend) and the answer-arrival increment (beta_4). This directly
-    answers R2's point 4: whether newcomers' low-effort actions (comments) carry a
-    reciprocity signal, or whether that signal is pre-answer activity selection.
+    read component-by-component. Each row reports the answer-arrival increment
+    (beta_4, the DiD treatment effect) alongside the waiting-period coefficient
+    (beta_2, "anticipatory engagement" parallel-trends diagnostic; not added to
+    beta_4). This directly answers R2's point 4: whether newcomers' low-effort
+    actions (comments) carry a reciprocity signal, or whether that signal is
+    pre-answer activity selection.
 
     Note on inputs: the help-type filter can only surface types that are present in
     ``study_events.parquet``. The default pipeline excludes ``accept`` events (see

@@ -39,12 +39,15 @@ def _parallel_workers(n_units: int, n_jobs: int | None) -> int:
 
 # The two treated indicators are nested: `treated_post_question` switches on when
 # the question is posted and STAYS on through the post-answer phase; `is_treated_active`
-# adds on only after the answer arrives. So the coefficient on `is_treated_active`
-# alone is the post-answer *increment over the waiting period*, not the treatment
-# effect. The treatment effect (post-answer vs. the pre-question baseline, treated vs.
-# control) is the SUM of the two coefficients — see _linear_combo / DID_TERMS.
+# adds on only after the answer arrives. Per the 2026-07-14 estimand decision,
+# `is_treated_active` (beta_4) ALONE is the difference-in-differences treatment effect
+# (the answer-arrival increment); `treated_post_question` (beta_2) is reported separately
+# as a parallel-trends diagnostic (it has no sign guarantee, so summing it into beta_4
+# would not bound anything). The SUM of the two coefficients (_linear_combo / DID_TERMS)
+# is still computed into `did_*` CSV fields for internal diagnostics, but must never be
+# emitted into a .tex table/caption/footnote — see cox_config.HEADLINE_ESTIMAND.
 DID_TERMS = ["treated_post_question", "is_treated_active"]
-# Speed spec: response-time moderation of that DiD is the sum of the two RT interactions.
+# Speed spec: the CSV-diagnostic-only summed RT moderation is the sum of the two RT interactions.
 DID_SPEED_TERMS = [
     "treated_post_question_response_time_interaction",
     "treated_response_time_interaction",
@@ -97,7 +100,8 @@ def _linear_combo(res, terms):
 
 
 def _did_fields(res, terms=DID_TERMS, prefix="did"):
-    """Return a dict of {prefix}_coef/se/p/hr/ci_lo/ci_hi for the summed DiD contrast,
+    """Return a dict of {prefix}_coef/se/p/hr/ci_lo/ci_hi for the summed contrast
+    (CSV diagnostic only — never rendered into a .tex table; see DID_TERMS comment),
     or all-NaN fields (so downstream CSV columns stay consistent) if unavailable."""
     combo = _linear_combo(res, terms)
     keys = ["coef", "se", "p", "hr", "ci_lo", "ci_hi"]
@@ -107,10 +111,10 @@ def _did_fields(res, terms=DID_TERMS, prefix="did"):
 
 
 def _arrival_fields(summary, term="is_treated_active", prefix="arrival"):
-    """ISS-24 re-headline: emit the ARRIVAL increment (a single fitted coefficient) with a
-    normal-approx 95% CI (exp(coef ± 1.96·se)) so every results CSV carries
-    {prefix}_coef/se/p/hr/ci_lo/ci_hi alongside the summed did_* fields. create_figures then
-    picks the primary reported effect per HEADLINE_ESTIMAND while keeping both visible.
+    """Emit the ARRIVAL increment (a single fitted coefficient) with a normal-approx 95%
+    CI (exp(coef ± 1.96·se)) so every results CSV carries {prefix}_coef/se/p/hr/ci_lo/ci_hi.
+    This is THE DiD treatment effect (beta_4); the summed did_* fields alongside it are
+    CSV-only diagnostics that create_figures.py must never render into a .tex table.
 
     For the headline treatment effect pass term='is_treated_active' (beta_4). For the RT
     moderation pass term='treated_response_time_interaction' (gamma) with prefix='arr_speed'.
@@ -393,9 +397,9 @@ def _fit_one_rt_bin(args):
         "n_questions": n_questions,
         "n_events": res.meta.get("n_events", n_events),
     }
-    # Summed DiD (post- vs pre-question baseline, treated vs control): the quantity that
-    # is comparable across bins. `treat_*` alone is only the post-answer increment and is
-    # not comparable across response-time bins (the waiting-period term varies with RT).
+    # Summed contrast (post- vs pre-question baseline, treated vs control): CSV diagnostic
+    # only, comparable across bins in a way `treat_*` alone is not (the waiting-period term
+    # varies with RT) — but never rendered into a .tex table (see DID_TERMS comment).
     row.update(_did_fields(res))
     # ISS-24 re-headline: also carry the arrival increment (beta_4) with its own CI so the
     # per-bin table can lead with arrival when HEADLINE_ESTIMAND=="arrival".
@@ -527,12 +531,13 @@ def _fit_one_tenure_bucket(args):
         "treat_ci_hi": np.exp(s_a.loc["is_treated_active", "coef upper 95%"]),
         "gap_coef": s_a.loc["treated_post_question", "coef"],
         "gap_hr": np.exp(s_a.loc["treated_post_question", "coef"]),
+        "gap_se": s_a.loc["treated_post_question", "se(coef)"],
         "gap_p": s_a.loc["treated_post_question", "p"],
         "phase_post_q_coef": s_a.loc["phase_post_question", "coef"],
         "phase_post_coef": s_a.loc["phase_post", "coef"],
         "hasAnswer_coef": s_a.loc["hasAnswer", "coef"],
     }
-    # Summed DiD treatment effect (post- vs pre-question baseline, treated vs control).
+    # Summed contrast (post- vs pre-question baseline, treated vs control): CSV diagnostic only.
     main_row.update(_did_fields(res_a))
     # ISS-24 re-headline: arrival increment (beta_4) with its own CI, primary under "arrival".
     main_row.update(_arrival_fields(s_a))
@@ -554,12 +559,13 @@ def _fit_one_tenure_bucket(args):
         "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],
         "speed_p": s_b.loc["treated_response_time_interaction", "p"],
         "gap_speed_coef": s_b.loc["treated_post_question_response_time_interaction", "coef"],
+        "gap_speed_se": s_b.loc["treated_post_question_response_time_interaction", "se(coef)"],
         "gap_speed_p": s_b.loc["treated_post_question_response_time_interaction", "p"],
     }
-    # DiD at mean response time (covariates are mean-centred, so the RT interactions are
-    # zero at their mean): the summed base contrast is still treated_post_question +
-    # is_treated_active. And the net RT moderation of the DiD is the sum of the two RT
-    # interaction terms (`did_speed_*`), not `speed_coef` alone.
+    # Covariates are mean-centred, so the RT interactions are zero at their mean. The
+    # summed base contrast (treated_post_question + is_treated_active) and the summed RT
+    # moderation (`did_speed_*`, the sum of the two RT interaction terms) are CSV-only
+    # diagnostics — never rendered into a .tex table.
     speed_row.update(_did_fields(res_b, prefix="did"))
     speed_row.update(_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"))
     # ISS-24 re-headline: arrival base increment (beta_4) and the arrival RT moderation
@@ -626,6 +632,7 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "treat_ci_hi": np.exp(s_a.loc["is_treated_active", "coef upper 95%"]),
         "gap_coef": s_a.loc["treated_post_question", "coef"],
         "gap_hr": np.exp(s_a.loc["treated_post_question", "coef"]),
+        "gap_se": s_a.loc["treated_post_question", "se(coef)"],
         "gap_p": s_a.loc["treated_post_question", "p"],
         **_did_fields(res_a),
         # ISS-24 re-headline: arrival increment (beta_4) with its own CI.
@@ -647,6 +654,9 @@ def fit_all_data_models(model_df: pd.DataFrame, use_cache: bool = True):
         "speed_coef": s_b.loc["treated_response_time_interaction", "coef"],
         "speed_se": s_b.loc["treated_response_time_interaction", "se(coef)"],
         "speed_p": s_b.loc["treated_response_time_interaction", "p"],
+        "gap_speed_coef": s_b.loc["treated_post_question_response_time_interaction", "coef"],
+        "gap_speed_se": s_b.loc["treated_post_question_response_time_interaction", "se(coef)"],
+        "gap_speed_p": s_b.loc["treated_post_question_response_time_interaction", "p"],
         **_did_fields(res_b),
         **_did_fields(res_b, terms=DID_SPEED_TERMS, prefix="did_speed"),
         # ISS-24 re-headline: arrival base increment (beta_4) and arrival RT moderation

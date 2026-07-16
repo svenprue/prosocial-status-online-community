@@ -6,9 +6,12 @@ NotImplementedError, and it does not wire a public ``cluster_col`` argument for
 time-varying fits. This script implements the reviewer-requested matched-pair
 alternative by resampling whole match_id pairs and refitting Model A.
 
-The bootstrapped statistic (base_coef / base_hr and the CIs) is the SUMMED DiD
-contrast, treated_post_question + is_treated_active — the treatment effect, not
-the is_treated_active increment over the waiting-period term.
+Per the 2026-07-14 estimand decision, the bootstrapped statistic (base_coef / base_hr
+and the CIs) is the is_treated_active coefficient ALONE (beta_4, the answer-arrival
+increment) — the DiD treatment effect. treated_post_question (beta_2, the waiting-period
+parallel-trends diagnostic) is also recorded per replicate (base_gap_coef / base_gap_hr
+and bootstrap_gap_*_ci_*) but is never summed into beta_4: beta_2 has no sign guarantee,
+so the old summed contrast bounded nothing.
 
 Replicates run in a process pool with independent RNGs via SeedSequence.spawn
 (not byte-identical to a serial Generator stream; statistically equivalent).
@@ -72,6 +75,11 @@ DROP_FOR_MODEL_A = [
 # Sampler id in checkpoint meta — bump if draw logic changes incompatibly.
 _SAMPLER_ID = "seed_sequence_parallel_v1"
 
+# Bumped 2026-07-14: checkpoints now hold the beta_4 (is_treated_active) coefficient
+# alone, not the summed treated_post_question + is_treated_active contrast. The "_b4"
+# slug suffix keeps this from silently merging with pre-existing summed-stat checkpoints.
+_STAT_SLUG = "b4"
+
 # Worker globals (set in _init_boot_worker; avoid pickling the full frame per task).
 _BOOT_SCOPED: pd.DataFrame | None = None
 _BOOT_UNIQUE_IDS: np.ndarray | None = None
@@ -79,13 +87,14 @@ _BOOT_MAX_PAIRS: int | None = None
 
 
 def _scope_slug(scope: str) -> str:
-    return (
+    slug = (
         str(scope)
         .replace(" ", "_")
         .replace("<", "lt")
         .replace(">", "gt")
         .replace("/", "-")
     )
+    return f"{slug}_{_STAT_SLUG}"
 
 
 def _checkpoint_paths(
@@ -156,8 +165,8 @@ def _load_checkpoint(
     sample_size: int | None,
     rep_start: int | None = None,
     rep_end: int | None = None,
-) -> dict[int, float | None]:
-    """Return {1-based replicate: coef_or_None} for a compatible checkpoint."""
+) -> dict[int, tuple[float | None, float | None]]:
+    """Return {1-based replicate: (beta4_coef, beta2_coef)_or_(None, None)} for a compatible checkpoint."""
     csv_path, meta_path = _checkpoint_paths(scope, rep_start, rep_end)
     if not (os.path.exists(csv_path) and os.path.exists(meta_path)):
         return {}
@@ -175,7 +184,7 @@ def _load_checkpoint(
     df = pd.read_csv(csv_path)
     if df.empty or "replicate" not in df.columns:
         return {}
-    completed: dict[int, float | None] = {}
+    completed: dict[int, tuple[float | None, float | None]] = {}
     for _, row in df.iterrows():
         rep = int(row["replicate"])
         if rep_start is not None and rep < int(rep_start):
@@ -184,9 +193,10 @@ def _load_checkpoint(
             continue
         ok = bool(row.get("ok", True))
         if ok and pd.notna(row.get("coef")):
-            completed[rep] = float(row["coef"])
+            gap = row.get("gap_coef", np.nan)
+            completed[rep] = (float(row["coef"]), float(gap) if pd.notna(gap) else None)
         else:
-            completed[rep] = None
+            completed[rep] = (None, None)
     if completed:
         last = max(completed)
         print(
@@ -202,7 +212,7 @@ def _save_checkpoint(
     n_bootstrap: int,
     max_pairs: int | None,
     sample_size: int | None,
-    completed: dict[int, float | None],
+    completed: dict[int, tuple[float | None, float | None]],
     rep_start: int | None = None,
     rep_end: int | None = None,
 ) -> None:
@@ -212,9 +222,10 @@ def _save_checkpoint(
         {
             "replicate": rep,
             "coef": coef if coef is not None else np.nan,
+            "gap_coef": gap if gap is not None else np.nan,
             "ok": coef is not None and np.isfinite(coef),
         }
-        for rep, coef in sorted(completed.items())
+        for rep, (coef, gap) in sorted(completed.items())
     ]
     _atomic_write_csv(csv_path, pd.DataFrame(rows))
     _atomic_write_json(
@@ -254,7 +265,7 @@ def merge_pair_bootstrap_checkpoints(
     write_merged_checkpoint: bool = True,
 ) -> pd.DataFrame:
     """Merge main + shard checkpoints into one results row (and optional merged checkpoint)."""
-    completed: dict[int, float | None] = {}
+    completed: dict[int, tuple[float | None, float | None]] = {}
     sources: list[str] = []
     for csv_path in _iter_checkpoint_csvs(scope):
         df = pd.read_csv(csv_path)
@@ -267,10 +278,12 @@ def merge_pair_bootstrap_checkpoints(
                 continue
             ok = bool(row.get("ok", True))
             coef = float(row["coef"]) if ok and pd.notna(row.get("coef")) else None
+            gap = row.get("gap_coef", np.nan)
+            gap_coef = float(gap) if pd.notna(gap) else None
             # Prefer first finite coef; skip overwriting a good value with None.
-            if rep in completed and completed[rep] is not None:
+            if rep in completed and completed[rep][0] is not None:
                 continue
-            completed[rep] = coef
+            completed[rep] = (coef, gap_coef)
         if len(completed) > n_before:
             sources.append(csv_path)
             print(f"  + {csv_path}: now {len(completed)} unique replicate(s)")
@@ -280,8 +293,12 @@ def merge_pair_bootstrap_checkpoints(
 
     missing = [r for r in range(1, int(n_bootstrap) + 1) if r not in completed]
     boot_coefs = [
-        c for _, c in sorted(completed.items())
+        c for _, (c, _) in sorted(completed.items())
         if c is not None and np.isfinite(c)
+    ]
+    boot_gap_coefs = [
+        g for _, (_, g) in sorted(completed.items())
+        if g is not None and np.isfinite(g)
     ]
     print(
         f"  Merged {len(completed)}/{n_bootstrap} replicate(s) "
@@ -297,8 +314,10 @@ def merge_pair_bootstrap_checkpoints(
         print(f"  ✓ Wrote merged checkpoint {_checkpoint_paths(scope)[0]}")
 
     coefs = np.asarray(boot_coefs, dtype=float)
+    gap_coefs = np.asarray(boot_gap_coefs, dtype=float) if boot_gap_coefs else np.asarray([])
     # Prefer base / N / Events from prior results or pooled Cox CSV.
     base_coef = np.nan
+    base_gap_coef = np.nan
     n_questions = ""
     n_events = ""
     prior = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")
@@ -308,6 +327,8 @@ def merge_pair_bootstrap_checkpoints(
         if not hit.empty:
             if "base_coef" in hit.columns and pd.notna(hit.iloc[-1].get("base_coef")):
                 base_coef = float(hit.iloc[-1]["base_coef"])
+            if "base_gap_coef" in hit.columns and pd.notna(hit.iloc[-1].get("base_gap_coef")):
+                base_gap_coef = float(hit.iloc[-1]["base_gap_coef"])
             if "n_questions" in hit.columns and pd.notna(hit.iloc[-1].get("n_questions")):
                 try:
                     n_questions = int(hit.iloc[-1]["n_questions"])
@@ -328,7 +349,7 @@ def merge_pair_bootstrap_checkpoints(
                 n_events = int(pall.iloc[0]["n_events"])
 
     if not np.isfinite(base_coef):
-        # Recover base DiD from the cached base-model pickle if present.
+        # Recover base beta_4 (is_treated_active) from the cached base-model pickle.
         for name in (
             f"ModelA_BootstrapBase_{scope}_1h.pkl",
             f"ModelA_BootstrapBase_{scope}.pkl",
@@ -339,21 +360,26 @@ def merge_pair_bootstrap_checkpoints(
             try:
                 with open(path, "rb") as f:
                     cached = pickle.load(f)
-                coef = _coef_from_result(cached)
-                if coef is not None and np.isfinite(coef):
-                    base_coef = float(coef)
+                b4, b2 = _coefs_from_result(cached)
+                if b4 is not None and np.isfinite(b4):
+                    base_coef = float(b4)
+                    if b2 is not None and np.isfinite(b2):
+                        base_gap_coef = float(b2)
                     print(f"  ✓ Recovered base_coef={base_coef:.6f} from {name}")
                     break
             except Exception as exc:
                 print(f"  ⚠ Could not read {name}: {exc}")
 
     if not np.isfinite(base_coef) and os.path.exists(pooled):
-        # Fall back to pooled Cox summed-DiD point estimate (same estimand as bootstrap).
+        # Fall back to the pooled Cox arrival-increment point estimate (same estimand
+        # as the bootstrap: is_treated_active alone, not the summed DiD).
         try:
             pall = pd.read_csv(pooled)
-            if not pall.empty and "did_coef" in pall.columns and pd.notna(pall.iloc[0]["did_coef"]):
-                base_coef = float(pall.iloc[0]["did_coef"])
-                print(f"  ✓ Recovered base_coef={base_coef:.6f} from results_main_all.csv did_coef")
+            if not pall.empty and "treat_coef" in pall.columns and pd.notna(pall.iloc[0]["treat_coef"]):
+                base_coef = float(pall.iloc[0]["treat_coef"])
+                print(f"  ✓ Recovered base_coef={base_coef:.6f} from results_main_all.csv treat_coef")
+            if not pall.empty and "gap_coef" in pall.columns and pd.notna(pall.iloc[0]["gap_coef"]):
+                base_gap_coef = float(pall.iloc[0]["gap_coef"])
         except Exception as exc:
             print(f"  ⚠ Could not read results_main_all.csv for base_coef: {exc}")
 
@@ -366,9 +392,13 @@ def merge_pair_bootstrap_checkpoints(
         "max_pairs_per_replicate": max_pairs if max_pairs is not None else "",
         "base_coef": base_coef if np.isfinite(base_coef) else np.nan,
         "base_hr": float(np.exp(base_coef)) if np.isfinite(base_coef) else np.nan,
+        "base_gap_coef": base_gap_coef if np.isfinite(base_gap_coef) else np.nan,
+        "base_gap_hr": float(np.exp(base_gap_coef)) if np.isfinite(base_gap_coef) else np.nan,
         "bootstrap_se_coef": float(coefs.std(ddof=1)) if len(coefs) > 1 else np.nan,
         "bootstrap_coef_ci_lo": float(np.percentile(coefs, 2.5)),
         "bootstrap_coef_ci_hi": float(np.percentile(coefs, 97.5)),
+        "bootstrap_gap_coef_ci_lo": float(np.percentile(gap_coefs, 2.5)) if len(gap_coefs) else np.nan,
+        "bootstrap_gap_coef_ci_hi": float(np.percentile(gap_coefs, 97.5)) if len(gap_coefs) else np.nan,
         "bootstrap_hr_ci_lo": float(np.exp(np.percentile(coefs, 2.5))),
         "bootstrap_hr_ci_hi": float(np.exp(np.percentile(coefs, 97.5))),
         "sources": ";".join(sources),
@@ -424,22 +454,18 @@ def _bootstrap_sample_by_match(
     return boot.drop(columns=["_boot_draw", "match_id"])
 
 
-def _coef_from_result(result) -> float | None:
-    """Return the SUMMED DiD coefficient (treated_post_question + is_treated_active).
-
-    This is the treatment effect (post-answer vs. pre-question baseline, treated vs.
-    control); the bootstrap therefore quantifies uncertainty in the effect itself, not
-    in the is_treated_active increment over the waiting-period term.
+def _coefs_from_result(result) -> tuple[float | None, float | None]:
+    """Return (beta_4, beta_2): the is_treated_active coefficient (the DiD treatment
+    effect, answer-arrival increment) and the treated_post_question coefficient (the
+    waiting-period parallel-trends diagnostic). beta_4 is never summed with beta_2 —
+    beta_2 has no sign guarantee, so a summed contrast would bound nothing.
     """
-    if result is None or "is_treated_active" not in result.summary_df.index:
-        return None
+    if result is None:
+        return None, None
     s = result.summary_df
-    try:
-        from cox_fit import DID_TERMS
-    except Exception:
-        DID_TERMS = ["treated_post_question", "is_treated_active"]
-    terms = [t for t in DID_TERMS if t in s.index]
-    return float(s.loc[terms, "coef"].sum())
+    b4 = float(s.loc["is_treated_active", "coef"]) if "is_treated_active" in s.index else None
+    b2 = float(s.loc["treated_post_question", "coef"]) if "treated_post_question" in s.index else None
+    return b4, b2
 
 
 def _init_boot_worker(
@@ -453,7 +479,7 @@ def _init_boot_worker(
     _BOOT_MAX_PAIRS = max_pairs
 
 
-def _run_one_replicate(payload: tuple[int, object, str]) -> tuple[int, float | None]:
+def _run_one_replicate(payload: tuple[int, object, str]) -> tuple[int, float | None, float | None]:
     """Worker: one bootstrap replicate. payload = (rep, child_seed, scope)."""
     rep, child_seed, scope = payload
     from cox_fit import fit_cox_cached
@@ -469,11 +495,12 @@ def _run_one_replicate(payload: tuple[int, object, str]) -> tuple[int, float | N
         use_cache=False,
         save_cache=False,
     )
-    coef = _coef_from_result(result)
+    b4, b2 = _coefs_from_result(result)
     del boot_df, result
-    if coef is not None and np.isfinite(coef):
-        return rep, float(coef)
-    return rep, None
+    if b4 is not None and np.isfinite(b4):
+        gap = float(b2) if b2 is not None and np.isfinite(b2) else None
+        return rep, float(b4), gap
+    return rep, None, None
 
 
 def _default_n_jobs(n_pending: int) -> int:
@@ -536,11 +563,11 @@ def run_pair_bootstrap(
         use_cache=use_cache,
         save_cache=use_cache,
     )
-    base_coef = _coef_from_result(base)
+    base_coef, base_gap_coef = _coefs_from_result(base)
     if base_coef is None:
         raise RuntimeError(f"Base fit failed for scope '{scope}'")
 
-    completed: dict[int, float | None] = {}
+    completed: dict[int, tuple[float | None, float | None]] = {}
     if resume:
         completed = _load_checkpoint(
             scope, seed, n_bootstrap, max_pairs, sample_size, ck_start, ck_end
@@ -574,8 +601,8 @@ def run_pair_bootstrap(
         if workers <= 1:
             _init_boot_worker(scoped, unique_ids, max_pairs)
             for task in tasks:
-                rep, coef = _run_one_replicate(task)
-                completed[rep] = coef
+                rep, coef, gap = _run_one_replicate(task)
+                completed[rep] = (coef, gap)
                 status = "ok" if coef is not None else "skipped"
                 _save_checkpoint(
                     scope, seed, n_bootstrap, max_pairs, sample_size,
@@ -590,8 +617,8 @@ def run_pair_bootstrap(
             ) as pool:
                 futures = {pool.submit(_run_one_replicate, t): t[0] for t in tasks}
                 for fut in as_completed(futures):
-                    rep, coef = fut.result()
-                    completed[rep] = coef
+                    rep, coef, gap = fut.result()
+                    completed[rep] = (coef, gap)
                     status = "ok" if coef is not None else "skipped"
                     _save_checkpoint(
                         scope, seed, n_bootstrap, max_pairs, sample_size,
@@ -605,8 +632,12 @@ def run_pair_bootstrap(
                     )
 
     boot_coefs = [
-        c for rep, c in sorted(completed.items())
+        c for rep, (c, _) in sorted(completed.items())
         if c is not None and np.isfinite(c) and lo <= rep <= hi
+    ]
+    boot_gap_coefs = [
+        g for rep, (_, g) in sorted(completed.items())
+        if g is not None and np.isfinite(g) and lo <= rep <= hi
     ]
     if not boot_coefs:
         raise RuntimeError(
@@ -614,6 +645,7 @@ def run_pair_bootstrap(
         )
 
     coefs = np.asarray(boot_coefs, dtype=float)
+    gap_coefs = np.asarray(boot_gap_coefs, dtype=float) if boot_gap_coefs else np.asarray([])
     row = {
         "scope": scope,
         "n_questions": n_questions,
@@ -625,10 +657,14 @@ def run_pair_bootstrap(
         "max_pairs_per_replicate": max_pairs if max_pairs is not None else "",
         "base_coef": base_coef,
         "base_hr": float(np.exp(base_coef)),
+        "base_gap_coef": base_gap_coef if base_gap_coef is not None and np.isfinite(base_gap_coef) else np.nan,
+        "base_gap_hr": float(np.exp(base_gap_coef)) if base_gap_coef is not None and np.isfinite(base_gap_coef) else np.nan,
         # Shard-local percentiles are NOT the final CIs — merge after all shards finish.
         "bootstrap_se_coef": float(coefs.std(ddof=1)) if len(coefs) > 1 else np.nan,
         "bootstrap_coef_ci_lo": float(np.percentile(coefs, 2.5)),
         "bootstrap_coef_ci_hi": float(np.percentile(coefs, 97.5)),
+        "bootstrap_gap_coef_ci_lo": float(np.percentile(gap_coefs, 2.5)) if len(gap_coefs) else np.nan,
+        "bootstrap_gap_coef_ci_hi": float(np.percentile(gap_coefs, 97.5)) if len(gap_coefs) else np.nan,
         "bootstrap_hr_ci_lo": float(np.exp(np.percentile(coefs, 2.5))),
         "bootstrap_hr_ci_hi": float(np.exp(np.percentile(coefs, 97.5))),
         "shard_partial": bool(shard and (lo > 1 or hi < int(n_bootstrap))),

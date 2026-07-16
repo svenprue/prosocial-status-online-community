@@ -14,12 +14,14 @@ ROUND_TO_HOURS = 1
 MAX_FIT_ROWS = 8_000_000
 SUBSAMPLE_SEED = 42
 
-# ISS-24 re-headline: which estimand LEADS the reported tables/figures. Reversible
-# config switch. "arrival" = the answer-arrival increment (beta_4 = is_treated_active),
-# reported as PRIMARY; "summed" = the summed DiD (beta_2 + beta_4). Under either value,
-# create_figures.py always shows BOTH — the non-headline estimand becomes a labeled
-# secondary row/column and beta_2 is shown as a pre-trend diagnostic. Never delete the
-# summed computation.
+# ISS-24 re-headline: which estimand LEADS the reported tables/figures. "arrival" =
+# the answer-arrival increment (beta_4 = is_treated_active), the sole DiD treatment
+# effect. beta_2 (treated_post_question) is reported separately as a parallel-trends
+# diagnostic and is never added to beta_4. Per the 2026-07-14 estimand decision, the
+# summed quantity beta_2+beta_4 bounds nothing (beta_2 has no sign guarantee), so the
+# `did_*` (summed) fields are computed only as CSV diagnostics — cox_fit.py and the
+# robustness scripts keep populating them for internal use — but must NEVER be
+# emitted into any .tex table, caption, or footnote.
 HEADLINE_ESTIMAND = "arrival"  # "arrival" | "summed"
 
 # fix(cache): bump when the data/covariate construction changes so stale model/interval

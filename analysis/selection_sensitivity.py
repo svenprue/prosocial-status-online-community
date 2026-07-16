@@ -99,10 +99,10 @@ def compute_churn_summary(input_folder: str) -> pd.DataFrame:
 
 
 def _base_hr_fields(r: pd.Series) -> dict:
-    """ISS-24 re-headline: the PRIMARY base HR is the answer-arrival increment (treat_* =
-    is_treated_active, beta_4) when HEADLINE_ESTIMAND=="arrival"; the summed DiD (did_*) is
-    carried alongside as base_hr_summed/base_ci_*_summed. Under "summed" the primary reverts
-    to the summed DiD. Both are always emitted so the bounds table can show both."""
+    """The base HR is the answer-arrival increment (treat_* = is_treated_active, beta_4,
+    the DiD treatment effect) when HEADLINE_ESTIMAND=="arrival". The summed contrast
+    (did_*) is also carried as base_hr_summed/base_ci_*_summed for CSV diagnostics only —
+    per the 2026-07-14 estimand decision it is never rendered into the .tex table."""
     summed = {
         "base_hr_summed": r.get("did_hr", np.nan),
         "base_ci_lo_summed": r.get("did_ci_lo", np.nan),
@@ -189,7 +189,7 @@ def compute_sensitivity_bounds(
                 "base_ci_hi": model["base_ci_hi"],
                 "base_se": model["base_se"],
                 "base_p": model["base_p"],
-                # ISS-24: summed DiD base HR carried as a labeled secondary (upper bound).
+                # Summed contrast: CSV-only diagnostic, never rendered into the .tex table.
                 "base_hr_summed": model.get("base_hr_summed", np.nan),
                 "base_ci_lo_summed": model.get("base_ci_lo_summed", np.nan),
                 "base_ci_hi_summed": model.get("base_ci_hi_summed", np.nan),
