@@ -104,14 +104,11 @@ Files: `body.tex` (18), `manuscript.tex` (1), `main.tex` (1), `appendix.tex` (8)
 9. Bootstrap CI for pooled β₄ excludes 1.
 10. Selection bounds: pooled effect "remains modest" under optimistic bounds; newcomer contrast more sensitive (limitations paragraph) — reword if the new A1 pattern differs.
 
-## 6. Response letter (`response_to_reviewers.tex`) — after tables land (issue #22)
+## 6. Response letter (`response_to_reviewers.tex`) — STRUCTURAL EDITS DONE 2026-07-15; only number fill remains
 
-- **Retitle row (Q1/Q5, ~line 74):** the paper is NO LONGER retitled; delete that claim. Reframe: claims were moderated in abstract/intro/conclusion; the title's "converts newcomers, not veterans" is now defended by the tenure gradient robustness.
-- **R2 P1/P4 row (~line 142):** flip the framing — the default outcome remains answers-only, *justified* on construct grounds (costly contribution), and we *re-estimated* under the requested composite and broader variants (decomposition table): comments dilute, edits raise, signal is answer-borne. Keep the accepts-degenerate and upvotes-unobservable explanations verbatim.
-- **All numeric quotes** across R1.3/R1.4/R2 rows updated to the answers-only tables (grep the letter for `1.06|1.00|0.98|1.10|0.94|1.22|1.11|1.01|summed|upper bound`).
-- **Bootstrap framing** per estimand spec §5: bootstrap now targets β₄ directly; β₂ reported as explicit diagnostic; summed quantity dropped because a signed pre-trend bounds nothing.
-- **Add a list-of-changes item:** removed a legacy supplementary lifetime-contributions analysis that predated the current design and was internally inconsistent.
-- **Highlights row (~line 44):** reword "consistently with the revised title" → "consistently with the title and revised abstract".
+All number-independent edits are already applied: verbatim reviewer quotes in every left cell, retitle claim deleted (title reverted in letter header too), R2 P1/P4 row reframed (answers-only justified + composite re-estimated), bootstrap row rewritten to target β₄ directly with the summed-drop rationale, lifetime-appendix disclosure added to the preamble, Highlights wording fixed, letter compiles clean.
+
+**Remaining: fill the 12 `[[AO:...]]` tokens in the letter** from the regenerated tables. Beyond the shared tokens in §4, the letter adds: `boot-hr` (A3 point HR), `nc-observables-hr` (A6 observables row), `quality-length-effect-letter` / `quality-full-direction-letter` (T10 wording choices, letter phrasing), `bin-3060-quality-verdict-letter`, `late-bump-letter` (A7), `nc-per-1000` (= newcomer ARD × 1000, from A2), `nc-nnt-ci` (A2). Then recompile the letter AFTER the manuscript (it reads `manuscript.aux` via `\externaldocument`) and verify `grep -c "\[\[AO:" response_to_reviewers.tex` → 0.
 
 ## 7. Final verification checklist
 
