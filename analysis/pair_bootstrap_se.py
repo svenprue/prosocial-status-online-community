@@ -77,9 +77,12 @@ DROP_FOR_MODEL_A = [
 _SAMPLER_ID = "seed_sequence_parallel_v1"
 
 # Bumped 2026-07-14: checkpoints now hold the beta_4 (is_treated_active) coefficient
-# alone, not the summed treated_post_question + is_treated_active contrast. The "_b4"
-# slug suffix keeps this from silently merging with pre-existing summed-stat checkpoints.
-_STAT_SLUG = "b4"
+# alone, not the summed treated_post_question + is_treated_active contrast. Bumped
+# again 2026-07-15 (b4 -> ao_b4) for the answers-only default-outcome switch — a
+# beta_4 draw from the old answer+comment composite default is not comparable to one
+# from the answers-only default. The slug suffix keeps either bump from silently
+# merging with pre-existing incompatible-stat checkpoints.
+_STAT_SLUG = "ao_b4"
 
 # Worker globals (set in _init_boot_worker; avoid pickling the full frame per task).
 _BOOT_SCOPED: pd.DataFrame | None = None

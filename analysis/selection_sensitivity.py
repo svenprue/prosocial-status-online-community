@@ -24,7 +24,7 @@ _ANALYSIS_DIR = os.path.dirname(os.path.abspath(__file__))
 if _ANALYSIS_DIR not in sys.path:
     sys.path.insert(0, _ANALYSIS_DIR)
 
-from cox_config import BUCKET_ORDER, CACHE_DIR, HEADLINE_ESTIMAND
+from cox_config import BUCKET_ORDER, CACHE_DIR, HEADLINE_ESTIMAND, PRIMARY_HELP_TYPES
 from cox_data import create_tenure_buckets
 
 
@@ -55,10 +55,19 @@ def _read_timelines(input_folder: str) -> pd.DataFrame:
 
 
 def _read_events(input_folder: str) -> pd.DataFrame:
+    """Events for the churn/selection-bounds summary, filtered to the primary Cox
+    outcome (PRIMARY_HELP_TYPES) so the zero-post-help event shares match the fits
+    reported alongside them, rather than counting every help type."""
     path = os.path.join(input_folder, "study_events.parquet")
     if not os.path.exists(path):
         raise FileNotFoundError(f"{path} not found")
-    return pd.read_parquet(path, columns=["match_id", "question_id", "t_event"])
+    cols = ["match_id", "question_id", "t_event"]
+    if PRIMARY_HELP_TYPES:
+        cols.append("help_type")
+    df = pd.read_parquet(path, columns=cols)
+    if PRIMARY_HELP_TYPES and "help_type" in df.columns:
+        df = df[df["help_type"].isin(PRIMARY_HELP_TYPES)].drop(columns=["help_type"])
+    return df
 
 
 def compute_churn_summary(input_folder: str) -> pd.DataFrame:

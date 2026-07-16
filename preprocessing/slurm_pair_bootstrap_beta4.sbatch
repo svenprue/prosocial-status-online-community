@@ -1,17 +1,23 @@
 #!/bin/bash
-#SBATCH --job-name=boot_beta4
+#SBATCH --job-name=boot_ao_beta4
 #SBATCH --partition=normal
 #SBATCH --time=12:00:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=350G
-#SBATCH --output=logs/slurm_boot_beta4_%j.out
-#SBATCH --error=logs/slurm_boot_beta4_%j.err
+#SBATCH --output=logs/slurm_boot_ao_beta4_%j.out
+#SBATCH --error=logs/slurm_boot_ao_beta4_%j.err
 #
-# 2026-07-14 estimand decision: re-target the matched-pair bootstrap onto beta_4
-# (is_treated_active) alone, the DiD treatment effect, instead of the summed
-# treated_post_question + is_treated_active contrast. New checkpoint namespace
-# (pair_bootstrap_checkpoint_all_b4*) so this cannot merge with the old summed-stat
-# checkpoints. Single job, full 100 replicates, Model A, pooled scope.
+# 2026-07-15 answers-only default-outcome switch: bootstrap beta_4 (is_treated_active)
+# alone, on the answers-only outcome (PRIMARY_HELP_TYPES=["answer"], DATA_VERSION=
+# rev2ao). New checkpoint namespace (pair_bootstrap_checkpoint_all_ao_b4*) so this
+# cannot merge with prior beta_4-on-composite-outcome or summed-stat checkpoints.
+# Single job, full 100 replicates, Model A, pooled scope.
+#
+# n_jobs=4 (not 8): an earlier n_jobs=8 attempt (job 377043) OOM'd within ~6 minutes
+# under the same 350G/8-cpu allocation — each worker holds its own copy of the scoped
+# ~64M-row frame before its own MAX_FIT_ROWS subsample, so 8 concurrent workers
+# exceeded available memory. n_jobs=4 matches the template that succeeded on
+# 2026-07-13 (jobs 370659/372148/371128) under the same allocation.
 
 set -euo pipefail
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -26,24 +32,22 @@ export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
 N_BOOTSTRAP="${N_BOOTSTRAP:-100}"
-N_JOBS="${N_JOBS:-8}"
+N_JOBS="${N_JOBS:-4}"
 SCOPE="${SCOPE:-all}"
 SEED="${SEED:-42}"
 
-CACHE="$ROOT/analysis/data_cache/intervals_full_answer_comment_rev1.parquet"
+CACHE="$ROOT/analysis/data_cache/intervals_full_answer_rev2ao.parquet"
 if [ ! -f "$CACHE" ]; then
-  CACHE="$ROOT/analysis/data_cache/intervals_full_answer_comment.parquet"
-fi
-if [ ! -f "$CACHE" ]; then
-  echo "ERROR: missing interval cache (intervals_full_answer_comment_rev1.parquet)."
+  echo "ERROR: missing interval cache ($CACHE). Run slurm_answers_only_refit.sbatch first."
   exit 1
 fi
 echo "Using interval cache: $CACHE"
 
 echo "=== $(date -Is) host=$(hostname) job=${SLURM_JOB_ID:-local} ==="
-echo "beta_4 bootstrap: n_bootstrap=${N_BOOTSTRAP} n_jobs=${N_JOBS} scope=${SCOPE} seed=${SEED}"
+echo "answers-only beta_4 bootstrap: n_bootstrap=${N_BOOTSTRAP} n_jobs=${N_JOBS} scope=${SCOPE} seed=${SEED}"
 echo "Python: $PYTHON"
 "$PYTHON" -c "import lifelines, pandas, numpy; print('lifelines', lifelines.__version__)"
+"$PYTHON" -c "from cox_config import PRIMARY_HELP_TYPES, DATA_VERSION; print('PRIMARY_HELP_TYPES=', PRIMARY_HELP_TYPES, 'DATA_VERSION=', DATA_VERSION)" || true
 
 cd "$ROOT/analysis"
 "$PYTHON" pair_bootstrap_se.py \
@@ -52,4 +56,4 @@ cd "$ROOT/analysis"
   --seed "$SEED" \
   --n-jobs "$N_JOBS"
 
-echo "=== $(date -Is) beta_4 bootstrap done ==="
+echo "=== $(date -Is) answers-only beta_4 bootstrap done ==="
