@@ -1,4 +1,4 @@
-Receiving help is weakly associated with later helping on Stack Overflow
+Receiving an answer modestly increases later helping on Stack Overflow
 Matched difference-in-differences on 21M questions addresses reciprocity confounding
-Effect is concentrated among newcomers and absent among long-tenured users
-Pooled association is small and fades once answer quality is controlled
+Help effect is strongest for newcomers and absent among long-tenured users
+Reciprocity operates as a contributor-recruitment channel at the point of entry
