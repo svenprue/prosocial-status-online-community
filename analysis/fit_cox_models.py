@@ -33,7 +33,7 @@ def main():
     parser.add_argument(
         "--all-help-types",
         action="store_true",
-        help="Use every help_type in study_events (default: PRIMARY_HELP_TYPES = answer+comment)",
+        help="Use every help_type in study_events (default: PRIMARY_HELP_TYPES from cox_config)",
     )
     args = parser.parse_args()
 

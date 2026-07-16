@@ -57,6 +57,7 @@ from cox_config import (
     BUCKET_ORDER,
     CACHE_DIR,
     COVARIATES_MAIN,
+    DATA_VERSION,
     MAX_FIT_ROWS,
     MAX_FIT_WORKERS,
     PRIMARY_HELP_TYPES,
@@ -130,6 +131,10 @@ def _checkpoint_meta(
         "max_pairs": None if max_pairs is None else int(max_pairs),
         "sample_size": None if sample_size is None else int(sample_size),
         "sampler": _SAMPLER_ID,
+        # Outcome/covariate generation: replicates drawn under a different
+        # PRIMARY_HELP_TYPES (e.g. the composite era) must not silently resume.
+        "data_version": DATA_VERSION,
+        "help_types": list(PRIMARY_HELP_TYPES),
     }
     if rep_start is not None and rep_end is not None:
         meta["rep_start"] = int(rep_start)

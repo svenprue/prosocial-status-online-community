@@ -26,7 +26,9 @@ HEADLINE_ESTIMAND = "arrival"  # "arrival" | "summed"
 
 # fix(cache): bump when the data/covariate construction changes so stale model/interval
 # caches miss instead of silently mixing generations. Backward-safe (old caches just miss).
-DATA_VERSION = "rev1"
+# rev2ao (2026-07-15): default outcome flipped to answers-only per
+# reviews/answers_only_default_spec.md — composite-era caches must not merge.
+DATA_VERSION = "rev2ao"
 # Cap concurrent lifelines fits (each can hold up to MAX_FIT_ROWS). Override via
 # --n-jobs / COX_MAX_FIT_WORKERS; default keeps Stage-6 RT-bin and bootstrap pools
 # from OOM'ing when cpu_count is large.
@@ -34,9 +36,12 @@ MAX_FIT_WORKERS = int(os.environ.get("COX_MAX_FIT_WORKERS", "4"))
 VARIANCE_ESTIMATOR = "robust_sandwich"
 CLUSTER_COL = "match_id"
 
-# Primary Cox outcome: generalized helping to others, excluding self-directed accepts
-# and (separately tabulated) edits. Matches the prior AllData / answers_comments estimand.
-PRIMARY_HELP_TYPES = ["answer", "comment"]
+# Primary Cox outcome (2026-07-15 decision, reviews/answers_only_default_spec.md):
+# answers the focal user posts to other users' questions — the paper's headline
+# outcome, matching the first submission. Self-directed accepts are excluded.
+# Comment-/edit-inclusive composites are estimated only for the outcome
+# decomposition (tab:outcome_decomposition), not as the default.
+PRIMARY_HELP_TYPES = ["answer"]
 
 CONTINUOUS_COVARIATES = [
     "hasAnswer_response_time_interaction",
