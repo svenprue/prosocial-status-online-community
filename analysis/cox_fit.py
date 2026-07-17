@@ -183,7 +183,13 @@ def fit_cox_cached(
     # two specs that share a model_name but differ in covariates — or a rerun after a data
     # rebuild — get distinct cache files instead of colliding. Backward-safe (old names miss).
     cov_hash = hashlib.md5(",".join(sorted(covariates)).encode("utf-8")).hexdigest()[:8]
-    cache_name = f"{model_name}{base_suffix}{variance_suffix}_{DATA_VERSION}_{cov_hash}"
+    # fix(cache): tag the cache name with MAX_FIT_ROWS whenever it differs from the 8M
+    # default, so a full-data (COX_MAX_FIT_ROWS-raised) point-estimate fit never collides
+    # with — or is mistaken for — the 8M-subsample pickle of the same model_name. Default
+    # (8M) runs keep the untagged name, so existing caches stay valid and the matched-pair
+    # bootstrap (which runs at the 8M default) is unaffected.
+    rows_tag = "" if MAX_FIT_ROWS == 8_000_000 else f"_r{MAX_FIT_ROWS // 1_000_000}M"
+    cache_name = f"{model_name}{base_suffix}{variance_suffix}_{DATA_VERSION}{rows_tag}_{cov_hash}"
     os.makedirs(CACHE_DIR, exist_ok=True)
     path = _model_path(cache_name)
 

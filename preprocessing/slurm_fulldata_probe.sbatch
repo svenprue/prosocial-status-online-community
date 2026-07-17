@@ -3,7 +3,7 @@
 #SBATCH --partition=normal
 #SBATCH --time=8:00:00
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=900G
+#SBATCH --mem=400G
 #SBATCH --output=logs/slurm_fd_probe_%j.out
 #SBATCH --error=logs/slurm_fd_probe_%j.err
 #

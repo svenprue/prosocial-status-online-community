@@ -268,8 +268,12 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
             events = events[events["help_type"].isin(event_help_types)].copy()
             print(f"Filtered events to help_type in {event_help_types}: {len(events):,} rows")
         descriptives = _compute_descriptives(timelines, events)
-        with open(desc_cache, "wb") as f:
+        # Atomic write: concurrent full-data stage jobs all call load_and_prepare and
+        # would otherwise write this same path simultaneously (torn-write risk).
+        _tmp = f"{desc_cache}.tmp.{os.getpid()}"
+        with open(_tmp, "wb") as f:
             pickle.dump(descriptives, f)
+        os.replace(_tmp, desc_cache)
         print(f"✓ Saved {desc_cache}")
         return model_df, descriptives
 
@@ -350,7 +354,9 @@ def load_and_prepare(input_folder: str, sample_size: int = None, event_help_type
     import gc
     gc.collect()
     model_df.to_parquet(interval_cache)
-    with open(desc_cache, "wb") as f:
+    _tmp = f"{desc_cache}.tmp.{os.getpid()}"
+    with open(_tmp, "wb") as f:
         pickle.dump(descriptives, f)
+    os.replace(_tmp, desc_cache)
     print(f"✓ Cached intervals to {interval_cache}")
     return model_df, descriptives
