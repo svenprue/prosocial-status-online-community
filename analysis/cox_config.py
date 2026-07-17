@@ -11,7 +11,14 @@ BUCKET_ORDER = [
 ]
 
 ROUND_TO_HOURS = 1
-MAX_FIT_ROWS = 8_000_000
+# Cap on rows passed to a single lifelines fit. Above this, fit_cox_cached draws a
+# matched-pair subsample. Overridable via COX_MAX_FIT_ROWS so the point-estimate fits
+# can run on the full data (seed-independent MLE) while the matched-pair bootstrap keeps
+# the default 8M cap per replicate for tractability. 2026-07-16: the default-8M pooled
+# fit proved subsample-fragile — its beta_4 varies ~0.006-0.01 across subsample seeds
+# (comparable to the ~0.04 effect itself), so the reported point estimate must come from
+# a full-data (or near-full) fit, not a single 8M subsample.
+MAX_FIT_ROWS = int(os.environ.get("COX_MAX_FIT_ROWS", "8000000"))
 SUBSAMPLE_SEED = 42
 
 # ISS-24 re-headline: which estimand LEADS the reported tables/figures. "arrival" =
