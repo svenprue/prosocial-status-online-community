@@ -21,6 +21,8 @@
 
 **Known anchor numbers (already computed in the decomposition row "Answers only," post-rematch): pooled Model A arrival HR = 1.03 [1.02, 1.05]; β₂ ≈ −0.00; Events = 3,435,973.** The refit pooled Model A must reproduce this row (it is the same model). If it does not, STOP — cache contamination.
 
+> **SUPERSEDED 2026-07-17:** the 1.03 anchor was itself an 8M-subsample artifact — the pooled fit proved subsample-fragile (β₄ varied ~0.006–0.01 across seeds). Point estimates now come from full-data fits (`COX_MAX_FIT_ROWS` env override): **pooled arrival HR = 1.05 [1.04, 1.05] (β₄ = 0.0479), β₂ = −0.0065\*, bootstrap 1.05 [1.03, 1.07] (100/100, pair-aware v2)**. All tables, manuscript prose, and the letter are synced to the full-data numbers; Events = 3,435,973 unchanged. Bootstrap STOP condition passed (CI excludes 1).
+
 ## 2. Final table inventory (main text order, with required structure)
 
 Model naming: **Model A** = eq. (1), main DiD; **Model B** = eq. (2), Model A + γ, δ response-time interactions. Tenure buckets in `BUCKET_ORDER` (7 buckets). All Cox tables: model-based SEs; stars `*** p<.001, ** p<.01, * p<.05, † p<.1`; footnote sentence per estimand spec §1 (β₄ = DiD treatment effect; β₂ = parallel-trends diagnostic, never summed).
