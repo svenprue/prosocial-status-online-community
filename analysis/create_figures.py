@@ -817,6 +817,9 @@ def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) ->
     lines.append(r"\bottomrule")
     notes = [
         _estimand_note_text(),
+        r"$\gamma$ and $\delta$ enter response time linearly in standardized log hours; "
+        r"the flexible discrete-bin counterpart of this specification is "
+        r"Table~\ref{tab:response_time_bins} and Figure~\ref{fig:interaction_effect}.",
         _standard_error_note_text(bootstrap_available=bootstrap_available),
         _events_note_text(),
         _sig_note_text(),
