@@ -376,7 +376,7 @@ The Cox analytic sample spans 24,349,760 question-level observations from 3,732,
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{analysis/output_figures/help_rate_pooled.pdf}
-\caption{Help rate over the $\pm$4-day observation window, pooled across all tenure buckets. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not).}
+\caption{Help rate over the 4-day observation window ($\pm$2 days around question posting), pooled across all tenure buckets. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not). The dashed vertical line marks the question time ($T_Q$) and the dotted line the median answer arrival; error bars indicate 95\% confidence intervals.}
 \label{fig:help_rate_pooled}
 \end{figure}
 
@@ -410,7 +410,7 @@ The tenure gradient is not an artifact of pooling structurally different entry c
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{analysis/output_figures/strength_rec.pdf}
-\caption{Strength of the generalized reciprocity effect across user experience. Bars show the hazard ratio for the treatment effect by tenure bucket. Error bars indicate 95\% confidence intervals.}
+\caption{Strength of the generalized reciprocity effect across user experience. Each point shows the arrival-increment hazard ratio ($\beta_4$) estimated separately within a tenure bucket; error bars indicate 95\% confidence intervals, and the dashed line marks no effect (HR\,$=$\,1). Stars denote significance ($^{***}p<.001$; $^{**}p<.01$).}
 \label{fig:strength_rec}
 \end{figure}
 
@@ -438,7 +438,7 @@ Two qualifications temper this reading. First, the waiting-period term carries a
 \begin{figure}[h]
 \centering
 \includegraphics[width=\textwidth]{analysis/output_figures/interaction_effect.pdf}
-\caption{Treatment effect (hazard ratio) by response-time bin, pooled across all tenure buckets. Each point represents the estimated hazard ratio of the treatment indicator within that response-time bin, relative to the matched control. Error bars indicate 95\% confidence intervals.}
+\caption{Treatment effect by response-time bin, pooled across all tenure buckets. Each point represents the arrival-increment hazard ratio ($\beta_4$) estimated within that response-time bin, relative to the matched control. Error bars indicate 95\% confidence intervals; the dashed line marks no effect (HR\,$=$\,1).}
 \label{fig:interaction_effect}
 \end{figure}
 
