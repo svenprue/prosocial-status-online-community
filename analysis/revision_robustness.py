@@ -23,6 +23,9 @@ from cox_config import (
     COVARIATES_SPEED_QUALITY,
     BUCKET_ORDER,
     PRIMARY_HELP_TYPES,
+    MAX_FIT_ROWS,
+    FIRST_ANSWER_SCORE_LOG,
+    FIRST_ANSWER_SCORE_BINS,
 )
 from cox_data import load_and_prepare, create_tenure_buckets
 from cox_fit import fit_cox_cached, fit_response_time_bin_quality_models, _linear_combo, DID_TERMS
@@ -145,6 +148,208 @@ def run_answer_quality(input_folder: str, use_cache: bool) -> pd.DataFrame:
     path = os.path.join(CACHE_DIR, "results_answer_quality.csv")
     out.to_csv(path, index=False)
     print(f"✓ Saved {path}")
+    return out
+
+
+def _add_score_codings(model_df: pd.DataFrame) -> pd.DataFrame:
+    """Derive the asinh (signed-log) and ordinal-bin codings of firstAnswerScore in place.
+
+    Both codings are computed from the existing ``firstAnswerScore`` column, so no
+    preprocessing rerun and no DATA_VERSION bump is needed — the derived columns are
+    added to the already-built ``model_df``.
+
+    Two invariants this function guarantees:
+
+    1. NaN propagation. A TREATED row with a missing score (cox_data leaves those NaN;
+       controls are structural zeros filled to 0.0) gets NaN in *every* derived column,
+       the bin dummies included. Without this, ``(score >= 1)`` etc. would evaluate NaN
+       comparisons to False and silently park those rows in the reference bin — while the
+       asinh/linear specs drop them via fit_cox_cached's ``dropna(subset=keep)``. The
+       three specs' fit samples would then diverge. Forcing NaN into the dummies makes all
+       three codings drop the identical rows.
+
+    2. Signed-log coding. The concave "log-like" coding is the inverse hyperbolic sine,
+       asinh(score) = ln(score + sqrt(score^2 + 1)), NOT log1p. log1p is undefined for
+       score <= -1, and ~2.08M treated rows carry NEGATIVE scores (downvoted answers) —
+       the original ``score >= 0`` assumption was WRONG — so log1p is not even computable
+       here. asinh is defined on all of R, behaves like ln(2·score) for large positive
+       score, and passes smoothly through zero and the negatives. IMPORTANT: this is
+       applied to the WHOLE column (not just the negative rows), so the coding is a single
+       consistent transform; asinh(x) != log(1+x) for x > 0, so do not describe or
+       re-implement this column as log1p. The column is stored under the legacy string
+       ``firstAnswerScoreLog`` (see cox_config.FIRST_ANSWER_SCORE_LOG) purely so the
+       existing full-data fit caches keep hitting — the VALUES are asinh. Knock-on for the
+       bins coding: a negative score fails all three ``>=`` bin tests and so lands in the
+       reference cell, making the bins reference "score <= 0", NOT "score == 0" (2026-07-17
+       user decision: accepted, since asinh/linear handle negatives directly and beta_4 —
+       not the score reference cell — is the focal quantity).
+    """
+    if "firstAnswerScore" not in model_df.columns:
+        print("  ⚠ firstAnswerScore absent from model_df; score-coding sensitivity cannot run.")
+        return model_df
+
+    score = model_df["firstAnswerScore"]
+    nan_mask = score.isna()
+
+    # --- Signed-log coding (continuous; standardized downstream via CONTINUOUS_COVARIATES_EXTENDED) ---
+    # asinh, applied to every row, is the concave coding here (NOT log1p — undefined on the
+    # negatives below). Kept unconditional so the fitted transform is identical regardless
+    # of the sign mix in a given subset (the reported HRs are asinh HRs). arcsinh propagates
+    # NaN, so treated-missing rows stay NaN automatically.
+    neg_mask = score < 0  # NaN comparisons are False, so this only counts real negatives
+    n_neg = int(neg_mask.sum())
+    if n_neg:
+        print(
+            f"  ⚠ {n_neg:,} rows carry a negative firstAnswerScore (downvoted answers); "
+            "the concave score coding is asinh (signed log), which is defined for them "
+            "(log1p is not). These rows fall into the bins reference cell, so the bins "
+            "reference is 'score <= 0', not 'score == 0'."
+        )
+    model_df[FIRST_ANSWER_SCORE_LOG] = np.arcsinh(score)
+
+    # --- Ordinal bin dummies (reference = score 0): 1–2, 3–9, 10+ votes ---
+    b12, b39, b10 = FIRST_ANSWER_SCORE_BINS
+    model_df[b12] = ((score >= 1) & (score <= 2)).astype(float)
+    model_df[b39] = ((score >= 3) & (score <= 9)).astype(float)
+    model_df[b10] = (score >= 10).astype(float)
+    # Negative scores (downvoted answers, ~2M rows) fail all three >= tests and so fall
+    # into the reference cell: empirically the bins reference is "score <= 0", NOT
+    # "score == 0". Linear/log codings handle negatives directly; accepted per the
+    # 2026-07-17 decision rather than restarting with a dedicated negative bin.
+    # Comparisons against NaN yield False → 0 (the reference bin). Force NaN so treated
+    # rows with a missing score drop from the bins spec exactly as they drop from the
+    # linear/log specs — keeping all three fit samples identical (invariant 1 above).
+    model_df.loc[nan_mask, [b12, b39, b10]] = np.nan
+
+    # --- Question-level bin occupancy (treated questions), logged so a thin 10+ cell is
+    #     visible before anyone reads the coefficients. ---
+    treated = model_df["hasAnswer"] == 1
+
+    def _nq(mask) -> int:
+        return int(model_df.loc[treated & mask, "question_id"].nunique())
+
+    # The bins reference cell is empirically "score <= 0", so print the negative and the
+    # exact-zero counts separately (they jointly make up the reference) — otherwise the
+    # lines would not sum to the treated total and the reference would look smaller than it
+    # is. Negatives and exact-zero together are the reference; 1–2/3–9/10+ are the dummies.
+    print("  Question-level firstAnswerScore-bin occupancy (treated questions):")
+    print(f"    negative (in reference): {_nq(score < 0):>9,} questions")
+    print(f"    score 0 (in reference):  {_nq(score == 0):>9,} questions")
+    print(f"    1–2 votes:               {_nq(model_df[b12] == 1):>9,} questions")
+    print(f"    3–9 votes:               {_nq(model_df[b39] == 1):>9,} questions")
+    print(f"    10+ votes:               {_nq(model_df[b10] == 1):>9,} questions")
+    print(f"    missing (→ dropped):     {_nq(nan_mask):>9,} questions")
+    return model_df
+
+
+def _score_variant_covs(base_covs: list, coding: str) -> list:
+    """Return ``base_covs`` with ``firstAnswerScore`` re-expressed under ``coding``.
+
+    ``linear`` returns the list unchanged (so it lands on the existing cache); ``log``
+    swaps in the single log1p column; ``bins`` swaps in the three bin dummies.
+    """
+    if coding == "linear":
+        return list(base_covs)
+    out = []
+    for c in base_covs:
+        if c == "firstAnswerScore":
+            if coding == "log":
+                out.append(FIRST_ANSWER_SCORE_LOG)
+            elif coding == "bins":
+                out.extend(FIRST_ANSWER_SCORE_BINS)
+            else:
+                raise ValueError(f"unknown score coding {coding!r}")
+        else:
+            out.append(c)
+    return out
+
+
+def run_score_coding_sensitivity(input_folder: str, use_cache: bool) -> pd.DataFrame:
+    """ISS-06 (revision): arrival-HR stability across firstAnswerScore codings.
+
+    Fits linear / asinh / bins codings of the score control for both the ScoreOnly and
+    full-quality speed specs, pooled and in the ``< 1 Week`` newcomer stratum, plus a
+    baseline anchor per stratum — 14 rows. The baseline and linear rows reuse the EXACT
+    cache names + covariate lists from run_answer_quality / run_newcomer_bucket_checks,
+    so they land as free cache hits; only the 8 asinh/bins specs actually fit.
+
+    FOOTING: the linear/baseline anchors are meaningful only when they reproduce the
+    manuscript's answer-quality/newcomer tables, which were fit at FULL DATA (COX_MAX_FIT_ROWS
+    raised, cache rows_tag = _rNNM). Run this at the SAME footing. At the default 8M cap the
+    anchors miss the full-data caches and refit on a subsample, producing a Linear column
+    that contradicts the main table for the identical spec — so we check and warn below.
+
+    Results go to a SEPARATE CSV (results_score_coding_sensitivity.csv). create_figures.py
+    renders every row of results_answer_quality.csv / results_newcomer_robustness.csv into
+    the manuscript tables, so writing here keeps those tables byte-identical.
+    """
+    print("\n=== ISS-06: firstAnswerScore coding sensitivity (linear / asinh / bins) ===")
+    rows_tag = "" if MAX_FIT_ROWS == 8_000_000 else f"_r{MAX_FIT_ROWS // 1_000_000}M"
+    print(f"  Footing: COX_MAX_FIT_ROWS={MAX_FIT_ROWS:,} (cache rows_tag='{rows_tag or '<8M-default>'}').")
+    if not rows_tag:
+        print(
+            "  ⚠ Running at the DEFAULT 8M cap. The linear/baseline anchors reused here are "
+            "the manuscript's FULL-DATA caches (rows_tag=_rNNM); at 8M they will MISS and "
+            "refit on a subsample, so the Linear column may contradict Table "
+            "answer_quality_robustness. Re-run with COX_MAX_FIT_ROWS raised to full data to "
+            "reproduce the manuscript numbers."
+        )
+    model_df, _ = load_and_prepare(input_folder, event_help_types=PRIMARY_HELP_TYPES)
+    model_df = _add_score_codings(model_df)
+    newcomer_df = model_df[model_df["tenure_bucket"] == "< 1 Week"].copy()
+    df_by_stratum = {"pooled": model_df, "newcomer_lt1w": newcomer_df}
+
+    # (stratum, spec, base covariate list, linear/baseline cache name). The cache names
+    # MUST match the existing runs byte-for-byte (same model_name + covariate list) to be
+    # free cache hits. Note the pooled/newcomer quality names differ historically
+    # ("QualityControls" vs "Quality"), so they are spelled out rather than templated.
+    plan = [
+        ("pooled",        "baseline",         COVARIATES_SPEED,               "ModelB_AllData_Baseline"),
+        ("pooled",        "score_only",       COVARIATES_SPEED + ["firstAnswerScore"], "ModelB_AllData_ScoreOnly"),
+        ("pooled",        "quality_controls", COVARIATES_SPEED_QUALITY,       "ModelB_AllData_QualityControls"),
+        ("newcomer_lt1w", "baseline",         COVARIATES_SPEED,               "ModelB_Newcomer_Baseline"),
+        ("newcomer_lt1w", "score_only",       COVARIATES_SPEED + ["firstAnswerScore"], "ModelB_Newcomer_ScoreOnly"),
+        ("newcomer_lt1w", "quality_controls", COVARIATES_SPEED_QUALITY,       "ModelB_Newcomer_Quality"),
+    ]
+
+    rows = []
+    for stratum, spec, base_covs, cache_name in plan:
+        df = df_by_stratum[stratum]
+        if spec == "baseline":
+            # No score control — one row, no coding variants.
+            row = _fit_subset(df, cache_name, COVARIATES_SPEED, use_cache)
+            if row:
+                rows.append({**row, "stratum": stratum, "spec": spec, "coding": "none"})
+            continue
+        for coding in ["linear", "log", "bins"]:
+            covs = _score_variant_covs(base_covs, coding)
+            # linear reuses the existing cache name; log/bins get a suffix → new fits.
+            name = cache_name if coding == "linear" else f"{cache_name}_{coding}"
+            row = _fit_subset(df, name, covs, use_cache)
+            if row:
+                rows.append({**row, "stratum": stratum, "spec": spec, "coding": coding})
+
+    out = pd.DataFrame(rows)
+    path = os.path.join(CACHE_DIR, "results_score_coding_sensitivity.csv")
+    out.to_csv(path, index=False)
+    print(f"✓ Saved {path}")
+
+    # Compact arrival-HR-by-coding printout — directly answers the stability question.
+    print("\n  Arrival HR (exp beta_4) by score coding:")
+    for stratum in ["pooled", "newcomer_lt1w"]:
+        for spec in ["score_only", "quality_controls"]:
+            cells = []
+            for coding in ["linear", "log", "bins"]:
+                match = out[
+                    (out["stratum"] == stratum)
+                    & (out["spec"] == spec)
+                    & (out["coding"] == coding)
+                ]
+                if len(match):
+                    cells.append(f"{coding}={match.iloc[0]['HR_increment_only']:.4f}")
+                else:
+                    cells.append(f"{coding}=NA")
+            print(f"    {stratum:14s} {spec:16s} " + "  ".join(cells))
     return out
 
 
@@ -376,6 +581,7 @@ def main():
         choices=[
             "observable",
             "quality",
+            "score_coding",
             "composite",
             "placebo",
             "newcomer",
@@ -397,6 +603,8 @@ def main():
         run_observable_controls(args.input, use_cache)
     if args.only in ("quality", "all"):
         run_answer_quality(args.input, use_cache)
+    if args.only in ("score_coding", "all"):
+        run_score_coding_sensitivity(args.input, use_cache)
     if args.only in ("composite", "all"):
         run_composite_outcome(args.input, use_cache)
     if args.only == "placebo":

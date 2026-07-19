@@ -570,6 +570,108 @@ def generate_revision_robustness_table(
     return "\n".join(lines)
 
 
+def generate_score_coding_table(df: pd.DataFrame) -> str:
+    """Appendix: firstAnswerScore coding sensitivity (linear / log / bins).
+
+    Long format, grouped by stratum (pooled, newcomer) then specification (baseline,
+    +score, +full quality). The arrival HR ($\\beta_4$) carries significance stars
+    testing $H_0$: HR $=1$, so a reader can see which estimates are distinguishable from
+    one --- the crux of the coding-sensitivity check (e.g. pooled score-only is $>1$ under
+    the linear coding but $\\approx 1$ under log/bins). The linear rows and both baselines
+    reuse the cache from run_answer_quality / run_newcomer_bucket_checks."""
+    if df.empty or "HR_increment_only" not in df.columns:
+        return ""
+    stratum_order = [("pooled", "Pooled"), ("newcomer_lt1w", r"Newcomer ($<$ 1 Week)")]
+    spec_order = [
+        ("baseline", "Speed baseline"),
+        ("score_only", r"$+$ Vote score"),
+        ("quality_controls", r"$+$ Full quality controls"),
+    ]
+    coding_label = {
+        "none": "---",
+        "linear": "Linear",
+        "log": "Asinh",  # the "log" spec id is asinh(score); see note
+        "bins": "Ordinal bins",
+    }
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Answer-Score Coding Sensitivity}",
+        r"\label{tab:score_coding_sensitivity}",
+        r"\centering",
+        r"\footnotesize",
+        r"\setlength{\tabcolsep}{4pt}",
+        r"\resizebox{\linewidth}{!}{%",
+        r"\begin{tabular}{@{}llrrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Specification} & \textbf{Score coding} & \textbf{Arrival HR} & "
+        r"\textbf{95\% CI} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\",
+        r"\midrule",
+    ]
+    first_stratum = True
+    for skey, slabel in stratum_order:
+        sub = df[df["stratum"] == skey] if "stratum" in df.columns else df.iloc[0:0]
+        if sub.empty:
+            continue
+        if not first_stratum:
+            lines.append(r"\midrule")
+        first_stratum = False
+        lines.append(rf"\multicolumn{{7}}{{@{{}}l}}{{\textit{{{slabel}}}}} \\")
+        for spkey, splabel in spec_order:
+            ss = sub[sub["spec"] == spkey]
+            if ss.empty:
+                continue
+            codings = ["none"] if spkey == "baseline" else ["linear", "log", "bins"]
+            spec_shown = False
+            for ck in codings:
+                rr = ss[ss["coding"] == ck]
+                if rr.empty:
+                    continue
+                r = rr.iloc[0]
+                # Label the spec on the first row that actually renders (not keyed on the
+                # linear index), so a missing linear row never blanks the Specification cell.
+                spec_disp = "" if spec_shown else splabel
+                spec_shown = True
+                arr_hr = r.get("HR_increment_only", np.nan)
+                arr_txt = (
+                    f"{arr_hr:.3f}{_sig_stars(r.get('arrival_p', np.nan))}"
+                    if pd.notna(arr_hr) else "---"
+                )
+                lo, hi = r.get("arrival_ci_lo", np.nan), r.get("arrival_ci_hi", np.nan)
+                ci = f"[{lo:.3f}, {hi:.3f}]" if pd.notna(lo) and pd.notna(hi) else "---"
+                wc = r.get("waiting_coef", np.nan)
+                wtxt = (
+                    f"{wc:+.3f}{_sig_stars(r.get('waiting_p', np.nan))}"
+                    if pd.notna(wc) else "---"
+                )
+                n_val = int(r.get("N_questions", 0))
+                lines.append(
+                    rf"{spec_disp} & {coding_label.get(ck, ck)} & {arr_txt} & {ci} & "
+                    rf"{wtxt} & {n_val:,} & {int(r.get('events', 0)):,} \\"
+                )
+    lines += [r"\bottomrule", r"\end{tabular}%", r"}"]
+    lines += _table_notes_block([
+        (
+            r"Codings of the answer's vote score, all re-expressing the same control: "
+            r"\emph{Linear} is the control tabled in Table~\ref{tab:answer_quality_robustness} "
+            r"(raw \emph{Score} winsorized at the 5th/95th percentiles and standardized); "
+            r"\emph{Asinh} is the inverse hyperbolic sine "
+            r"$\mathrm{asinh}(\mathrm{score})=\ln(\mathrm{score}+\sqrt{\mathrm{score}^2+1})$ "
+            r"(a signed log, concave in the score and defined for the negative scores present), "
+            r"likewise winsorized and standardized; \emph{Ordinal bins} are indicators for "
+            r"1--2, 3--9, and $\ge 10$ votes (reference score $\le 0$). Arrival-HR stars test "
+            r"$H_0$: HR $=1$. The bin reference is score $\le 0$ and the concave coding uses "
+            r"asinh rather than $\log(1+\mathrm{score})$ because roughly two million answers "
+            r"carry net-negative (downvoted) scores, for which $\log(1+\mathrm{score})$ is undefined."
+        ),
+        _estimand_note_text(),
+        _standard_error_note_text(),
+        _events_note_text(),
+        _sig_note_text(),
+    ])
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
 def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
     """Decompose the answer-arrival treatment effect (beta_4) by help type, alongside
     the waiting-period (beta_2, parallel-trends) diagnostic. Makes visible where a
@@ -1489,6 +1591,19 @@ def main():
             tex = generate_outcome_decomposition_table(df_comp)
             if tex:
                 out = os.path.join(TABLE_DIR, "composite_outcome.tex")
+                with open(out, "w") as f:
+                    f.write(tex)
+                print(f"✓ {out}")
+
+    # ISS-06: answer-score coding sensitivity (dedicated appendix table; separate CSV so
+    # answer_quality_robustness.tex stays byte-identical to its linear-only rendering).
+    score_coding_path = os.path.join(CACHE_DIR, "results_score_coding_sensitivity.csv")
+    if os.path.exists(score_coding_path) and os.path.getsize(score_coding_path) > 1:
+        df_sc = pd.read_csv(score_coding_path)
+        if not df_sc.empty:
+            tex = generate_score_coding_table(df_sc)
+            if tex:
+                out = os.path.join(TABLE_DIR, "score_coding_sensitivity.tex")
                 with open(out, "w") as f:
                     f.write(tex)
                 print(f"✓ {out}")

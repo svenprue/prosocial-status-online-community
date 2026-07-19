@@ -88,6 +88,12 @@ Table~\ref{tab:response_time_bins_quality} revisits the discrete response-time b
 \input{analysis/output_tables/response_time_bins_quality.tex}%
 }{}
 
+Table~\ref{tab:score_coding_sensitivity} probes whether the answer-quality result depends on how the vote-score control is coded. The main-text specifications enter the score linearly (winsorized at the 5th and 95th percentiles and standardized); here we re-estimate the score-only and full-quality specifications, pooled and in the newcomer stratum, under two alternatives --- a signed-log ($\mathrm{asinh}$) coding and ordinal bins (1--2, 3--9, and $\ge 10$ votes, reference $\le 0$) --- at full data. We use $\mathrm{asinh}(\mathrm{score})$ rather than $\log(1+\mathrm{score})$ because roughly two million answers carry net-negative (downvoted) scores, for which $\log(1+\mathrm{score})$ is undefined. The below-one full-specification result is robust to the coding: the pooled arrival increment is 0.98 under all three codings and the newcomer counterpart 0.95, and if anything the better-specified signed-log and binned codings pull the estimate marginally \emph{further} below one rather than back toward it. The one estimate that does not survive re-coding is the intermediate score-only step, which is significantly above one under the linear coding (1.01) but statistically indistinguishable from one under the signed-log and binned codings; we therefore do not read it as evidence of an above-one effect.
+
+\IfFileExists{analysis/output_tables/score_coding_sensitivity.tex}{%
+\input{analysis/output_tables/score_coding_sensitivity.tex}%
+}{}
+
 % [Removed] Legacy "Analysis of Life-Time Contributions" section: it referenced a
 % nonexistent "Study 1", an undefined "reciprocity-activated" construct, and a
 % July 14 2024 cutoff inconsistent with the 1 April 2025 study window. Restore from

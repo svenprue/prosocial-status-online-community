@@ -92,6 +92,37 @@ OBSERVABLE_CONTROL_COVARIATES = [
 ]
 COVARIATES_MAIN_OBSERVABLE = COVARIATES_MAIN + OBSERVABLE_CONTROL_COVARIATES
 
+# ISS-06 (revision): alternative codings of firstAnswerScore for the score-coding
+# sensitivity check (revision_robustness.run_score_coding_sensitivity). The tabled
+# control is the LINEAR firstAnswerScore, winsorized (p5–p95) and z-scored via
+# CONTINUOUS_COVARIATES_EXTENDED. These two alternatives probe whether the arrival HR
+# depends on the functional form of the score control.
+#
+# Concave "signed-log" coding: asinh(score) = ln(score + sqrt(score^2 + 1)), computed in
+# revision_robustness._add_score_codings. NOT log1p — log1p is undefined for the ~2.08M
+# NEGATIVE (downvoted) scores present in the data, whereas asinh is defined on all of R
+# and behaves like ln(2·score) for large positive score. asinh(x) != log(1+x) for x > 0,
+# so do not re-implement this as log1p or describe it as such in prose/tables. The column
+# STRING stays "firstAnswerScoreLog" (a legacy id) only so the existing full-data fit
+# caches keep hitting — its VALUES are asinh. Added to CONTINUOUS_COVARIATES_EXTENDED below
+# so it flows through the IDENTICAL winsorize(p5–p95)+z-score pipeline as the linear
+# version; the only thing that differs between the linear and asinh specs is the
+# functional form, not the standardization.
+FIRST_ANSWER_SCORE_LOG = "firstAnswerScoreLog"
+
+# Ordinal bin dummies: 1–2, 3–9, 10+ votes. Reference is the omitted cell — intended as
+# "score 0", but empirically "score <= 0": ~2.08M treated rows carry NEGATIVE scores
+# (downvoted answers), which fail all three >= tests and fall into the reference (the
+# score >= 0 extraction assumption was wrong; see revision_robustness._add_score_codings).
+# These deliberately BYPASS the continuous winsorize+z-score pipeline — they are 0/1
+# indicators that need no standardization — so they are intentionally NOT added to
+# CONTINUOUS_COVARIATES_EXTENDED.
+FIRST_ANSWER_SCORE_BINS = [
+    "firstAnswerScoreBin_1to2",
+    "firstAnswerScoreBin_3to9",
+    "firstAnswerScoreBin_10plus",
+]
+
 # ISS-06: answer-quality robustness (speed spec extension)
 QUALITY_COVARIATES = ["hasAcceptedAnswer", "firstAnswerScore", "firstAnswerBodyLenChars"]
 COVARIATES_SPEED_QUALITY = COVARIATES_SPEED + QUALITY_COVARIATES
@@ -102,6 +133,10 @@ COVARIATES_MAIN_QUALITY = COVARIATES_MAIN + QUALITY_COVARIATES
 
 CONTINUOUS_COVARIATES_EXTENDED = CONTINUOUS_COVARIATES + OBSERVABLE_CONTROL_COVARIATES + [
     "firstAnswerScore", "firstAnswerBodyLenChars",
+    # asinh (signed-log) score coding: flows through the SAME winsorize(p5–p95)+z-score
+    # pipeline as the linear firstAnswerScore. The bin dummies (FIRST_ANSWER_SCORE_BINS)
+    # are deliberately absent here — they bypass continuous processing.
+    FIRST_ANSWER_SCORE_LOG,
 ]
 
 RT_BIN_EDGES_HOURS = [0, 0.25, 0.5, 1, 2, 4, 8, 12, 24, 72, float("inf")]

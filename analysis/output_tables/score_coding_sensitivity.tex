@@ -1,0 +1,42 @@
+\begin{table}[H]
+\caption{Answer-Score Coding Sensitivity}
+\label{tab:score_coding_sensitivity}
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+\textbf{Specification} & \textbf{Score coding} & \textbf{Arrival HR} & \textbf{95\% CI} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Pooled}} \\
+Speed baseline & --- & 1.038*** & [1.034, 1.042] & +0.014*** & 24,349,760 & 3,435,973 \\
+$+$ Vote score & Linear & 1.010*** & [1.006, 1.015] & -0.015*** & 24,349,760 & 3,435,973 \\
+ & Asinh & 1.001 & [0.997, 1.005] & -0.026*** & 24,349,760 & 3,435,973 \\
+ & Ordinal bins & 1.003 & [0.999, 1.007] & -0.023*** & 24,349,760 & 3,435,973 \\
+$+$ Full quality controls & Linear & 0.982*** & [0.978, 0.986] & -0.046*** & 24,349,760 & 3,435,973 \\
+ & Asinh & 0.977*** & [0.973, 0.982] & -0.052*** & 24,349,760 & 3,435,973 \\
+ & Ordinal bins & 0.979*** & [0.975, 0.983] & -0.050*** & 24,349,760 & 3,435,973 \\
+\midrule
+\multicolumn{7}{@{}l}{\textit{Newcomer ($<$ 1 Week)}} \\
+Speed baseline & --- & 1.010\textdagger & [0.999, 1.021] & +0.008 & 4,029,008 & 368,780 \\
+$+$ Vote score & Linear & 0.979*** & [0.968, 0.990] & -0.022*** & 4,029,008 & 368,780 \\
+ & Asinh & 0.974*** & [0.963, 0.985] & -0.028*** & 4,029,008 & 368,780 \\
+ & Ordinal bins & 0.976*** & [0.965, 0.987] & -0.026*** & 4,029,008 & 368,780 \\
+$+$ Full quality controls & Linear & 0.950*** & [0.939, 0.960] & -0.052*** & 4,029,008 & 368,780 \\
+ & Asinh & 0.947*** & [0.936, 0.957] & -0.056*** & 4,029,008 & 368,780 \\
+ & Ordinal bins & 0.949*** & [0.938, 0.959] & -0.054*** & 4,029,008 & 368,780 \\
+\bottomrule
+\end{tabular}%
+}
+\vspace{0.35em}
+\begin{minipage}{\linewidth}
+\footnotesize
+\raggedright
+Codings of the answer's vote score, all re-expressing the same control: \emph{Linear} is the control tabled in Table~\ref{tab:answer_quality_robustness} (raw \emph{Score} winsorized at the 5th/95th percentiles and standardized); \emph{Asinh} is the inverse hyperbolic sine $\mathrm{asinh}(\mathrm{score})=\ln(\mathrm{score}+\sqrt{\mathrm{score}^2+1})$ (a signed log, concave in the score and defined for the negative scores present), likewise winsorized and standardized; \emph{Ordinal bins} are indicators for 1--2, 3--9, and $\ge 10$ votes (reference score $\le 0$). Arrival-HR stars test $H_0$: HR $=1$. The bin reference is score $\le 0$ and the concave coding uses asinh rather than $\log(1+\mathrm{score})$ because roughly two million answers carry net-negative (downvoted) scores, for which $\log(1+\mathrm{score})$ is undefined.\\
+$\beta_4$ (the answer-arrival increment) is the difference-in-differences treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends diagnostic and is not added to the effect.\\
+Cox-table standard errors are model-based; matched-pair bootstrap uncertainty is reported separately when generated.\\
+Events = helping events in the full analysis sample (after time rounding). When interval rows exceed the fit cap, estimation uses a matched-pair subsample, but Events still refer to the full sample.\\
+$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
+\end{minipage}
+\end{table}
