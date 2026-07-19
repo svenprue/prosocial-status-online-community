@@ -16,7 +16,11 @@
 \usepackage{booktabs}
 \usepackage{longtable}          % tables that break across pages
 \usepackage{amsmath}
-\usepackage[hidelinks]{hyperref}
+% hyperref intentionally omitted: it is only used for cosmetic (hidden) ref/cite
+% links here, cross-PDF links to the separate manuscript do not work anyway, and
+% plain xr + hyperref breaks external \ref inside the longtable cells
+% ("Paragraph ended before \Hy@setref@link was complete"); xr-hyperref is not
+% installed in this TeX Live. Plain \ref/\cite render the external numbers fine.
 \usepackage{xr}                 % cross-reference the manuscript's labels
 \externaldocument{manuscript}
 \setlength{\parskip}{6pt}
