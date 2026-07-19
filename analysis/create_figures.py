@@ -91,27 +91,29 @@ TENURE_TABLE_HEADERS = [
 
 
 def _tenure_table_col_spec(n_buckets: int) -> str:
-    return rf"@{{}}>{{\raggedright\arraybackslash}}p{{2.55cm}}*{{{n_buckets}}}{{c}}@{{}}"
+    # tabularx X columns stretch to fill \linewidth without magnifying the font
+    # (a plain `c` column inside \resizebox got scaled up instead).
+    return rf"@{{}}>{{\raggedright\arraybackslash}}p{{2.55cm}}*{{{n_buckets}}}{{>{{\centering\arraybackslash}}X}}@{{}}"
 
 
 def _tenure_table_preamble(caption: str, label: str) -> list[str]:
-    """Open a page-width tenure table: resize only the tabular, keep notes outside."""
+    """Open a page-width tenure table: tabularx fills \\linewidth at a fixed font
+    size, so columns stretch via padding instead of the type being scaled up.
+    Footnotes are emitted outside the tabularx by the postamble."""
     return [
         r"\begin{table}",
         rf"\caption{{{caption}}}",
         rf"\label{{{label}}}",
         r"\centering",
-        r"\scriptsize",
-        r"\setlength{\tabcolsep}{1.5pt}",
-        r"\resizebox{\linewidth}{!}{%",
+        r"\footnotesize",
+        r"\setlength{\tabcolsep}{4pt}",
     ]
 
 
 def _tenure_table_postamble(notes: list[str] | None = None) -> list[str]:
-    """Close resizebox+tabular, then emit wrapping footnotes at page width."""
+    """Close tabularx, then emit wrapping footnotes at page width."""
     lines = [
-        r"\end{tabular}%",
-        r"}",
+        r"\end{tabularx}",
     ]
     if notes:
         lines += _table_notes_block(notes)
@@ -687,7 +689,7 @@ def generate_main_results_table(df: pd.DataFrame, bootstrap_available: bool = Fa
         "tab:main_results",
     )
     lines += [
-        rf"\begin{{tabular}}{{{_tenure_table_col_spec(n_buckets)}}}",
+        rf"\begin{{tabularx}}{{\linewidth}}{{{_tenure_table_col_spec(n_buckets)}}}",
         r"\toprule",
         rf" & {header_labels} \\",
         r"\midrule",
@@ -783,7 +785,7 @@ def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) ->
         "tab:speed_results",
     )
     lines += [
-        rf"\begin{{tabular}}{{{_tenure_table_col_spec(n_buckets)}}}",
+        rf"\begin{{tabularx}}{{\linewidth}}{{{_tenure_table_col_spec(n_buckets)}}}",
         r"\toprule",
         rf" & {header_labels} \\",
         r"\midrule",
