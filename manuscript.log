@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  19 JUL 2026 00:17
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  22 JUL 2026 15:15
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -884,18 +884,18 @@ L/cmm/m/it/12 h[]\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 ) [] []\OML
 t/12 t\OT1/cmr/m/n/12 )$ 
  []
 
-[17] [18]
+[17]
 Overfull \hbox (8.554pt too wide) in paragraph at lines 359--360
 \T1/cmr/m/n/12 the Cox model al-ready lever-ages within-observation tem-po-ral 
 vari-a-tion through
  []
 
-[19] (./analysis/output_tables/desc_stats.tex
+[18] (./analysis/output_tables/desc_stats.tex
 Overfull \hbox (44.16954pt too wide) in paragraph at lines 5--36
  [][] 
  []
 
-)
+) [19]
 <analysis/output_figures/help_rate_pooled.pdf, id=89, 570.57104pt x 316.2101pt>
 
 File: analysis/output_figures/help_rate_pooled.pdf Graphic file (type pdf)
@@ -930,7 +930,7 @@ in_results.tex) [26] [27
 File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
 <use analysis/output_figures/interaction_effect.pdf>
 Package pdftex.def Info: analysis/output_figures/interaction_effect.pdf  used o
-n input line 445.
+n input line 446.
 (pdftex.def)             Requested size: 390.0pt x 240.8436pt.
 
 (./analysis/output_tables/response_time_bins.tex) [30
@@ -943,7 +943,7 @@ File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type
 pdf)
 <use analysis/output_figures/help_rate_adoption_pooled.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
- used on input line 460.
+ used on input line 461.
 (pdftex.def)             Requested size: 390.0pt x 217.41225pt.
 <analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=350, 714.25598pt 
 x 1030.28284pt>
@@ -951,21 +951,26 @@ File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
 pe pdf)
 <use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
-df  used on input line 467.
+df  used on input line 468.
 (pdftex.def)             Requested size: 390.0pt x 562.55417pt.
 
 
-LaTeX Warning: Float too large for page by 84.05417pt on input line 470.
+LaTeX Warning: Float too large for page by 84.05417pt on input line 471.
 
 [32] [33 <./analysis/output_figures/help_rate_adoption_pooled.pdf>] [34 <./anal
-ysis/output_figures/help_rate_adoption_by_tenure.pdf>] [35] [36]
-(./analysis/output_tables/absolute_effects.tex) [37] [38] [39] [40]) [41]
+ysis/output_figures/help_rate_adoption_by_tenure.pdf>] [35]
+Overfull \hbox (0.36151pt too wide) in paragraph at lines 500--501
+\T1/cmr/m/n/12 The first is an-swer qual-ity, which the Re-sults ad-ju-di-cate 
+di-rectly (Sec-tion 5.5[]).
+ []
+
+[36] (./analysis/output_tables/absolute_effects.tex) [37] [38] [39]) [40]
 Overfull \hbox (3.2596pt too wide) in paragraph at lines 38--39
 []\T1/cmr/m/n/12 Stack Over-flow pub-lic data dumps were ob-tained from the In-
 ter-net Archive
  []
 
-(./manuscript.bbl [42]
+(./manuscript.bbl [41]
 Underfull \hbox (badness 3590) in paragraph at lines 91--99
 []\T1/cmr/m/n/12 Cox, D.R., 1972.  Re-gres-sion Mod-els and Life-Tables.  Jour-
 nal
@@ -977,7 +982,7 @@ Underfull \hbox (badness 3690) in paragraph at lines 91--99
 cal) 34,
  []
 
-[43] [44]) (./appendix.tex
+[42] [43]) (./appendix.tex [44]
 <matching/common_support.pdf, id=514, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
@@ -995,14 +1000,14 @@ File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
 Package pdftex.def Info: analysis/output_figures/help_rate_by_tenure.pdf  used 
 on input line 50.
 (pdftex.def)             Requested size: 390.0pt x 467.99733pt.
- [45] (./analysis/output_tables/selection_bounds.tex
+ [45 <./matching/common_support.pdf>] [46 <./matching/love_plot.pdf>] [47 <./an
+alysis/output_figures/help_rate_by_tenure.pdf>]
+(./analysis/output_tables/selection_bounds.tex
 Overfull \hbox (91.16513pt too wide) in paragraph at lines 6--50
  [][] 
  []
 
-) [46 <./matching/common_support.pdf>] [47 <./matching/love_plot.pdf>] [48 <./a
-nalysis/output_figures/help_rate_by_tenure.pdf>]
-(./analysis/output_tables/pair_bootstrap.tex) [49]
+) [48] (./analysis/output_tables/pair_bootstrap.tex) [49]
 (./analysis/output_tables/cohort_robustness.tex
 Overfull \hbox (54.24556pt too wide) in paragraph at lines 6--22
  [][] 
@@ -1032,13 +1037,13 @@ L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 19401 strings out of 469006
- 391707 string characters out of 5454813
- 774398 words of memory out of 5000000
- 47660 multiletter control sequences out of 15000+600000
+ 19402 strings out of 469006
+ 391726 string characters out of 5454813
+ 774431 words of memory out of 5000000
+ 47661 multiletter control sequences out of 15000+600000
  651154 words of font info for 101 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 89i,15n,107p,1815b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 89i,15n,107p,1860b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfou
 r/jknappen/ec/ectt1200.600pk> </Users/lenardstrahringer/Library/texlive/2026bas
 ic/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600pk> </Users/lenardstrahrin
@@ -1073,7 +1078,7 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (55 pages, 682045 bytes).
+Output written on manuscript.pdf (55 pages, 681008 bytes).
 PDF statistics:
  1438 PDF objects out of 1440 (max. 8388607)
  273 compressed objects within 3 object streams
