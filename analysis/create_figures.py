@@ -995,6 +995,7 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
         _standard_error_note_text(bootstrap_available=bootstrap_available),
         _events_note_text(),
         r"Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.",
+        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days.",
         detail_note,
         _sig_note_text(),
     ])
@@ -1059,6 +1060,7 @@ def generate_response_time_bins_quality_table(
     lines += _table_notes_block([
         _standard_error_note_text(bootstrap_available=bootstrap_available),
         r"Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool.",
+        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days.",
         r"HR is the answer-arrival increment ($\beta_4$). Quality columns add acceptance, first-answer score, and length.",
         _sig_note_text(),
     ])
