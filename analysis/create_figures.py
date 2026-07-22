@@ -1068,54 +1068,6 @@ def generate_response_time_bins_quality_table(
     return "\n".join(lines)
 
 
-def generate_selection_bounds_table(df: pd.DataFrame) -> str:
-    """Generate a compact table from selection_sensitivity.py outputs."""
-    if df.empty or "adjusted_event_rate_rr_proxy" not in df.columns:
-        return ""
-    keep_fracs = [0.0, 0.10, 0.25, 0.50]
-    df = df.loc[
-        df["assumed_control_zero_post_event_fraction"].round(2).isin(keep_fracs)
-    ].copy()
-    if df.empty:
-        return ""
-    scope_order = {scope: i for i, scope in enumerate(["All"] + BUCKET_ORDER)}
-    df["scope_order"] = df["scope"].map(scope_order).fillna(999)
-    df = df.sort_values(["scope_order", "assumed_control_zero_post_event_fraction"])
-
-    # Base HR is the answer-arrival increment (beta_4). Adjusted RR is an independent
-    # event-rate proxy.
-    n_cols = 5
-    col_spec = r"@{}lrrrr@{}"
-    lines = [
-        r"\begin{table}[H]",
-        r"\caption{Selection Sensitivity Based on Zero Post-Question Helping}",
-        r"\label{tab:selection_bounds}",
-        r"\centering",
-        r"\footnotesize",
-        rf"\begin{{tabular}}{{{col_spec}}}",
-        r"\toprule",
-        r"\textbf{Scope} & \textbf{Assumed frac.} & \textbf{Base HR (arrival)} & \textbf{Control zero share} & \textbf{Adjusted RR proxy} \\",
-        r"\midrule",
-    ]
-    for _, r in df.iterrows():
-        lines.append(
-            rf"{_latex_bucket(str(r['scope']))} & {r['assumed_control_zero_post_event_fraction']:.2f} "
-            rf"& {r['base_hr']:.2f} & {r['control_zero_post_help_share'] * 100:.1f}\% "
-            rf"& {r['adjusted_event_rate_rr_proxy']:.2f} \\"
-        )
-    lines += [
-        r"\bottomrule",
-        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Assumed frac. is the fraction of zero-post-help control questions assigned one latent help event.}} \\",
-        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Adjusted RR is an event-rate proxy, not a refitted Cox hazard ratio.}} \\",
-        rf"\multicolumn{{{n_cols}}}{{@{{}}l}}{{\footnotesize Base HR is the answer-arrival increment ($\beta_4$, is\_treated\_active).}} \\",
-    ]
-    lines += [
-        r"\end{tabular}",
-        r"\end{table}",
-    ]
-    return "\n".join(lines)
-
-
 def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
     """Generate LaTeX table for matched-pair bootstrap uncertainty."""
     if df.empty or "bootstrap_hr_ci_lo" not in df.columns:
@@ -1454,7 +1406,6 @@ def main():
     speed_all_path = os.path.join(CACHE_DIR, "results_speed_all.csv")
     rt_bins_path = os.path.join(CACHE_DIR, "results_response_time_bins.csv")
     rt_bins_quality_path = os.path.join(CACHE_DIR, "results_response_time_bins_quality.csv")
-    selection_bounds_path = os.path.join(CACHE_DIR, "results_selection_bounds.csv")
     pair_bootstrap_path = os.path.join(CACHE_DIR, "results_pair_bootstrap.csv")
     speed_path = os.path.join(CACHE_DIR, "results_speed.csv")
     desc_path = os.path.join(CACHE_DIR, "descriptives.pkl")
@@ -1471,7 +1422,6 @@ def main():
     df_rt_bins_quality = (
         pd.read_csv(rt_bins_quality_path) if os.path.exists(rt_bins_quality_path) else pd.DataFrame()
     )
-    df_selection_bounds = pd.read_csv(selection_bounds_path) if os.path.exists(selection_bounds_path) else pd.DataFrame()
     df_pair_bootstrap = pd.read_csv(pair_bootstrap_path) if os.path.exists(pair_bootstrap_path) else pd.DataFrame()
     df_speed = pd.read_csv(speed_path) if os.path.exists(speed_path) else pd.DataFrame()
     descriptives = {}
@@ -1545,14 +1495,6 @@ def main():
         )
         if tex:
             out = os.path.join(TABLE_DIR, "response_time_bins_quality.tex")
-            with open(out, "w") as f:
-                f.write(tex)
-            print(f"✓ {out}")
-
-    if not df_selection_bounds.empty:
-        tex = generate_selection_bounds_table(df_selection_bounds)
-        if tex:
-            out = os.path.join(TABLE_DIR, "selection_bounds.tex")
             with open(out, "w") as f:
                 f.write(tex)
             print(f"✓ {out}")

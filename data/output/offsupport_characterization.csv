@@ -1,0 +1,65 @@
+kind,arm,label,covariate,n_a,n_b,mean_a,mean_b,sd_a,sd_b,smd,n_questions,n_users,discard_share
+discard_split,control_unanswered,discarded,,,,,,,,,2517774,1449347,0.5036
+discard_split,control_unanswered,retained,,,,,,,,,2481556,1393044,0.4964
+discard_split,treated_answered,discarded,,,,,,,,,3859219,1608525,0.2407
+discard_split,treated_answered,retained,,,,,,,,,12174880,3232207,0.7593
+mechanism,control_unanswered,strata_dropped,,,,,,,,,1654191,,
+mechanism,control_unanswered,caliper_dropped,,,,,,,,,863583,,
+mechanism,control_unanswered,retained,,,,,,,,,2481556,,
+mechanism,control_unanswered,total,,,,,,,,,4999330,,
+mechanism,treated_answered,strata_dropped,,,,,,,,,3743252,,
+mechanism,treated_answered,caliper_dropped,,,,,,,,,115967,,
+mechanism,treated_answered,retained,,,,,,,,,12174880,,
+mechanism,treated_answered,total,,,,,,,,,16034099,,
+smd_universe,control_unanswered,,timeSinceFirstActivityDays,2481556,2517774,671.1252,851.3558,915.0564,1093.2246,-0.1788,,,
+smd_universe,control_unanswered,,ownerReputation,2481556,2517774,2526.2451,2752.0409,10774.6902,14461.5013,-0.0177,,,
+smd_universe,control_unanswered,,bodyLenChars,2481556,2517774,1566.6365,1681.5589,2075.7592,2426.6329,-0.0509,,,
+smd_universe,control_unanswered,,titleLenChars,2481556,2517774,56.5912,58.8075,21.7884,22.9321,-0.0991,,,
+smd_universe,control_unanswered,,numQuestionsAskedAT,2481556,2517774,26.0986,25.2841,81.7208,81.7681,0.01,,,
+smd_universe,control_unanswered,,numHelpProvidedAT,2481556,2517774,12.5992,17.3622,94.4731,149.7595,-0.038,,,
+smd_universe,control_unanswered,,numQuestionsAsked30D,2481556,2517774,1.2906,0.9264,3.2998,2.6651,0.1214,,,
+smd_universe,control_unanswered,,numHelpProvided30D,2481556,2517774,0.4479,0.4706,3.6039,4.309,-0.0057,,,
+smd_universe,control_unanswered,,numTags,2481556,2517774,2.9768,3.19,1.1968,1.2343,-0.1754,,,
+smd_universe,treated_answered,,timeSinceFirstActivityDays,12174880,3859219,568.3718,684.3731,814.358,944.2385,-0.1316,,,
+smd_universe,treated_answered,,ownerReputation,12174880,3859219,4130.415,5965.5543,17028.9251,24637.6066,-0.0867,,,
+smd_universe,treated_answered,,bodyLenChars,12174880,3859219,1286.3707,1259.8786,1726.7548,1826.1999,0.0149,,,
+smd_universe,treated_answered,,titleLenChars,12174880,3859219,53.7887,54.8528,20.8068,21.2715,-0.0506,,,
+smd_universe,treated_answered,,numQuestionsAskedAT,12174880,3859219,30.3445,32.375,87.8704,99.1331,-0.0217,,,
+smd_universe,treated_answered,,numHelpProvidedAT,12174880,3859219,14.3611,23.0389,111.1877,185.515,-0.0567,,,
+smd_universe,treated_answered,,numQuestionsAsked30D,12174880,3859219,1.9637,1.8236,4.7911,4.8689,0.029,,,
+smd_universe,treated_answered,,numHelpProvided30D,12174880,3859219,0.7637,1.1326,5.881,7.7227,-0.0537,,,
+smd_universe,treated_answered,,numTags,12174880,3859219,2.8325,3.1723,1.189,1.2247,-0.2815,,,
+smd_pool_neverchosen,control_unanswered,,tag_accept_share_avg,2481556,863583,0.456,0.3926,0.0981,0.0945,0.6585,,,
+smd_pool_neverchosen,control_unanswered,,timeSinceFirstActivityDays,2481556,863583,671.1252,862.8477,915.0564,1083.2055,-0.1912,,,
+smd_pool_neverchosen,control_unanswered,,ownerReputation,2481556,863583,2526.2451,2586.5549,10774.6902,14986.9048,-0.0046,,,
+smd_pool_neverchosen,control_unanswered,,bodyLenChars,2481556,863583,1566.6365,1922.6117,2075.7592,2725.2893,-0.147,,,
+smd_pool_neverchosen,control_unanswered,,titleLenChars,2481556,863583,56.5912,60.11,21.7884,23.4911,-0.1553,,,
+smd_pool_neverchosen,control_unanswered,,numQuestionsAskedAT,2481556,863583,26.0986,25.6974,81.7208,83.5622,0.0049,,,
+smd_pool_neverchosen,control_unanswered,,numHelpProvidedAT,2481556,863583,12.5992,18.6156,94.4731,174.4396,-0.0429,,,
+smd_pool_neverchosen,control_unanswered,,numQuestionsAsked30D,2481556,863583,1.2906,0.8948,3.2998,2.5243,0.1347,,,
+smd_pool_neverchosen,control_unanswered,,numHelpProvided30D,2481556,863583,0.4479,0.4854,3.6039,4.7928,-0.0088,,,
+smd_pool_neverchosen,control_unanswered,,numTags,2481556,863583,2.9768,3.2283,1.1968,1.1782,-0.2118,,,
+smd_pool_neverchosen,treated_answered,,tag_accept_share_avg,12174880,115967,0.5137,0.5425,0.112,0.14,-0.2276,,,
+smd_pool_neverchosen,treated_answered,,timeSinceFirstActivityDays,12174880,115967,568.3718,841.4502,814.358,1069.9373,-0.2872,,,
+smd_pool_neverchosen,treated_answered,,ownerReputation,12174880,115967,4130.415,22164.6804,17028.9251,56738.2131,-0.4305,,,
+smd_pool_neverchosen,treated_answered,,bodyLenChars,12174880,115967,1286.3707,1575.3094,1726.7548,3106.82,-0.115,,,
+smd_pool_neverchosen,treated_answered,,titleLenChars,12174880,115967,53.7887,54.4939,20.8068,22.1123,-0.0328,,,
+smd_pool_neverchosen,treated_answered,,numQuestionsAskedAT,12174880,115967,30.3445,111.8811,87.8704,248.8312,-0.437,,,
+smd_pool_neverchosen,treated_answered,,numHelpProvidedAT,12174880,115967,14.3611,110.5404,111.1877,567.9799,-0.235,,,
+smd_pool_neverchosen,treated_answered,,numQuestionsAsked30D,12174880,115967,1.9637,5.4534,4.7911,10.0438,-0.4435,,,
+smd_pool_neverchosen,treated_answered,,numHelpProvided30D,12174880,115967,0.7637,5.477,5.881,20.3514,-0.3147,,,
+smd_pool_neverchosen,treated_answered,,numTags,12174880,115967,2.8325,3.0961,1.189,1.3423,-0.2079,,,
+tenure,control_unanswered,< 1 Week,,699377,,,,,,,1396815,,0.5007
+tenure,control_unanswered,1 - 3 Years,,524804,,,,,,,1074273,,0.4885
+tenure,control_unanswered,3 - 6 Years,,420534,,,,,,,788978,,0.533
+tenure,control_unanswered,1 - 6 Months,,256682,,,,,,,570911,,0.4496
+tenure,control_unanswered,> 6 Years,,327579,,,,,,,532867,,0.6147
+tenure,control_unanswered,6 - 12 Months,,205906,,,,,,,443027,,0.4648
+tenure,control_unanswered,1 Week - 1 Month,,82892,,,,,,,192459,,0.4307
+tenure,treated_answered,< 1 Week,,955395,,,,,,,4181212,,0.2285
+tenure,treated_answered,1 - 3 Years,,874156,,,,,,,3643721,,0.2399
+tenure,treated_answered,1 - 6 Months,,554132,,,,,,,2451719,,0.226
+tenure,treated_answered,3 - 6 Years,,535652,,,,,,,2048596,,0.2615
+tenure,treated_answered,6 - 12 Months,,415453,,,,,,,1784506,,0.2328
+tenure,treated_answered,> 6 Years,,338841,,,,,,,1065618,,0.318
+tenure,treated_answered,1 Week - 1 Month,,185590,,,,,,,858727,,0.2161

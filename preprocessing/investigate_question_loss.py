@@ -11,6 +11,8 @@ Uses duckdb if available (same as preprocessing), else pyarrow, else pandas.
 Install one of: pip install duckdb   OR   pip install pyarrow   OR   pip install pandas
 """
 
+import csv
+import math
 from pathlib import Path
 
 BUCKET_ORDER = [
@@ -49,12 +51,18 @@ def main():
     print("QUESTION PIPELINE LOSS INVESTIGATION")
     print("=" * 70)
 
-    if _BACKEND == "duckdb":
-        _main_duckdb(input_dir, study_dir, cutoff_date)
-    elif _BACKEND == "pandas":
-        _main_pandas(input_dir, study_dir, cutoff_date)
-    else:
-        _main_pyarrow(input_dir, study_dir, cutoff_date)
+    try:
+        if _BACKEND == "duckdb":
+            _main_duckdb(input_dir, study_dir, cutoff_date)
+        elif _BACKEND == "pandas":
+            _main_pandas(input_dir, study_dir, cutoff_date)
+        else:
+            _main_pyarrow(input_dir, study_dir, cutoff_date)
+    except Exception as e:
+        print(f"[WARN] Pipeline-loss stage failed ({e}); continuing to discard characterization.")
+
+    # ISS-19: characterize which questions the matching step discards (off-support).
+    characterize_discards(base, input_dir, study_dir)
 
 
 def _main_duckdb(input_dir, study_dir, cutoff_date):
@@ -77,9 +85,9 @@ def _main_duckdb(input_dir, study_dir, cutoff_date):
     raw_path = input_dir / "question_centered_model_7d_all_questions.parquet"
     if raw_path.exists():
         rp = str(raw_path.resolve())
-        r = con.execute(f"SELECT COUNT(*) FROM read_parquet('{rp}', columns=['event'])").fetchone()
+        r = con.execute(f"SELECT COUNT(*) FROM read_parquet('{rp}')").fetchone()
         n_raw_rows = r[0]
-        r2 = con.execute(f"SELECT COUNT(*) FROM read_parquet('{rp}', columns=['event']) WHERE event = 'Phase_One_Start'").fetchone()
+        r2 = con.execute(f"SELECT COUNT(*) FROM read_parquet('{rp}') WHERE event = 'Phase_One_Start'").fetchone()
         n_raw_questions = r2[0]
         print(f"\n2. RAW: {raw_path.name}")
         print(f"   Total event rows:       {n_raw_rows:,}")
@@ -88,7 +96,7 @@ def _main_duckdb(input_dir, study_dir, cutoff_date):
             print(f"   Lost vs source (owner): {n_source_with_owner - n_raw_questions:,} (expected 0)")
         try:
             r3 = con.execute(f"""
-                SELECT COUNT(*) FROM read_parquet('{rp}', columns=['event','phase_two_end'])
+                SELECT COUNT(*) FROM read_parquet('{rp}')
                 WHERE event = 'Phase_One_Start' AND CAST(phase_two_end AS TIMESTAMP) > CAST('{cutoff_date}' AS TIMESTAMP)
             """).fetchone()
             print(f"   Questions with phase_two_end > {cutoff_date}: {r3[0]:,} (dropped in processing)")
@@ -454,6 +462,218 @@ def _print_zero_post_question_help_rows(rows):
             f"{int(n_zero):>14,}  {share:>6.1%}  {int(n_events):>11,}"
         )
     print()
+
+
+# ---------------------------------------------------------------------------
+# ISS-19: off-support / discard characterization
+# ---------------------------------------------------------------------------
+# The matching step (matching/create_matched_dataset.py) discards questions in
+# TWO structurally different ways:
+#   (A) STRATA filter: build_prematch_frame drops every year x mainTag cell with
+#       < MIN_QUESTIONS_PER_STRATUM (=300) questions before matching runs. This
+#       takes the pre-matching universe (processed, minus self-answered, with
+#       responseTime>7d recoded to hasAnswer=0) down to the prematch_years pool.
+#   (B) CALIPER loop: iterating over treated units, a treated question with no
+#       control inside caliper 0.05 in its year x mainTag x numTags cell is
+#       dropped outright; controls are matched WITH REPLACEMENT, so a control is
+#       discarded only by never being selected as any treated unit's neighbour
+#       (the off-support tail).
+# We report, per arm (hasAnswer): the discard split, the strata/caliper
+# decomposition, retained-vs-discarded standardized mean differences (SMDs, same
+# pooled-SD convention as tab:balance), and a tenure-bucket breakdown.
+
+# Covariates present in the processed file (universe-level comparison).
+_DISCARD_COVS_UNIVERSE = [
+    "timeSinceFirstActivityDays", "ownerReputation", "bodyLenChars", "titleLenChars",
+    "numQuestionsAskedAT", "numHelpProvidedAT", "numQuestionsAsked30D",
+    "numHelpProvided30D", "numTags",
+]
+# tag_accept_share_avg is derived during matching and only lives in the pool
+# (prematch_years); it is the direct tag-level answerability proxy.
+_DISCARD_COVS_POOL = ["tag_accept_share_avg"] + _DISCARD_COVS_UNIVERSE
+
+_TENURE_CASE = """
+    CASE
+        WHEN timeSinceFirstActivityDays <= 7 THEN '< 1 Week'
+        WHEN timeSinceFirstActivityDays <= 30 THEN '1 Week - 1 Month'
+        WHEN timeSinceFirstActivityDays <= 180 THEN '1 - 6 Months'
+        WHEN timeSinceFirstActivityDays <= 365 THEN '6 - 12 Months'
+        WHEN timeSinceFirstActivityDays <= 1095 THEN '1 - 3 Years'
+        WHEN timeSinceFirstActivityDays <= 2190 THEN '3 - 6 Years'
+        ELSE '> 6 Years'
+    END
+"""
+
+_CSV_FIELDS = [
+    "kind", "arm", "label", "covariate",
+    "n_a", "n_b", "mean_a", "mean_b", "sd_a", "sd_b", "smd",
+    "n_questions", "n_users", "discard_share",
+]
+
+
+def _arm_name(arm):
+    return "control_unanswered" if int(arm) == 0 else "treated_answered"
+
+
+def _smd(mean_a, mean_b, var_a, var_b):
+    """Pooled-SD SMD (Austin/Stuart/cobalt convention), matching tab:balance."""
+    denom = math.sqrt((var_a + var_b) / 2) if (var_a is not None and var_b is not None
+                                               and (var_a + var_b) > 0) else 0.0
+    return (mean_a - mean_b) / denom if denom else 0.0
+
+
+def characterize_discards(base, input_dir, study_dir):
+    proc_path = study_dir / "question_centered_model_7d_processed.parquet"
+    matched_path = input_dir / "matched_questions.parquet"
+    pool_glob = input_dir / "prematch_years" / "*.parquet"
+    if not (proc_path.exists() and matched_path.exists()):
+        print("[SKIP] Discard characterization: processed and/or matched file not found.")
+        return
+    if _BACKEND != "duckdb":
+        print("[SKIP] Discard characterization requires duckdb "
+              "(21M-row anti-joins); install duckdb and re-run.")
+        return
+
+    print("=" * 70)
+    print("OFF-SUPPORT / DISCARD CHARACTERIZATION (ISS-19)")
+    print("=" * 70)
+
+    con = duckdb.connect(":memory:")
+    con.execute("PRAGMA threads=8")
+    proc = str(proc_path.resolve())
+    matched = str(matched_path.resolve())
+    pool = str(pool_glob.resolve())
+    have_pool = any((input_dir / "prematch_years").glob("*.parquet"))
+
+    # Pre-matching universe, arms defined exactly as build_prematch_frame does.
+    con.execute(f"""
+        CREATE VIEW universe AS
+        SELECT questionId, userId,
+               CASE WHEN responseTimeHours / 24.0 > 7 THEN 0 ELSE hasAnswer END AS arm,
+               {_TENURE_CASE} AS tenure_bucket,
+               {', '.join(_DISCARD_COVS_UNIVERSE)}
+        FROM read_parquet('{proc}')
+        WHERE hasSelfAnswer = 0
+    """)
+    con.execute(f"CREATE VIEW ret AS SELECT DISTINCT questionId FROM read_parquet('{matched}')")
+    con.execute("""
+        CREATE VIEW flagged AS
+        SELECT u.*,
+               CASE WHEN r.questionId IS NULL THEN 'discarded' ELSE 'retained' END AS status
+        FROM universe u LEFT JOIN ret r ON u.questionId = r.questionId
+    """)
+
+    rows = []
+
+    # --- Stage counts + discard split by arm (the headline deliverable) ---
+    print("\n1. DISCARD SPLIT BY ARM (arm 0 = unanswered/control, 1 = answered/treated)")
+    print(f"   {'arm':<20}{'status':>10}{'questions':>14}{'users':>14}{'share_of_arm':>14}")
+    arm_totals = dict(con.execute(
+        "SELECT arm, COUNT(*) FROM universe GROUP BY arm").fetchall())
+    for arm, status, n_q, n_u in con.execute("""
+        SELECT arm, status, COUNT(*) n, COUNT(DISTINCT userId) u
+        FROM flagged GROUP BY arm, status ORDER BY arm, status
+    """).fetchall():
+        share = n_q / max(1, arm_totals.get(arm, 0))
+        print(f"   {_arm_name(arm):<20}{status:>10}{n_q:>14,}{n_u:>14,}{share:>13.1%}")
+        rows.append({"kind": "discard_split", "arm": _arm_name(arm), "label": status,
+                     "n_questions": n_q, "n_users": n_u, "discard_share": round(share, 4)})
+
+    # --- Strata (A) vs caliper (B) decomposition ---
+    if have_pool:
+        con.execute(f"CREATE VIEW poolids AS SELECT DISTINCT questionId FROM read_parquet('{pool}')")
+        print("\n2. DISCARD MECHANISM: strata filter (<300/cell) vs caliper off-support tail")
+        print(f"   {'arm':<20}{'strata_drop':>14}{'caliper_drop':>14}{'retained':>14}{'total':>14}")
+        for arm, s, c, keep, tot in con.execute("""
+            SELECT u.arm,
+                   SUM(CASE WHEN pi.questionId IS NULL THEN 1 ELSE 0 END) strata_dropped,
+                   SUM(CASE WHEN pi.questionId IS NOT NULL AND r.questionId IS NULL THEN 1 ELSE 0 END) caliper_dropped,
+                   SUM(CASE WHEN r.questionId IS NOT NULL THEN 1 ELSE 0 END) retained,
+                   COUNT(*) total
+            FROM universe u
+            LEFT JOIN poolids pi ON u.questionId = pi.questionId
+            LEFT JOIN ret r ON u.questionId = r.questionId
+            GROUP BY u.arm ORDER BY u.arm
+        """).fetchall():
+            print(f"   {_arm_name(arm):<20}{s:>14,}{c:>14,}{keep:>14,}{tot:>14,}")
+            for lbl, val in [("strata_dropped", s), ("caliper_dropped", c),
+                             ("retained", keep), ("total", tot)]:
+                rows.append({"kind": "mechanism", "arm": _arm_name(arm),
+                             "label": lbl, "n_questions": val})
+
+    # --- Universe-level retained-vs-discarded SMDs (covariates in processed) ---
+    print("\n3. RETAINED vs DISCARDED SMDs (universe; pooled-SD, same scale as tab:balance)")
+    _emit_smd_block(con, rows, "smd_universe", "flagged", _DISCARD_COVS_UNIVERSE,
+                    group_a="retained", group_b="discarded")
+
+    # --- Pool-level retained-vs-neverchosen SMDs (P3-relevant, adds answerability) ---
+    if have_pool:
+        con.execute(f"""
+            CREATE VIEW poolf AS
+            SELECT p.questionId, p.hasAnswer AS arm,
+                   {', '.join(_DISCARD_COVS_POOL)},
+                   CASE WHEN r.questionId IS NULL THEN 'discarded' ELSE 'retained' END AS status
+            FROM read_parquet('{pool}') p
+            LEFT JOIN ret r ON p.questionId = r.questionId
+        """)
+        print("\n4. POOL: retained vs caliper NEVER-CHOSEN SMDs (adds tag_accept_share_avg)")
+        _emit_smd_block(con, rows, "smd_pool_neverchosen", "poolf", _DISCARD_COVS_POOL,
+                        group_a="retained", group_b="discarded")
+
+    # --- Tenure-bucket discard breakdown ---
+    print("\n5. DISCARD SHARE BY TENURE BUCKET (universe; < 1 Week carries the headline)")
+    print(f"   {'arm':<20}{'tenure_bucket':<20}{'questions':>14}{'discarded':>14}{'share':>10}")
+    for arm, bucket, n_q, n_disc in con.execute("""
+        SELECT arm, tenure_bucket, COUNT(*) n,
+               SUM(CASE WHEN status = 'discarded' THEN 1 ELSE 0 END) disc
+        FROM flagged GROUP BY arm, tenure_bucket
+        ORDER BY arm, n DESC
+    """).fetchall():
+        share = n_disc / max(1, n_q)
+        star = "  <== newcomer" if bucket == "< 1 Week" else ""
+        print(f"   {_arm_name(arm):<20}{bucket:<20}{n_q:>14,}{n_disc:>14,}{share:>9.1%}{star}")
+        rows.append({"kind": "tenure", "arm": _arm_name(arm), "label": bucket,
+                     "n_questions": n_q, "n_a": n_disc, "discard_share": round(share, 4)})
+
+    con.close()
+
+    out_dir = base / "data" / "output"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "offsupport_characterization.csv"
+    with open(out_path, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: r.get(k, "") for k in _CSV_FIELDS})
+    print(f"\nWrote {len(rows)} rows to {out_path}")
+
+
+def _emit_smd_block(con, rows, kind, view, covs, group_a, group_b):
+    """Compute and print per-arm SMDs (group_a vs group_b) for each covariate."""
+    sel = ", ".join([f"avg({c}) m_{c}, var_samp({c}) v_{c}" for c in covs])
+    for arm in (0, 1):
+        agg = {r[0]: r for r in con.execute(
+            f"SELECT status, COUNT(*) n, {sel} FROM {view} WHERE arm = {arm} "
+            f"GROUP BY status ORDER BY status").fetchall()}
+        colnames = ["status", "n"] + sum([[f"m_{c}", f"v_{c}"] for c in covs], [])
+        R = {k: dict(zip(colnames, v)) for k, v in agg.items()}
+        if group_a not in R or group_b not in R:
+            continue
+        n_a, n_b = R[group_a]["n"], R[group_b]["n"]
+        print(f"   arm={_arm_name(arm)}: {group_a} n={n_a:,} vs {group_b} n={n_b:,}")
+        print(f"     {'covariate':<28}{'mean_'+group_a:>16}{'mean_'+group_b:>16}{'SMD':>9}")
+        for c in covs:
+            ma, mb = R[group_a][f"m_{c}"], R[group_b][f"m_{c}"]
+            va, vb = R[group_a][f"v_{c}"], R[group_b][f"v_{c}"]
+            smd = _smd(ma, mb, va, vb)
+            flag = "  *" if abs(smd) >= 0.1 else ""
+            print(f"     {c:<28}{ma:>16.3f}{mb:>16.3f}{smd:>9.3f}{flag}")
+            rows.append({"kind": kind, "arm": _arm_name(arm), "covariate": c,
+                         "n_a": n_a, "n_b": n_b,
+                         "mean_a": round(ma, 4), "mean_b": round(mb, 4),
+                         "sd_a": round(math.sqrt(va), 4) if va and va > 0 else 0.0,
+                         "sd_b": round(math.sqrt(vb), 4) if vb and vb > 0 else 0.0,
+                         "smd": round(smd, 4)})
 
 
 if __name__ == "__main__":
