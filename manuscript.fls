@@ -372,6 +372,9 @@ INPUT ./analysis/output_figures/help_rate_adoption_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_adoption_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_adoption_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_adoption_by_tenure.pdf
+INPUT ./analysis/output_tables/absolute_effects.tex
+INPUT ./analysis/output_tables/absolute_effects.tex
+INPUT analysis/output_tables/absolute_effects.tex
 INPUT /usr/local/texlive/2026basic/texmf-dist/fonts/tfm/jknappen/ec/ectt1200.tfm
 INPUT ./manuscript.bbl
 INPUT ./manuscript.bbl
@@ -396,12 +399,6 @@ INPUT ./analysis/output_figures/help_rate_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_by_tenure.pdf
 INPUT ./analysis/output_figures/help_rate_by_tenure.pdf
-INPUT ./analysis/output_tables/selection_bounds.tex
-INPUT ./analysis/output_tables/selection_bounds.tex
-INPUT analysis/output_tables/selection_bounds.tex
-INPUT ./analysis/output_tables/absolute_effects.tex
-INPUT ./analysis/output_tables/absolute_effects.tex
-INPUT analysis/output_tables/absolute_effects.tex
 INPUT ./analysis/output_tables/pair_bootstrap.tex
 INPUT ./analysis/output_tables/pair_bootstrap.tex
 INPUT analysis/output_tables/pair_bootstrap.tex

@@ -1,14 +1,14 @@
 # Fdb version 4
-["bibtex manuscript"] 1784426137.14486 "manuscript.aux" "manuscript.bbl" "manuscript" 1784426138.01665 0
+["bibtex manuscript"] 1784760325.59278 "manuscript.aux" "manuscript.bbl" "manuscript" 1784760326.42046 0
   "./elsarticle-harv.bst" 1779657202.97227 30002 8c3d766e7980d576fdc8329774bbf7b2 ""
   "./references-2.bib" 1775236618.39851 1153 1fd57884b142194e7139fca997171f53 ""
   "./references.bib" 1773608457.35058 257388 4fdea04dd21394bddd622c9a28e9e734 ""
-  "manuscript.aux" 1784426137.85232 17611 6753c9efe4a2175d361c822ea18dfb0f "pdflatex"
+  "manuscript.aux" 1784760326.25755 17762 f7d6e3d4583c50b861452ea144d6b833 "pdflatex"
   (generated)
   "manuscript.bbl"
   "manuscript.blg"
   (rewritten before read)
-["pdflatex"] 1784426137.21957 "manuscript.tex" "manuscript.pdf" "manuscript" 1784426138.01677 0
+["pdflatex"] 1784760325.63112 "manuscript.tex" "manuscript.pdf" "manuscript" 1784760326.42062 0
   "/Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map" 1783663951 80415 4cf9373a95d236658ff1cfc3f6a66089 ""
   "/Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.600pk" 1779657234.3628 25396 4f72e1baec67ba3c15634e2da5e0efba ""
   "/Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.600pk" 1779657235.45591 28952 2794412b037544609eb26963db2d496c ""
@@ -233,18 +233,17 @@
   "analysis/output_tables/observable_controls.tex" 1784425999.40984 692 d1e5bb4ee8252dba358d8f176e9319a5 ""
   "analysis/output_tables/pair_bootstrap.tex" 1784426111.80446 665 a913796a538055f65936be623dc1b72b ""
   "analysis/output_tables/regression_all.tex" 1784426057.58677 1586 40b22658b892921324f0add634b8054e ""
-  "analysis/output_tables/response_time_bins.tex" 1784426068.73876 1380 31d5f36287afff915aa1eb137c94ddf3 ""
-  "analysis/output_tables/response_time_bins_quality.tex" 1784426080.02996 1470 8c29ebb4c45c632be16b1fde4e560eab ""
+  "analysis/output_tables/response_time_bins.tex" 1784760243.03027 1639 c3fa5cc7dae359aa7168844928d283db ""
+  "analysis/output_tables/response_time_bins_quality.tex" 1784760243.03065 1729 7e817b89ceb4131df729f3f3e27c2d71 ""
   "analysis/output_tables/score_coding_sensitivity.tex" 1784426097.45515 2831 5676f30507600fdd048f55f439a399dd ""
-  "analysis/output_tables/selection_bounds.tex" 1784426119.83946 2135 81a2639dfffc913b4383f7004cd04592 ""
   "analysis/output_tables/speed_results.tex" 1784426046.66892 2106 2cad8bd5d738b1558a06d5f64589c39c ""
-  "appendix.tex" 1784426083.26508 13872 2b3940934d33030963d0079a44347f6e ""
-  "body.tex" 1784426083.26427 90404 ddf291cac29e8d0ee01168414cc4c865 ""
+  "appendix.tex" 1784760312.52016 13632 888a1afe6a04460ad7e5864277baba37 ""
+  "body.tex" 1784760312.54457 90515 960b64bce8ee280fe1d177022ca03a97 ""
   "elsarticle.cls" 1779657202.96971 45215 9d0ac34550f43a70d1f4cad96ac37b42 ""
-  "manuscript.aux" 1784426137.85232 17611 6753c9efe4a2175d361c822ea18dfb0f "pdflatex"
-  "manuscript.bbl" 1784426137.20551 13670 8019f2a0383ef2f2e82c33c358f4442e "bibtex manuscript"
-  "manuscript.spl" 1784426137.32981 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
-  "manuscript.tex" 1784346109.31804 3681 8387ba5827332cfed3196df5acea0159 ""
+  "manuscript.aux" 1784760326.25755 17762 f7d6e3d4583c50b861452ea144d6b833 "pdflatex"
+  "manuscript.bbl" 1784760325.62797 13670 8019f2a0383ef2f2e82c33c358f4442e "bibtex manuscript"
+  "manuscript.spl" 1784760325.73125 0 d41d8cd98f00b204e9800998ecf8427e "pdflatex"
+  "manuscript.tex" 1784758258.01147 3792 b1a74c621b9a6590dabab236e1fa21a8 ""
   "matching/common_support.pdf" 1784069224.64991 21810 88c49c7c8d214c53a24b7acc1cce6144 ""
   "matching/love_plot.pdf" 1784069224.65271 23569 e5fec23d03a6fce22dbf19a939ad4fa0 ""
   "preamble.tex" 1779657979.74584 863 e54d6f65977db63bbcc0261af10af93a ""
