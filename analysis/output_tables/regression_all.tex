@@ -10,8 +10,8 @@
 \multicolumn{3}{@{}l}{\textit{Treatment effect (difference-in-differences): increment at answer arrival ($\beta_4$)}} \\
 \hspace{1em} Answer arrival ($\times$ Post-Answer Received) & 0.0479*** & 0.0373*** \\
  & (0.0026) & (0.0022) \\
-\hspace{1em} Hazard Ratio [95\% CI] & [1.04, 1.05] & [1.03, 1.04] \\[4pt]
-\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & [1.03, 1.07] & — \\[4pt]
+\hspace{1em} Hazard Ratio [95\% CI] & [1.044, 1.054] & [1.034, 1.042] \\[4pt]
+\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & [1.032, 1.075] & — \\[4pt]
 \multicolumn{3}{@{}l}{\textit{Parallel-trends diagnostic: waiting period ($\beta_2$)}} \\
 \hspace{1em} Waiting period ($\beta_2$): Received Answer $\times$ Post-Question & -0.0065* & 0.0142*** \\
  & (0.0026) & (0.0021) \\
@@ -21,7 +21,8 @@
 \hspace{1em} Waiting period $\times$ log(RT) ($\delta$) & — & 0.0630*** \\
  & — & (0.0013) \\[4pt]
 \midrule
-N & 24,349,760 & 24,349,760 \\
+N (matched question rows) & 24,349,760 & 24,349,760 \\
+Person-interval rows & 62,379,420 & 62,379,420 \\
 Events & 3,435,973 & 3,435,973 \\
 \bottomrule
 \end{tabular}
@@ -30,6 +31,7 @@ Events & 3,435,973 & 3,435,973 \\
 \footnotesize
 \raggedright
 \textbf{Notes:} Matched-pair bootstrap 95\% CI for the pooled arrival increment is from Table~\ref{tab:pair_bootstrap}.\\
+N counts matched question-level rows (treated $+$ control); the Cox partial likelihood is fit over the person-interval rows expanded from them. The point estimates use the full interval set; only the matched-pair bootstrap replicates (Table~\ref{tab:pair_bootstrap}) draw an 8M-interval-row subsample per replicate.\\
 Estimand ($\beta_4$/$\beta_2$), standard-error, and Events conventions follow Table~\ref{tab:main_results}.\\
 $^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
 \end{minipage}

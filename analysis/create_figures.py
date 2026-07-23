@@ -127,7 +127,10 @@ def _latex_bucket(label: str) -> str:
 
 
 def _table_notes_block(notes: list[str]) -> list[str]:
-    """Footnotes as a wrapping minipage (avoids clipped \multicolumn{@{}l} notes)."""
+    """Footnotes as a wrapping minipage (avoids clipped \multicolumn{@{}l} notes).
+
+    The first note carries a bold ``Notes:'' lead-in (commit e20f0ff note-formatting
+    standardization)."""
     lines = [
         r"\vspace{0.35em}",
         r"\begin{minipage}{\linewidth}",
@@ -136,7 +139,8 @@ def _table_notes_block(notes: list[str]) -> list[str]:
     ]
     for i, note in enumerate(notes):
         sep = r"\\" if i < len(notes) - 1 else ""
-        lines.append(note + sep)
+        prefix = r"\textbf{Notes:} " if i == 0 else ""
+        lines.append(prefix + note + sep)
     lines.append(r"\end{minipage}")
     return lines
 
@@ -169,6 +173,16 @@ def _events_note_text() -> str:
         r"Events = helping events in the full analysis sample (after time rounding). "
         r"When interval rows exceed the fit cap, estimation uses a matched-pair "
         r"subsample, but Events still refer to the full sample."
+    )
+
+
+def _conventions_note_text() -> str:
+    """Consolidated cross-reference used on every table EXCEPT tab:main_results, which
+    defines the estimand ($\\beta_4$/$\\beta_2$), standard-error, and Events conventions
+    once (commit e20f0ff). Replaces the three repeated boilerplate note lines."""
+    return (
+        r"Estimand ($\beta_4$/$\beta_2$), standard-error, and Events conventions "
+        r"follow Table~\ref{tab:main_results}."
     )
 
 
@@ -396,7 +410,7 @@ def generate_regression_all_table(
 
     def _ci_cell(rr, klo, khi):
         if pd.notna(rr.get(klo)) and pd.notna(rr.get(khi)):
-            return rf"[{rr[klo]:.2f}, {rr[khi]:.2f}]"
+            return rf"[{rr[klo]:.3f}, {rr[khi]:.3f}]"
         return "—"
 
     def _hr_row(label, klo, khi):
@@ -415,7 +429,7 @@ def generate_regression_all_table(
                 boot = df_pair_bootstrap
             if not boot.empty:
                 br = boot.iloc[0]
-                boot_ci = rf"[{br['bootstrap_hr_ci_lo']:.2f}, {br['bootstrap_hr_ci_hi']:.2f}]"
+                boot_ci = rf"[{br['bootstrap_hr_ci_lo']:.3f}, {br['bootstrap_hr_ci_hi']:.3f}]"
                 cells = [boot_ci] + (["—"] if has_speed else [])
                 lines.append(
                     r"\hspace{1em} Hazard Ratio [bootstrap 95\% CI] & "
@@ -448,11 +462,17 @@ def generate_regression_all_table(
 
     n = int(r.get("n_questions", r["n_rows"]))
     n_events = int(r["n_events"])
+    n_interval = int(r["n_rows"]) if pd.notna(r.get("n_rows")) else None
     lines.append(r"\midrule")
-    row = rf"N & {n:,}"
+    row = rf"N (matched question rows) & {n:,}"
     for _ in range(n_cols - 1):
         row += rf" & {n:,}"
     lines.append(row + r" \\")
+    if n_interval is not None:
+        row = rf"Person-interval rows & {n_interval:,}"
+        for _ in range(n_cols - 1):
+            row += rf" & {n_interval:,}"
+        lines.append(row + r" \\")
     row = rf"Events & {n_events:,}"
     for _ in range(n_cols - 1):
         row += rf" & {n_events:,}"
@@ -463,10 +483,12 @@ def generate_regression_all_table(
         r"\end{tabular}",
     ]
     lines += _table_notes_block([
-        _estimand_note_text(),
         r"Matched-pair bootstrap 95\% CI for the pooled arrival increment is from Table~\ref{tab:pair_bootstrap}.",
-        _standard_error_note_text(bootstrap_available=False),
-        _events_note_text(),
+        r"N counts matched question-level rows (treated $+$ control); the Cox partial likelihood "
+        r"is fit over the person-interval rows expanded from them. The point estimates use the "
+        r"full interval set; only the matched-pair bootstrap replicates "
+        r"(Table~\ref{tab:pair_bootstrap}) draw an 8M-interval-row subsample per replicate.",
+        _conventions_note_text(),
         _sig_note_text(),
     ])
     lines.append(r"\end{table}")
@@ -532,9 +554,7 @@ def generate_revision_robustness_table(
             r"\end{tabular}",
         ]
         lines += _table_notes_block([
-            _estimand_note_text(),
-            _standard_error_note_text(),
-            _events_note_text(),
+            _conventions_note_text(),
         ])
         lines.append(r"\end{table}")
         return "\n".join(lines)
@@ -563,8 +583,7 @@ def generate_revision_robustness_table(
         r"\end{tabular}",
     ]
     lines += _table_notes_block([
-        _standard_error_note_text(),
-        _events_note_text(),
+        _conventions_note_text(),
     ])
     lines.append(r"\end{table}")
     return "\n".join(lines)
@@ -663,9 +682,7 @@ def generate_score_coding_table(df: pd.DataFrame) -> str:
             r"asinh rather than $\log(1+\mathrm{score})$ because roughly two million answers "
             r"carry net-negative (downvoted) scores, for which $\log(1+\mathrm{score})$ is undefined."
         ),
-        _estimand_note_text(),
-        _standard_error_note_text(),
-        _events_note_text(),
+        _conventions_note_text(),
         _sig_note_text(),
     ])
     lines.append(r"\end{table}")
@@ -705,9 +722,9 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
         r"\label{tab:outcome_decomposition}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lccr@{}}",
+        r"\begin{tabular}{@{}lccrr@{}}",
         r"\toprule",
-        r"\textbf{Outcome} & \textbf{Arrival HR [95\% CI] ($\beta_4$)} & \textbf{Waiting $\beta_2$} & \textbf{Events} \\",
+        r"\textbf{Outcome} & \textbf{Arrival HR [95\% CI] ($\beta_4$)} & \textbf{Waiting $\beta_2$} & \textbf{N} & \textbf{Events} \\",
         r"\midrule",
     ]
     for _, r in df.iterrows():
@@ -718,21 +735,20 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
             arr_hr = float(np.exp(b4))
         arr_lo, arr_hi = r.get("arrival_ci_lo", np.nan), r.get("arrival_ci_hi", np.nan)
         events = int(r.get("events", 0)) if pd.notna(r.get("events", np.nan)) else 0
-        arr_ci = f"[{arr_lo:.2f}, {arr_hi:.2f}]" if pd.notna(arr_lo) and pd.notna(arr_hi) else ""
-        arr_txt = f"{arr_hr:.2f}\\,{arr_ci}" if pd.notna(arr_hr) else "—"
+        n_val = int(r.get("N_questions", 0)) if pd.notna(r.get("N_questions", np.nan)) else 0
+        arr_ci = f"[{arr_lo:.3f}, {arr_hi:.3f}]" if pd.notna(arr_lo) and pd.notna(arr_hi) else ""
+        arr_txt = f"{arr_hr:.3f}\\,{arr_ci}" if pd.notna(arr_hr) else "—"
         b2_txt = f"{b2:+.2f}" if pd.notna(b2) else "—"
-        lines.append(rf"{name} & {arr_txt} & {b2_txt} & {events:,} \\")
+        lines.append(rf"{name} & {arr_txt} & {b2_txt} & {n_val:,} & {events:,} \\")
     lines += [
         r"\bottomrule",
         r"\end{tabular}",
     ]
     lines += _table_notes_block([
-        _estimand_note_text()
-        + r" Accepting an answer is excluded from the decomposition: it is a self-directed "
+        r"Accepting an answer is excluded from the decomposition: it is a self-directed "
         r"act available only to treated users (a control never receives an answer to "
         r"accept), so the matched difference-in-differences contrast is degenerate for it.",
-        _standard_error_note_text(),
-        _events_note_text(),
+        _conventions_note_text(),
     ])
     lines.append(r"\end{table}")
     return "\n".join(lines)
@@ -840,7 +856,7 @@ def generate_main_results_table(df: pd.DataFrame, bootstrap_available: bool = Fa
             if (pd.isna(lo) or pd.isna(hi)) and coef_key and pd.notna(r.get(coef_key)) and pd.notna(r.get(se_key)):
                 lo = float(np.exp(r[coef_key] - 1.96 * r[se_key]))
                 hi = float(np.exp(r[coef_key] + 1.96 * r[se_key]))
-            cells.append(f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else "—")
+            cells.append(f"[{lo:.3f}, {hi:.3f}]" if pd.notna(lo) and pd.notna(hi) else "—")
         lines.append(rf"{label} & " + " & ".join(cells) + r" \\[4pt]")
 
     _section(r"Treatment effect: increment at answer arrival ($\beta_4$)")
@@ -920,12 +936,10 @@ def generate_speed_table(df: pd.DataFrame, bootstrap_available: bool = False) ->
 
     lines.append(r"\bottomrule")
     notes = [
-        _estimand_note_text(),
         r"$\gamma$ and $\delta$ enter response time linearly in standardized log hours; "
         r"the flexible discrete-bin counterpart of this specification is "
         r"Table~\ref{tab:response_time_bins} and Figure~\ref{fig:interaction_effect}.",
-        _standard_error_note_text(bootstrap_available=bootstrap_available),
-        _events_note_text(),
+        _conventions_note_text(),
         _sig_note_text(),
     ]
     lines += _tenure_table_postamble(notes)
@@ -975,8 +989,8 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
         events = int(r.get("n_events", 0))
         hr = r.get(hr_key, np.nan)
         lo, hi = r.get(lo_key, np.nan), r.get(hi_key, np.nan)
-        hr_txt = f"{hr:.2f}{stars}" if pd.notna(hr) else "—"
-        ci_txt = f"[{lo:.2f}, {hi:.2f}]" if pd.notna(lo) and pd.notna(hi) else "—"
+        hr_txt = f"{hr:.3f}{stars}" if pd.notna(hr) else "—"
+        ci_txt = f"[{lo:.3f}, {hi:.3f}]" if pd.notna(lo) and pd.notna(hi) else "—"
         lines.append(
             rf"{_latex_bucket(str(r['bucket']))} & {hr_txt} "
             rf"& {ci_txt} "
@@ -992,11 +1006,10 @@ def generate_response_time_bins_table(df: pd.DataFrame, bootstrap_available: boo
         r"\end{tabular}",
     ]
     lines += _table_notes_block([
-        _standard_error_note_text(bootstrap_available=bootstrap_available),
-        _events_note_text(),
-        r"Each row fits Model A to treated questions in that response-time bin plus the full no-answer control pool.",
-        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days.",
-        detail_note,
+        r"Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool. "
+        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days. "
+        + detail_note,
+        _conventions_note_text(),
         _sig_note_text(),
     ])
     lines.append(r"\end{table}")
@@ -1036,9 +1049,9 @@ def generate_response_time_bins_quality_table(
         r"\label{tab:response_time_bins_quality}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lrrrr@{}}",
+        r"\begin{tabular}{@{}lrrrrr@{}}",
         r"\toprule",
-        r"\textbf{Response time} & \textbf{Baseline HR} & \textbf{95\% CI} & \textbf{Quality HR} & \textbf{95\% CI} \\",
+        r"\textbf{Response time} & \textbf{Baseline HR} & \textbf{95\% CI} & \textbf{Quality HR} & \textbf{95\% CI} & \textbf{N} \\",
         r"\midrule",
     ]
     for _, r in merged.iterrows():
@@ -1048,20 +1061,21 @@ def generate_response_time_bins_quality_table(
         stars_q = _sig_stars(p_q) if pd.notna(p_q) else ""
         hr_b, lo_b, hi_b = r.get("treat_hr_base"), r.get("treat_ci_lo_base"), r.get("treat_ci_hi_base")
         hr_q, lo_q, hi_q = r.get("treat_hr_qual"), r.get("treat_ci_lo_qual"), r.get("treat_ci_hi_qual")
+        n_val = int(r.get("n_questions_base", r.get("n_questions_qual", 0)))
         lines.append(
             rf"{_latex_bucket(str(r['bucket']))} & "
-            rf"{hr_b:.2f}{stars_b} & [{lo_b:.2f}, {hi_b:.2f}] & "
-            rf"{hr_q:.2f}{stars_q} & [{lo_q:.2f}, {hi_q:.2f}] \\"
+            rf"{hr_b:.3f}{stars_b} & [{lo_b:.3f}, {hi_b:.3f}] & "
+            rf"{hr_q:.3f}{stars_q} & [{lo_q:.3f}, {hi_q:.3f}] & {n_val:,} \\"
         )
     lines += [
         r"\bottomrule",
         r"\end{tabular}",
     ]
     lines += _table_notes_block([
-        _standard_error_note_text(bootstrap_available=bootstrap_available),
-        r"Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool.",
-        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days.",
+        r"Each row fits Model~A to treated questions in that response-time bin plus the full no-answer control pool. "
+        r"Bins are cut on the actual question-to-answer latency ($T_A - T_Q$); because the observation window closes two days after the answer, every treated question retains a full two-day post-answer phase, so $\beta_4$ is identified in all bins including $>$3 days. "
         r"HR is the answer-arrival increment ($\beta_4$). Quality columns add acceptance, first-answer score, and length.",
+        _conventions_note_text(),
         _sig_note_text(),
     ])
     lines.append(r"\end{table}")
@@ -1092,20 +1106,102 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
         else:
             n_q_txt = f"{int(n_q):,}"
         lines.append(
-            rf"{_latex_bucket(str(r['scope']))} & {r['base_hr']:.2f} "
-            rf"& [{r['bootstrap_hr_ci_lo']:.2f}, {r['bootstrap_hr_ci_hi']:.2f}] "
+            rf"{_latex_bucket(str(r['scope']))} & {r['base_hr']:.3f} "
+            rf"& [{r['bootstrap_hr_ci_lo']:.3f}, {r['bootstrap_hr_ci_hi']:.3f}] "
             rf"& {int(r['n_bootstrap_success'])}/{int(r['n_bootstrap_requested'])} "
             rf"& {n_q_txt} \\"
         )
     lines += [
         r"\bottomrule",
-        r"\multicolumn{5}{@{}l}{\footnotesize Replicates resample whole matched pairs with replacement.} \\",
-        r"\multicolumn{5}{@{}l}{\footnotesize HR is the answer-arrival increment $\exp(\beta_4)$, the difference-in-differences treatment effect.} \\",
-    ]
-    lines += [
         r"\end{tabular}",
-        r"\end{table}",
     ]
+    lines += _table_notes_block([
+        r"Replicates resample whole matched pairs with replacement. "
+        r"HR is the answer-arrival increment $\exp(\beta_4)$, the difference-in-differences treatment effect.",
+    ])
+    lines.append(r"\end{table}")
+    return "\n".join(lines)
+
+
+def generate_estimation_samples_table(
+    df_main: pd.DataFrame,
+    df_main_all: pd.DataFrame,
+    n_unique_users: int | None = None,
+    n_unique_questions: int | None = None,
+) -> str:
+    """Appendix mapping table (#34): reconciles the several sample sizes reported across
+    the Cox tables, per model / tenure bucket.
+
+    Columns: Users / Questions / Matched rows / Interval rows / Events.
+      - Matched rows  = treated $+$ control question-level rows in the Cox sample
+                        (= 2 $\\times$ matched pairs; controls counted once per pair they
+                        anchor, so a reused control appears in several rows).
+      - Interval rows = person-interval rows the Cox partial likelihood is fit over.
+      - Users / Questions are dataset-wide DISTINCT counts (from the matched file). They do
+        not partition by tenure bucket -- a user (and, via control reuse, a question) can
+        contribute to several buckets -- so the per-bucket rows leave them blank.
+    """
+    def _fmt(v):
+        return f"{int(v):,}" if v is not None and pd.notna(v) else "—"
+
+    lines = [
+        r"\begin{table}[H]",
+        r"\caption{Estimation Sample Sizes by Model}",
+        r"\label{tab:estimation_samples}",
+        r"\centering",
+        r"\footnotesize",
+        r"\begin{tabular}{@{}lrrrrr@{}}",
+        r"\toprule",
+        r"\textbf{Model} & \textbf{Users} & \textbf{Questions} & \textbf{Matched rows} & "
+        r"\textbf{Interval rows} & \textbf{Events} \\",
+        r"\midrule",
+    ]
+
+    # Pooled row (Models A and B share the same estimation sample).
+    if df_main_all is not None and not df_main_all.empty:
+        rp = df_main_all.iloc[0]
+        matched = int(rp.get("n_questions", 0))
+        interval = int(rp.get("n_rows", 0))
+        events = int(rp.get("n_events", 0))
+    else:
+        matched = interval = events = 0
+    lines.append(
+        rf"Pooled (Models A \& B) & {_fmt(n_unique_users)} & {_fmt(n_unique_questions)} & "
+        rf"{matched:,} & {interval:,} & {events:,} \\"
+    )
+
+    # Per tenure bucket (from results_main.csv), matched/interval/events partition the pool.
+    if df_main is not None and not df_main.empty:
+        lines.append(r"\midrule")
+        lines.append(r"\multicolumn{6}{@{}l}{\textit{Model A, by tenure bucket}} \\")
+        dfb = df_main.set_index("bucket").reindex(BUCKET_ORDER).reset_index()
+        dfb = dfb.dropna(subset=["n_rows"])
+        for _, r in dfb.iterrows():
+            matched_b = int(r.get("n_questions", r.get("n_rows", 0)))
+            interval_b = int(r.get("n_rows", 0))
+            events_b = int(r.get("n_events", 0))
+            lines.append(
+                rf"\hspace{{1em}}{_latex_bucket(str(r['bucket']))} & — & — & "
+                rf"{matched_b:,} & {interval_b:,} & {events_b:,} \\"
+            )
+
+    lines += [
+        r"\bottomrule",
+        r"\end{tabular}",
+    ]
+    lines += _table_notes_block([
+        r"Matched rows are treated $+$ control question-level rows in the Cox sample "
+        r"($=2\times$ matched pairs); a control reused across pairs contributes one row per "
+        r"pair it anchors. Interval rows are the person-interval rows expanded from the "
+        r"matched rows and fit by the Cox partial likelihood; the point estimates use the "
+        r"full interval set, while the matched-pair bootstrap (Table~\ref{tab:pair_bootstrap}) "
+        r"caps each replicate at 8M interval rows.",
+        r"Users and Questions are dataset-wide distinct counts and do not partition by tenure "
+        r"bucket (a user's questions, and reused control questions, can fall in several "
+        r"buckets), so the bucket rows leave those columns blank.",
+        r"Events = helping events in the full analysis sample (after time rounding).",
+    ])
+    lines.append(r"\end{table}")
     return "\n".join(lines)
 
 
@@ -1161,9 +1257,12 @@ def generate_reciprocity_figure(df: pd.DataFrame):
         markeredgewidth=1.0,
     )
 
-    # Null effect line and subtle band for reference
-    y_min = min(0.92, ci_lo.min() - 0.02)
-    y_max = max(1.35, ci_hi.max() + 0.08)
+    # Null effect line and subtle band for reference. Tighten the y-limit to the data:
+    # the CIs top out near 1.09, so leave only modest headroom above the tallest error
+    # bar for the value labels (drawn at ci_hi+0.015) and the significance stars
+    # (ci_hi+0.055), rather than the old fixed 1.35 ceiling that left ~half the panel empty.
+    y_min = min(0.97, ci_lo.min() - 0.02)
+    y_max = ci_hi.max() + 0.09
     ax.axhspan(0.98, 1.02, color="gray", alpha=0.12, zorder=0)
     ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)", zorder=1)
     ax.set_ylim(y_min, y_max)

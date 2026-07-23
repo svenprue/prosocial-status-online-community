@@ -1,0 +1,30 @@
+\begin{table}[H]
+\caption{Estimation Sample Sizes by Model}
+\label{tab:estimation_samples}
+\centering
+\footnotesize
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+\textbf{Model} & \textbf{Users} & \textbf{Questions} & \textbf{Matched rows} & \textbf{Interval rows} & \textbf{Events} \\
+\midrule
+Pooled (Models A \& B) & 3,732,706 & 14,656,436 & 24,349,760 & 62,379,420 & 3,435,973 \\
+\midrule
+\multicolumn{6}{@{}l}{\textit{Model A, by tenure bucket}} \\
+\hspace{1em}$<$ 1 Week & — & — & 4,029,008 & 10,055,987 & 368,780 \\
+\hspace{1em}1 Week - 1 Month & — & — & 1,551,586 & 3,895,000 & 238,189 \\
+\hspace{1em}1 - 6 Months & — & — & 4,045,952 & 10,248,285 & 694,001 \\
+\hspace{1em}6 - 12 Months & — & — & 2,983,180 & 7,632,877 & 537,263 \\
+\hspace{1em}1 - 3 Years & — & — & 6,424,968 & 16,588,890 & 1,037,470 \\
+\hspace{1em}3 - 6 Years & — & — & 3,614,184 & 9,444,885 & 428,036 \\
+\hspace{1em}$>$ 6 Years & — & — & 1,700,882 & 4,513,496 & 132,234 \\
+\bottomrule
+\end{tabular}
+\vspace{0.35em}
+\begin{minipage}{\linewidth}
+\footnotesize
+\raggedright
+\textbf{Notes:} Matched rows are treated $+$ control question-level rows in the Cox sample ($=2\times$ matched pairs); a control reused across pairs contributes one row per pair it anchors. Interval rows are the person-interval rows expanded from the matched rows and fit by the Cox partial likelihood; the point estimates use the full interval set, while the matched-pair bootstrap (Table~\ref{tab:pair_bootstrap}) caps each replicate at 8M interval rows.\\
+Users and Questions are dataset-wide distinct counts and do not partition by tenure bucket (a user's questions, and reused control questions, can fall in several buckets), so the bucket rows leave those columns blank.\\
+Events = helping events in the full analysis sample (after time rounding).
+\end{minipage}
+\end{table}

@@ -31,12 +31,33 @@ _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 if _SCRIPT_DIR not in sys.path:
     sys.path.insert(0, _SCRIPT_DIR)
 
-from cox_config import BUCKET_ORDER, CACHE_DIR, HEADLINE_ESTIMAND  # noqa: E402
+from cox_config import (  # noqa: E402
+    BUCKET_ORDER,
+    CACHE_DIR,
+    DATA_CACHE_DIR,
+    DATA_VERSION,
+    HEADLINE_ESTIMAND,
+    PRIMARY_HELP_TYPES,
+    ROUND_TO_HOURS,
+)
 
 MAIN_PATH = os.path.join(CACHE_DIR, "results_main.csv")
 MAIN_ALL_PATH = os.path.join(CACHE_DIR, "results_main_all.csv")
 DESC_PATH = os.path.join(CACHE_DIR, "descriptives.pkl")
 OUT_PATH = os.path.join(CACHE_DIR, "results_absolute_effects.csv")
+TABLE_DIR = os.path.join(_SCRIPT_DIR, "output_tables")
+TEX_PATH = os.path.join(TABLE_DIR, "absolute_effects.tex")
+
+# Sentinel key for the pooled (all-tenure) control-arm rate.
+_POOLED_KEY = "__pooled__"
+
+# The interval-level model frame (same universe the Cox fits use) lets us split
+# helping events by arm. Its filename mirrors cox_data.load_and_prepare's cache tag:
+#   intervals_full{_<help_types>}_<DATA_VERSION>.parquet
+_HELP_TAG = ("_" + "_".join(PRIMARY_HELP_TYPES)) if PRIMARY_HELP_TYPES else ""
+INTERVAL_CACHE_PATH = os.path.join(
+    DATA_CACHE_DIR, f"intervals_full{_HELP_TAG}_{DATA_VERSION}.parquet"
+)
 
 
 def _fmt_num(value: object, decimals: int = 4) -> str:
@@ -81,7 +102,96 @@ def _row_label(row: pd.Series, source_name: str) -> str:
     return source_name
 
 
-def _baseline_event_rate(row: pd.Series, descriptives: dict) -> float:
+def _control_arm_event_rates(
+    interval_path: str = INTERVAL_CACHE_PATH,
+    round_to_hours: float = ROUND_TO_HOURS,
+) -> dict:
+    """Control-arm helping-event rate per tenure bucket and pooled.
+
+    The base quantity for ARD must be the CONTROL arm (matched, *unanswered*
+    questions, hasAnswer == 0), not the treated+control pool. We read the same
+    interval-level model frame the Cox fits consume and count helping events per
+    control question, replicating the fit-time interval rounding (start/stop
+    snapped to a `round_to_hours` grid, intervals that collapse are dropped) so
+    the counted universe matches each Table row's ``n_events``.
+
+    Returns {tenure_bucket: rate, _POOLED_KEY: rate}. Rate = control-arm helping
+    events / control-arm questions = a mean *count* of recurrent events per
+    observation window (NOT a probability). Returns {} if the frame or the duckdb
+    dependency is unavailable, so callers can fall back to the pooled proxy.
+    """
+    if not os.path.exists(interval_path):
+        print(
+            f"WARNING: interval frame {os.path.abspath(interval_path)} not found; "
+            "cannot compute control-arm rates — falling back to pooled Events/N proxy."
+        )
+        return {}
+    try:
+        import duckdb  # noqa: E402
+    except Exception as exc:  # pragma: no cover - environment guard
+        print(f"WARNING: duckdb unavailable ({exc}); falling back to pooled Events/N proxy.")
+        return {}
+
+    rt = float(round_to_hours) if round_to_hours and round_to_hours > 0 else 1.0
+    # Snap start/stop to the fit-time grid and drop intervals that collapse, exactly
+    # as fit_cox_cached does before summing event_occurred.
+    keep = f"round(start / {rt}) * {rt} < round(stop / {rt}) * {rt}"
+    con = duckdb.connect()
+    try:
+        per_bucket = con.execute(
+            f"""
+            SELECT tenure_bucket AS bucket,
+                   SUM(CASE WHEN hasAnswer = 0 THEN event_occurred ELSE 0 END) AS ev_ctrl,
+                   COUNT(DISTINCT CASE WHEN hasAnswer = 0
+                                       THEN match_id || '_' || question_id END) AS q_ctrl
+            FROM (SELECT * FROM '{interval_path}')
+            WHERE {keep}
+            GROUP BY tenure_bucket
+            """
+        ).df()
+        pooled = con.execute(
+            f"""
+            SELECT SUM(CASE WHEN hasAnswer = 0 THEN event_occurred ELSE 0 END) AS ev_ctrl,
+                   COUNT(DISTINCT CASE WHEN hasAnswer = 0
+                                       THEN match_id || '_' || question_id END) AS q_ctrl
+            FROM (SELECT * FROM '{interval_path}')
+            WHERE {keep}
+            """
+        ).df()
+    finally:
+        con.close()
+
+    rates: dict = {}
+    for _, r in per_bucket.iterrows():
+        q = float(r["q_ctrl"])
+        if q > 0:
+            rates[str(r["bucket"])] = float(r["ev_ctrl"]) / q
+    q_pool = float(pooled["q_ctrl"].iloc[0])
+    if q_pool > 0:
+        rates[_POOLED_KEY] = float(pooled["ev_ctrl"].iloc[0]) / q_pool
+    print(
+        f"Computed control-arm helping-event rates from {os.path.basename(interval_path)}: "
+        f"pooled={rates.get(_POOLED_KEY)}, {len(per_bucket)} tenure buckets."
+    )
+    return rates
+
+
+def _baseline_event_rate(
+    row: pd.Series, descriptives: dict, control_rates: Optional[dict] = None
+) -> float:
+    """Base rate for ARD = the CONTROL-ARM helping-event rate for this row's universe.
+
+    Falls back to the pooled (treated+control) Events/N proxy only if control-arm
+    rates could not be computed (interval frame / duckdb absent).
+    """
+    control_rates = control_rates or {}
+    bucket = row.get("bucket")
+    if pd.notna(bucket) and str(bucket) in control_rates:
+        return control_rates[str(bucket)]
+    if _POOLED_KEY in control_rates:
+        return control_rates[_POOLED_KEY]
+
+    # Fallback: pooled Events/N (both arms) — flagged upstream via the warnings above.
     n_questions = row.get("n_questions")
     if pd.isna(n_questions) or float(n_questions) == 0.0:
         n_questions = descriptives.get("n_questions")
@@ -109,8 +219,13 @@ def _ard_nnt(baseline: float, hr, hr_ci_lo, hr_ci_hi) -> dict:
     }
 
 
-def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict:
-    baseline = _baseline_event_rate(row, descriptives)
+def _summarize_row(
+    row: pd.Series,
+    source_name: str,
+    descriptives: dict,
+    control_rates: Optional[dict] = None,
+) -> dict:
+    baseline = _baseline_event_rate(row, descriptives, control_rates)
 
     # The PRIMARY absolute effect (HR/ARD/NNT) is based on the answer-arrival increment
     # (beta_4 = is_treated_active), the DiD treatment effect, when HEADLINE_ESTIMAND==
@@ -161,6 +276,10 @@ def _summarize_row(row: pd.Series, source_name: str, descriptives: dict) -> dict
         "absolute_risk_difference_proxy": primary["ard"],
         "ard_ci_lo": primary["ard_ci_lo"],
         "ard_ci_hi": primary["ard_ci_hi"],
+        # Reviewer R1's framing: additional helping events per 1,000 answered questions.
+        "additional_events_per_1000": (
+            1000.0 * primary["ard"] if pd.notna(primary["ard"]) else np.nan
+        ),
         "nnt": primary["nnt"],
         "nnt_ci_lo": primary["nnt_ci_lo"],
         "nnt_ci_hi": primary["nnt_ci_hi"],
@@ -184,6 +303,7 @@ def build_absolute_effects(
     Returns an empty DataFrame if no usable cache files are present.
     """
     descriptives = _load_descriptives(descriptives_path)
+    control_rates = _control_arm_event_rates()
 
     sources = [
         ("results_main.csv", _read_result_csv(main_path)),
@@ -195,7 +315,7 @@ def build_absolute_effects(
         if df is None or df.empty:
             continue
         for _, row in df.iterrows():
-            records.append(_summarize_row(row, source_name, descriptives))
+            records.append(_summarize_row(row, source_name, descriptives, control_rates))
 
     if not records:
         print(
@@ -226,14 +346,16 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
         r"\label{tab:absolute_effects}",
         r"\centering",
         r"\footnotesize",
-        r"\begin{tabular}{@{}lrrrrr@{}}",
+        r"\begin{tabular}{@{}lrrrrrr@{}}",
         r"\toprule",
-        r"\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} \\",
+        r"\textbf{Row} & \textbf{Control rate} & \textbf{HR} & \textbf{ARD} & "
+        r"\textbf{Events/1k} & \textbf{NNT} & \textbf{NNT CI} \\",
         r"\midrule",
     ]
 
     # HR/ARD/NNT are based on the answer-arrival increment (beta_4, the DiD treatment
-    # effect) when HEADLINE_ESTIMAND=="arrival".
+    # effect) when HEADLINE_ESTIMAND=="arrival". The base is now the CONTROL-arm helping-
+    # event rate (unanswered matched questions), not the treated+control pool.
     for _, row in df.iterrows():
         nnt_ci = "—"
         if pd.notna(row.get("nnt_ci_lo")) and pd.notna(row.get("nnt_ci_hi")):
@@ -245,6 +367,7 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
                     _fmt_num(row.get("baseline_event_rate_proxy"), 4),
                     _fmt_num(row.get("treat_hr"), 3),
                     _fmt_num(row.get("absolute_risk_difference_proxy"), 5),
+                    _fmt_num(row.get("additional_events_per_1000"), 2),
                     _fmt_num(row.get("nnt"), 1),
                     nnt_ci,
                 ]
@@ -254,8 +377,25 @@ def generate_absolute_effects_latex_table(df: pd.DataFrame, caption: str = "Abso
 
     lines += [
         r"\bottomrule",
-        r"\multicolumn{6}{@{}l}{\footnotesize HR/ARD/NNT are based on the answer-arrival increment ($\beta_4$), the primary (headline) estimand.} \\",
         r"\end{tabular}",
+        r"\vspace{0.35em}",
+        r"\begin{minipage}{\linewidth}",
+        r"\footnotesize",
+        r"\raggedright",
+        r"\textbf{Notes:} HR/ARD/NNT are based on the answer-arrival increment "
+        r"($\beta_4$), the primary (headline) estimand. \emph{Control rate} is the mean "
+        r"number of helping events per observation window among the matched \emph{control} "
+        r"(unanswered) questions in each row's universe --- i.e.\ a recurrent-event "
+        r"\emph{rate}, not a probability or risk. The absolute effect is obtained as "
+        r"$\mathrm{ARD} = \text{control rate}\times(\mathrm{HR}-1)$, which treats the "
+        r"arrival hazard ratio as a rate (risk) ratio; with a base rate near $0.13$ and a "
+        r"recurrent outcome this is a first-order approximation rather than an exact risk "
+        r"difference. \emph{Events/1k} $= 1000\times\mathrm{ARD}$ is the implied number of "
+        r"additional helping events per $1{,}000$ answered questions. Because the outcome "
+        r"is a recurrent-event rate (not a binary risk), $\mathrm{NNT}=1/\mathrm{ARD}$ is "
+        r"an approximate ``answers needed per additional helping event'' rather than a "
+        r"true number-needed-to-treat.",
+        r"\end{minipage}",
         r"\end{table}",
     ]
     return "\n".join(lines)
@@ -270,11 +410,23 @@ def write_absolute_effects_csv(df: pd.DataFrame, out_path: str = OUT_PATH) -> st
     return out_path
 
 
+def write_absolute_effects_latex(df: pd.DataFrame, out_path: str = TEX_PATH) -> str:
+    if df is None or df.empty:
+        return ""
+    tex = generate_absolute_effects_latex_table(df)
+    os.makedirs(os.path.dirname(out_path), exist_ok=True)
+    with open(out_path, "w") as fh:
+        fh.write(tex)
+    print(f"Wrote {os.path.abspath(out_path)}")
+    return out_path
+
+
 def main() -> pd.DataFrame:
     df = build_absolute_effects()
     if df.empty:
         return df
     write_absolute_effects_csv(df)
+    write_absolute_effects_latex(df)
     return df
 
 

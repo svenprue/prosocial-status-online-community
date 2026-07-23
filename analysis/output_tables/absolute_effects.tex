@@ -3,24 +3,24 @@
 \label{tab:absolute_effects}
 \centering
 \footnotesize
-\begin{tabular}{@{}lrrrrr@{}}
+\begin{tabular}{@{}lrrrrrr@{}}
 \toprule
-\textbf{Row} & \textbf{Base risk} & \textbf{HR} & \textbf{ARD} & \textbf{NNT} & \textbf{NNT CI} \\
+\textbf{Row} & \textbf{Control rate} & \textbf{HR} & \textbf{ARD} & \textbf{Events/1k} & \textbf{NNT} & \textbf{NNT CI} \\
 \midrule
-$<$ 1 Week & 0.0915 & 1.071 & 0.00647 & 154.7 & 127.7--195.3 \\
-1 Week - 1 Month & 0.1535 & 1.031 & 0.00481 & 207.9 & 123.7--624.9 \\
-1 - 6 Months & 0.1715 & 1.051 & 0.00882 & 113.3 & 90.4--151.2 \\
-6 - 12 Months & 0.1801 & 1.051 & 0.00913 & 109.6 & 84.8--153.8 \\
-1 - 3 Years & 0.1615 & 1.047 & 0.00751 & 133.2 & 109.6--169.2 \\
-3 - 6 Years & 0.1184 & 1.024 & 0.00279 & 358.0 & 227.9--819.3 \\
-$>$ 6 Years & 0.0777 & 0.999 & -0.00007 & — & — \\
-AllData\_Main & 0.1411 & 1.049 & 0.00692 & 144.5 & 130.3--161.9 \\
+$<$ 1 Week & 0.1133 & 1.071 & 0.00800 & 8.00 & 125.0 & 103.2--157.8 \\
+1 Week - 1 Month & 0.1401 & 1.031 & 0.00439 & 4.39 & 227.8 & 135.5--684.6 \\
+1 - 6 Months & 0.1542 & 1.051 & 0.00793 & 7.93 & 126.1 & 100.6--168.2 \\
+6 - 12 Months & 0.1542 & 1.051 & 0.00782 & 7.82 & 127.9 & 99.0--179.6 \\
+1 - 3 Years & 0.1370 & 1.047 & 0.00637 & 6.37 & 157.0 & 129.2--199.4 \\
+3 - 6 Years & 0.1032 & 1.024 & 0.00244 & 2.44 & 410.7 & 261.5--939.9 \\
+$>$ 6 Years & 0.0716 & 0.999 & -0.00006 & -0.06 & — & — \\
+AllData\_Main & 0.1287 & 1.049 & 0.00631 & 6.31 & 158.4 & 142.9--177.5 \\
 \bottomrule
 \end{tabular}
 \vspace{0.35em}
 \begin{minipage}{\linewidth}
 \footnotesize
 \raggedright
-\textbf{Notes:} HR/ARD/NNT are based on the answer-arrival increment ($\beta_4$), the primary (headline) estimand.
+\textbf{Notes:} HR/ARD/NNT are based on the answer-arrival increment ($\beta_4$), the primary (headline) estimand. \emph{Control rate} is the mean number of helping events per observation window among the matched \emph{control} (unanswered) questions in each row's universe --- i.e.\ a recurrent-event \emph{rate}, not a probability or risk. The absolute effect is obtained as $\mathrm{ARD} = \text{control rate}\times(\mathrm{HR}-1)$, which treats the arrival hazard ratio as a rate (risk) ratio; with a base rate near $0.13$ and a recurrent outcome this is a first-order approximation rather than an exact risk difference. \emph{Events/1k} $= 1000\times\mathrm{ARD}$ is the implied number of additional helping events per $1{,}000$ answered questions. Because the outcome is a recurrent-event rate (not a binary risk), $\mathrm{NNT}=1/\mathrm{ARD}$ is an approximate ``answers needed per additional helping event'' rather than a true number-needed-to-treat.
 \end{minipage}
 \end{table}
