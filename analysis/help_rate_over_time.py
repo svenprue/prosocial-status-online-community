@@ -456,7 +456,7 @@ def plot_help_rate_one_panel(
     ax.axvline(0, color="black", linestyle="--", linewidth=0.6, alpha=0.8, label="Question (TQ)")
     if median_ta_hours is not None and not np.isnan(median_ta_hours):
         ta_days = median_ta_hours / 24.0
-        ax.axvline(ta_days, color="gray", linestyle=":", linewidth=0.7, alpha=0.9, label=f"Median answer (TAT_A)")
+        ax.axvline(ta_days, color="gray", linestyle=":", linewidth=0.7, alpha=0.9, label="Median answer ($T_A$)")
 
     ax.set_xlabel("Time relative to question (days)")
     ax.set_ylabel("Help rate (norm. to baseline)" if use_normalized else "Help rate (answers per user per hour)")
