@@ -1,4 +1,4 @@
-Receiving an answer modestly increases later helping on Stack Overflow
+Users whose Stack Overflow questions were answered helped others modestly more often
 Matched difference-in-differences on 21M questions addresses reciprocity confounding
-Help effect is strongest for newcomers and absent among long-tenured users
-Reciprocity operates as a contributor-recruitment channel at the point of entry
+The association is strongest among newcomers and absent among long-tenured users
+Pattern is consistent with contributor recruitment at the point of entry
