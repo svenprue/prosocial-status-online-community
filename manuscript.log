@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:04
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:13
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1045,7 +1045,7 @@ L3 programming layer <2026-01-19>
 Here is how much of TeX's memory you used:
  19416 strings out of 469006
  392223 string characters out of 5454813
- 774758 words of memory out of 5000000
+ 774759 words of memory out of 5000000
  47673 multiletter control sequences out of 15000+600000
  651154 words of font info for 101 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
@@ -1084,7 +1084,7 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (56 pages, 731555 bytes).
+Output written on manuscript.pdf (56 pages, 731703 bytes).
 PDF statistics:
  1458 PDF objects out of 1728 (max. 8388607)
  283 compressed objects within 3 object streams
