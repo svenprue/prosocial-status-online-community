@@ -746,6 +746,9 @@ def main():
     parser.add_argument("--output-dir", default=FIGURE_DIR, help="Output directory for figures")
     parser.add_argument("--window-days", type=float, default=WINDOW_DAYS, help="Plot and bin from -N to +N days relative to question (default 7)")
     parser.add_argument("--no-adoption", action="store_true", help="Skip adoption-over-time figure (first 24h, time-varying control/treated)")
+    parser.add_argument("--adoption-only", action="store_true", help="Skip the pooled/by-tenure help-rate figures; only (re)generate the adoption figures")
+    parser.add_argument("--adoption-bin-hours", type=float, default=0.1, help="Bin width in hours for adoption figures (default 0.1)")
+    parser.add_argument("--adoption-max-hours", type=float, default=6.0, help="Max hours since question for adoption figures (default 6.0)")
     args = parser.parse_args()
 
     window_days = args.window_days
@@ -774,27 +777,30 @@ def main():
 
     show_ci = not args.no_ci
     min_yerr_frac = (args.min_errorbar_pct / 100.0) if args.min_errorbar_pct else 0.0
-    print("Generating pooled help rate figure…")
-    plot_help_rate_pooled(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
-    print("Generating help rate by tenure (appendix)…")
-    plot_help_rate_by_tenure(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
+    if not args.adoption_only:
+        print("Generating pooled help rate figure…")
+        plot_help_rate_pooled(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
+        print("Generating help rate by tenure (appendix)…")
+        plot_help_rate_by_tenure(rates_df, timelines, use_normalized=use_normalized, output_dir=args.output_dir, xlim_days=xlim_days, show_ci=show_ci, min_yerr_frac=min_yerr_frac)
 
     if not args.no_adoption:
-        print("Generating pooled adoption figure (0–12h, all groups)…")
+        adopt_bin = args.adoption_bin_hours
+        adopt_max = args.adoption_max_hours
+        print(f"Generating pooled adoption figure (0–{adopt_max:g}h, {adopt_bin:g}h bins, all groups)…")
         plot_adoption_pooled(
             timelines, events,
             output_dir=args.output_dir,
             show_ci=show_ci,
-            bin_width_hours=0.5,
-            time_max_hours=12.0,
+            bin_width_hours=adopt_bin,
+            time_max_hours=adopt_max,
         )
-        print("Generating adoption-by-tenure figure (0–12h, joint legend)…")
+        print(f"Generating adoption-by-tenure figure (0–{adopt_max:g}h, {adopt_bin:g}h bins, joint legend)…")
         plot_adoption_by_tenure(
             timelines, events,
             output_dir=args.output_dir,
             show_ci=show_ci,
-            bin_width_hours=0.5,
-            time_max_hours=12.0,
+            bin_width_hours=adopt_bin,
+            time_max_hours=adopt_max,
         )
 
     print("Done.")
