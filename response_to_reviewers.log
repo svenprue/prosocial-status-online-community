@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:13
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:19
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -169,7 +169,7 @@ LaTeX Info: Redefining \] on input line 2951.
 (/usr/local/texlive/2026basic/texmf-dist/tex/latex/tools/xr.sty
 Package: xr 2024-12-22 v6.00 eXternal References (DPC)
 )
-Package xr Info: IMPORTING LABELS FROM manuscript.aux on input line 26.
+Package xr Info: IMPORTING LABELS FROM manuscript.aux on input line 30.
 
 (/usr/local/texlive/2026basic/texmf-dist/tex/latex/l3backend/l3backend-pdftex.d
 ef
@@ -178,20 +178,20 @@ File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
 ) (./response_to_reviewers.aux)
 \openout1 = `response_to_reviewers.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 33.
-LaTeX Font Info:    ... okay on input line 33.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 37.
+LaTeX Font Info:    ... okay on input line 37.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -240,10 +240,10 @@ ignored: Infinite glue shrinkage found in box being split [5]
 ignored: Infinite g
 lue shrinkage found in box being split [6]
 ignored: Infinite glue shrinkage found in box 
-being split [7]
-ignored: Infinite glue shrinkage found in box being split [8]
-ignored: Infinite glu
-e shrinkage found in box being split [9] [10]
+being split [7] [8]
+ignored: Infinite glue shrinkage found in box being split [9]
+ignored: Infinite
+ glue shrinkage found in box being split [10]
 ignored: Infinite glue shrinkage found in b
 ox being split [11]
 ignored: Infinite glue shrinkage found in box being split [12]
@@ -251,15 +251,7 @@ ignored: Infinit
 e glue shrinkage found in box being split [13]
 ignored: Infinite glue shrinkage found in 
 box being split
-[14]
-ignored: Infinite glue shrinkage found in box being split [15]
-ignored: Infinite glue shrinkag
-e found in box being split [16]
-ignored: Infinite glue shrinkage found in box being split
- [17]
-ignored: Infinite glue shrinkage found in box being split [18]
-ignored: Infinite glue shrinka
-ge found in box being split [19] [20] (./response_to_reviewers.aux)
+[14] [15] (./response_to_reviewers.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -268,11 +260,11 @@ L3 programming layer <2026-01-19>
 Here is how much of TeX's memory you used:
  2174 strings out of 469006
  33667 string characters out of 5454813
- 534985 words of memory out of 5000000
+ 510865 words of memory out of 5000000
  30890 multiletter control sequences out of 15000+600000
  634151 words of font info for 62 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 57i,9n,65p,3861b,269s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,9n,65p,1082b,269s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfou
 r/jknappen/ec/tcrm1095.600pk></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts
@@ -285,10 +277,10 @@ texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026ba
 sic/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/20
 26basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive
 /2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on response_to_reviewers.pdf (20 pages, 189029 bytes).
+Output written on response_to_reviewers.pdf (15 pages, 171533 bytes).
 PDF statistics:
- 124 PDF objects out of 1000 (max. 8388607)
- 80 compressed objects within 1 object stream
+ 108 PDF objects out of 1000 (max. 8388607)
+ 69 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
