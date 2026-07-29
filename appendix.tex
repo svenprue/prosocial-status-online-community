@@ -42,6 +42,13 @@ Figure~\ref{fig:love_plot} displays the standardized mean differences (SMDs) for
     \label{fig:love_plot}
 \end{figure}
 
+\section{Common Support and the Scope of the Estimand}
+\label{sec:estimand_scope}
+
+Matching restricts the scope of the estimand rather than the set of users we observe. Of the 4{,}999{,}330 unanswered questions in the pre-matching sample, 2{,}481{,}556 serve as matched controls. The rest either lack a valid exact stratum or complete matching covariates, or are never selected as a nearest neighbor within the caliper, so roughly half the unanswered pool has no on-support match. Because the exact strata are calendar year, primary tag, and number of tags, the control pool that survives is drawn from more readily answered tags than the discarded tail.
+
+The reported contrast is therefore the effect for answered questions that have an on-support unanswered counterpart. This is a generalizability restriction inherent to matching, and a conservative one: because the discarded questions are the less answerable ones, the more-answerable retained controls set a higher, not lower, comparison baseline. The discarding is also not concentrated in the newcomer stratum that carries our central result, where the $<$\,1 week bucket is dropped at close to its arm-wide average rate.
+
 \section{Help Rate Over the Observation Window by Tenure}
 \label{sec:help_rate_by_tenure}
 

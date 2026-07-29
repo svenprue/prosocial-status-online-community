@@ -1,4 +1,4 @@
-\begin{thebibliography}{31}
+\begin{thebibliography}{34}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 \providecommand{\url}[1]{\texttt{#1}}
 \providecommand{\href}[2]{#2}
@@ -44,6 +44,14 @@
 \newblock \bibinfo{publisher}{Lawrence Erlbaum Associates},
   \bibinfo{address}{Hillsdale, NJ}.
 %Type = Article
+\bibitem[{B{\'e}nabou and Tirole(2006)}]{benabou_incentives_2006}
+\bibinfo{author}{B{\'e}nabou, R.}, \bibinfo{author}{Tirole, J.},
+  \bibinfo{year}{2006}.
+\newblock \bibinfo{title}{Incentives and {Prosocial} {Behavior}}.
+\newblock \bibinfo{journal}{American Economic Review} \bibinfo{volume}{96},
+  \bibinfo{pages}{1652--1678}.
+\newblock \DOIprefix\doi{10.1257/aer.96.5.1652}.
+%Type = Article
 \bibitem[{Boyd and Richerson(1989)}]{boyd_evolution_1989}
 \bibinfo{author}{Boyd, R.}, \bibinfo{author}{Richerson, P.J.},
   \bibinfo{year}{1989}.
@@ -52,13 +60,14 @@
   \bibinfo{pages}{213--236}.
 \newblock \DOIprefix\doi{https://doi.org/10.1016/0378-8733(89)90003-8}.
 %Type = Article
-\bibitem[{Bénabou and Tirole(2006)}]{benabou_incentives_2006}
-\bibinfo{author}{Bénabou, R.}, \bibinfo{author}{Tirole, J.},
-  \bibinfo{year}{2006}.
-\newblock \bibinfo{title}{Incentives and {Prosocial} {Behavior}}.
-\newblock \bibinfo{journal}{American Economic Review} \bibinfo{volume}{96},
-  \bibinfo{pages}{1652--1678}.
-\newblock \DOIprefix\doi{10.1257/aer.96.5.1652}.
+\bibitem[{Burtch et~al.(2024)Burtch, Lee and Chen}]{burtch_consequences_2024}
+\bibinfo{author}{Burtch, G.}, \bibinfo{author}{Lee, D.}, \bibinfo{author}{Chen,
+  Z.}, \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{The consequences of generative {AI} for online
+  knowledge communities}.
+\newblock \bibinfo{journal}{Scientific Reports} \bibinfo{volume}{14},
+  \bibinfo{pages}{10413}.
+\newblock \DOIprefix\doi{10.1038/s41598-024-61221-0}.
 %Type = Article
 \bibitem[{Callaway and Sant'Anna(2021)}]{callaway_santanna_2021}
 \bibinfo{author}{Callaway, B.}, \bibinfo{author}{Sant'Anna, P.H.C.},
@@ -92,9 +101,7 @@
 \newblock \bibinfo{title}{Regression {Models} and {Life}-{Tables}}.
 \newblock \bibinfo{journal}{Journal of the Royal Statistical Society: Series B
   (Methodological)} \bibinfo{volume}{34}, \bibinfo{pages}{187--202}.
-\newblock \URLprefix
-  \url{https://rss.onlinelibrary.wiley.com/doi/abs/10.1111/j.2517-6161.1972.tb00899.x},
-  \DOIprefix\doi{https://doi.org/10.1111/j.2517-6161.1972.tb00899.x}.
+\newblock \DOIprefix\doi{10.1111/j.2517-6161.1972.tb00899.x}.
 %Type = Article
 \bibitem[{Curry et~al.(2019)Curry, Mullins and Whitehouse}]{curry_is_2019}
 \bibinfo{author}{Curry, O.S.}, \bibinfo{author}{Mullins, D.A.},
@@ -109,8 +116,7 @@
 \bibinfo{author}{Elster, J.}, \bibinfo{year}{2009}.
 \newblock \bibinfo{title}{Norms}, in: \bibinfo{booktitle}{The {Oxford}
   {Handbook} of {Analytical} {Sociology}}. \bibinfo{publisher}{Oxford
-  University Press}, \bibinfo{address}{Oxford}. Research {Handbook} on
-  {Analytical} {Sociology}, pp. \bibinfo{pages}{195--217}.
+  University Press}, \bibinfo{address}{Oxford}, pp. \bibinfo{pages}{195--217}.
 %Type = Article
 \bibitem[{Fowler and Christakis(2010)}]{fowler_cooperative_2010}
 \bibinfo{author}{Fowler, J.H.}, \bibinfo{author}{Christakis, N.A.},
@@ -163,8 +169,7 @@
 \newblock \bibinfo{title}{How do self-attributed and implicit motives differ?}
 \newblock \bibinfo{journal}{Psychological Review} \bibinfo{volume}{96},
   \bibinfo{pages}{690--702}.
-\newblock \DOIprefix\doi{10.1037/0033-295X.96.4.690}. \bibinfo{note}{place: US
-  Publisher: American Psychological Association}.
+\newblock \DOIprefix\doi{10.1037/0033-295X.96.4.690}.
 %Type = Article
 \bibitem[{McCullough et~al.(2001)McCullough, Kilpatrick, Emmons and
   Larson}]{mccullough_is_2001}
@@ -209,6 +214,16 @@
 \newblock \bibinfo{journal}{Proceedings of the Royal Society B: Biological
   Sciences} \bibinfo{volume}{274}, \bibinfo{pages}{605--610}.
 %Type = Article
+\bibitem[{del Rio-Chanona et~al.(2024)del Rio-Chanona, Laurentsyeva and
+  Wachs}]{delriochanona_large_2024}
+\bibinfo{author}{del Rio-Chanona, R.M.}, \bibinfo{author}{Laurentsyeva, N.},
+  \bibinfo{author}{Wachs, J.}, \bibinfo{year}{2024}.
+\newblock \bibinfo{title}{Large language models reduce public knowledge sharing
+  on online {Q}\&{A} platforms}.
+\newblock \bibinfo{journal}{PNAS Nexus} \bibinfo{volume}{3},
+  \bibinfo{pages}{pgae400}.
+\newblock \DOIprefix\doi{10.1093/pnasnexus/pgae400}.
+%Type = Article
 \bibitem[{Rosenbaum and Rubin(1983)}]{rosenbaum_rubin_1983}
 \bibinfo{author}{Rosenbaum, P.R.}, \bibinfo{author}{Rubin, D.B.},
   \bibinfo{year}{1983}.
@@ -217,6 +232,11 @@
 \newblock \bibinfo{journal}{Biometrika} \bibinfo{volume}{70},
   \bibinfo{pages}{41--55}.
 \newblock \DOIprefix\doi{10.1093/biomet/70.1.41}.
+%Type = Misc
+\bibitem[{{Stack Exchange}(2025)}]{stack_exchange_sites_2025}
+\bibinfo{author}{{Stack Exchange}}, \bibinfo{year}{2025}.
+\newblock \bibinfo{title}{All {Sites} - {Stack} {Exchange}}.
+\newblock \URLprefix \url{https://stackexchange.com/sites}.
 %Type = Misc
 \bibitem[{{Stack Exchange Inc.}(2024)}]{stack_exchange_inc_how_2024}
 \bibinfo{author}{{Stack Exchange Inc.}}, \bibinfo{year}{2024}.
@@ -250,8 +270,7 @@
   {Dual}‐{Process} {Model} of {Culture} in {Action}}.
 \newblock \bibinfo{journal}{American Journal of Sociology}
   \bibinfo{volume}{114}, \bibinfo{pages}{1675--1715}.
-\newblock \DOIprefix\doi{10.1086/597179}. \bibinfo{note}{publisher: The
-  University of Chicago Press}.
+\newblock \DOIprefix\doi{10.1086/597179}.
 %Type = Article
 \bibitem[{Wasko and Faraj(2000)}]{wasko_it_2000}
 \bibinfo{author}{Wasko, M.M.}, \bibinfo{author}{Faraj, S.},

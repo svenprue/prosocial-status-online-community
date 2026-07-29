@@ -1,8 +1,8 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  18 JUL 2026 19:07
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:04
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
-**response_to_reviewers
+**response_to_reviewers.tex
 (./response_to_reviewers.tex
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
@@ -241,9 +241,9 @@ ignored: Infinite g
 lue shrinkage found in box being split [6]
 ignored: Infinite glue shrinkage found in box 
 being split [7]
-ignored: Infinite glue shrinkage found in box being split [8] [9]
-ignored: Infinite
- glue shrinkage found in box being split [10]
+ignored: Infinite glue shrinkage found in box being split [8]
+ignored: Infinite glu
+e shrinkage found in box being split [9] [10]
 ignored: Infinite glue shrinkage found in b
 ox being split [11]
 ignored: Infinite glue shrinkage found in box being split [12]
@@ -252,36 +252,43 @@ e glue shrinkage found in box being split [13]
 ignored: Infinite glue shrinkage found in 
 box being split
 [14]
-ignored: Infinite glue shrinkage found in box being split [15] [16] (./response_to_r
-eviewers.aux)
+ignored: Infinite glue shrinkage found in box being split [15]
+ignored: Infinite glue shrinkag
+e found in box being split [16]
+ignored: Infinite glue shrinkage found in box being split
+ [17]
+ignored: Infinite glue shrinkage found in box being split [18]
+ignored: Infinite glue shrinka
+ge found in box being split [19] [20] (./response_to_reviewers.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 2165 strings out of 469006
- 33477 string characters out of 5454813
- 499792 words of memory out of 5000000
- 30881 multiletter control sequences out of 15000+600000
+ 2174 strings out of 469006
+ 33667 string characters out of 5454813
+ 534509 words of memory out of 5000000
+ 30890 multiletter control sequences out of 15000+600000
  634151 words of font info for 62 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 57i,9n,65p,2385b,269s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,9n,65p,3718b,269s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfou
 r/jknappen/ec/tcrm1095.600pk></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmbx10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts
 /type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2026basic/texmf-dist/f
 onts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026basic/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026basic/texmf
--dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026basic/tex
-mf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic
-/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/2026b
-asic/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive/20
-26basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
-Output written on response_to_reviewers.pdf (16 pages, 164767 bytes).
+st/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2026basic/texmf
+-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026basic/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026basic/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026ba
+sic/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/local/texlive/20
+26basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/local/texlive
+/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb>
+Output written on response_to_reviewers.pdf (20 pages, 188864 bytes).
 PDF statistics:
- 106 PDF objects out of 1000 (max. 8388607)
- 68 compressed objects within 1 object stream
+ 124 PDF objects out of 1000 (max. 8388607)
+ 80 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
