@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:32
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:46
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -971,25 +971,24 @@ Overfull \hbox (16.82251pt too wide) in paragraph at lines 6--26
  [][] 
  []
 
-) [37] [38] [39] [40] [41]) [42]
+) [37] [38] [39] [40]) [41]
 Overfull \hbox (3.2596pt too wide) in paragraph at lines 38--39
 []\T1/cmr/m/n/12 Stack Over-flow pub-lic data dumps were ob-tained from the In-
 ter-net Archive
  []
 
-(./manuscript.bbl [43] [44] [45]) (./appendix.tex
+[42] (./manuscript.bbl [43] [44] [45]) (./appendix.tex
 <matching/common_support.pdf, id=523, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
 Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
 (pdftex.def)             Requested size: 390.0pt x 194.99928pt.
- [46]
-<matching/love_plot.pdf, id=527, 578.16pt x 433.62pt>
+<matching/love_plot.pdf, id=524, 578.16pt x 433.62pt>
 File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
 Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
 (pdftex.def)             Requested size: 390.0pt x 292.4956pt.
- [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>]
+ [46] [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>]
 <analysis/output_figures/help_rate_by_tenure.pdf, id=632, 715.00879pt x 859.680
 51pt>
 File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
@@ -1079,7 +1078,7 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (57 pages, 732549 bytes).
+Output written on manuscript.pdf (57 pages, 732057 bytes).
 PDF statistics:
  1462 PDF objects out of 1728 (max. 8388607)
  285 compressed objects within 3 object streams
