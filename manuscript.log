@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:28
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:32
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -915,7 +915,7 @@ Overfull \hbox (54.69676pt too wide) in paragraph at lines 6--24
 File: analysis/output_figures/strength_rec.pdf Graphic file (type pdf)
 <use analysis/output_figures/strength_rec.pdf>
 Package pdftex.def Info: analysis/output_figures/strength_rec.pdf  used on inpu
-t line 420.
+t line 421.
 (pdftex.def)             Requested size: 390.0pt x 240.77963pt.
 
 
@@ -932,7 +932,7 @@ LaTeX Warning: `h' float specifier changed to `ht'.
 File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
 <use analysis/output_figures/interaction_effect.pdf>
 Package pdftex.def Info: analysis/output_figures/interaction_effect.pdf  used o
-n input line 451.
+n input line 452.
 (pdftex.def)             Requested size: 390.0pt x 240.8436pt.
 
 (./analysis/output_tables/response_time_bins.tex) [31
@@ -945,7 +945,7 @@ File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type
 pdf)
 <use analysis/output_figures/help_rate_adoption_pooled.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
- used on input line 470.
+ used on input line 471.
 (pdftex.def)             Requested size: 390.0pt x 217.49463pt.
 <analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=357, 714.02133pt 
 x 1030.28284pt>
@@ -953,15 +953,15 @@ File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
 pe pdf)
 <use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
-df  used on input line 477.
+df  used on input line 478.
 (pdftex.def)             Requested size: 342.11621pt x 493.64978pt.
 
 
-LaTeX Warning: Float too large for page by 15.14978pt on input line 480.
+LaTeX Warning: Float too large for page by 15.14978pt on input line 481.
 
 [33 <./analysis/output_figures/help_rate_adoption_pooled.pdf>] [34 <./analysis/
 output_figures/help_rate_adoption_by_tenure.pdf>]
-Overfull \hbox (3.78995pt too wide) in paragraph at lines 493--494
+Overfull \hbox (3.78995pt too wide) in paragraph at lines 494--495
 \T1/cmr/m/n/12 be-tween users whose ques-tions re-ceived an-swers and propensit
 y-score-matched
  []
@@ -977,12 +977,13 @@ Overfull \hbox (3.2596pt too wide) in paragraph at lines 38--39
 ter-net Archive
  []
 
-(./manuscript.bbl [43] [44] [45]) (./appendix.tex [46]
-<matching/common_support.pdf, id=526, 722.7pt x 361.35pt>
+(./manuscript.bbl [43] [44] [45]) (./appendix.tex
+<matching/common_support.pdf, id=523, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
 Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
 (pdftex.def)             Requested size: 390.0pt x 194.99928pt.
+ [46]
 <matching/love_plot.pdf, id=527, 578.16pt x 433.62pt>
 File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
@@ -1037,10 +1038,10 @@ L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 19422 strings out of 469006
- 392397 string characters out of 5454813
- 767908 words of memory out of 5000000
- 47679 multiletter control sequences out of 15000+600000
+ 19423 strings out of 469006
+ 392413 string characters out of 5454813
+ 767939 words of memory out of 5000000
+ 47680 multiletter control sequences out of 15000+600000
  651154 words of font info for 101 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
  89i,15n,107p,3021b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -1078,7 +1079,7 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (57 pages, 732794 bytes).
+Output written on manuscript.pdf (57 pages, 732549 bytes).
 PDF statistics:
  1462 PDF objects out of 1728 (max. 8388607)
  285 compressed objects within 3 object streams
