@@ -1,4 +1,4 @@
-\begin{thebibliography}{34}
+\begin{thebibliography}{36}
 \expandafter\ifx\csname natexlab\endcsname\relax\def\natexlab#1{#1}\fi
 \providecommand{\url}[1]{\texttt{#1}}
 \providecommand{\href}[2]{#2}
@@ -190,6 +190,17 @@
   \bibinfo{volume}{17}, \bibinfo{pages}{281--285}.
 \newblock \DOIprefix\doi{10.1111/j.1467-8721.2008.00590.x}.
 %Type = Article
+\bibitem[{Milinski et~al.(2002)Milinski, Semmann and
+  Krambeck}]{milinski_reputation_2002}
+\bibinfo{author}{Milinski, M.}, \bibinfo{author}{Semmann, D.},
+  \bibinfo{author}{Krambeck, H.J.}, \bibinfo{year}{2002}.
+\newblock \bibinfo{title}{Reputation helps solve the ‘tragedy of the
+  commons’}.
+\newblock \bibinfo{journal}{Nature} \bibinfo{volume}{415},
+  \bibinfo{pages}{424--426}.
+\newblock \URLprefix \url{https://doi.org/10.1038/415424a},
+  \DOIprefix\doi{10.1038/415424a}.
+%Type = Article
 \bibitem[{Molm et~al.(2007)Molm, Collett and Schaefer}]{molm_building_2007}
 \bibinfo{author}{Molm, L.D.}, \bibinfo{author}{Collett, J.L.},
   \bibinfo{author}{Schaefer, D.R.}, \bibinfo{year}{2007}.
@@ -232,6 +243,19 @@
 \newblock \bibinfo{journal}{Biometrika} \bibinfo{volume}{70},
   \bibinfo{pages}{41--55}.
 \newblock \DOIprefix\doi{10.1093/biomet/70.1.41}.
+%Type = Article
+\bibitem[{Simpson et~al.(2018)Simpson, Harrell, Melamed, Heiserman and
+  Negraia}]{simpson_roots_2018}
+\bibinfo{author}{Simpson, B.}, \bibinfo{author}{Harrell, A.},
+  \bibinfo{author}{Melamed, D.}, \bibinfo{author}{Heiserman, N.},
+  \bibinfo{author}{Negraia, D.V.}, \bibinfo{year}{2018}.
+\newblock \bibinfo{title}{The {Roots} of {Reciprocity}: {Gratitude} and
+  {Reputation} in {Generalized} {Exchange} {Systems}}.
+\newblock \bibinfo{journal}{American Sociological Review} \bibinfo{volume}{83},
+  \bibinfo{pages}{88--110}.
+\newblock \URLprefix
+  \url{http://journals.sagepub.com/doi/10.1177/0003122417747290},
+  \DOIprefix\doi{10.1177/0003122417747290}.
 %Type = Misc
 \bibitem[{{Stack Exchange}(2025)}]{stack_exchange_sites_2025}
 \bibinfo{author}{{Stack Exchange}}, \bibinfo{year}{2025}.

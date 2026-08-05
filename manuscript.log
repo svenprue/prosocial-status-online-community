@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  29 JUL 2026 00:13
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:28
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -851,28 +851,28 @@ ce-in-differences
  []
 
 [2] [3] [4] [5]
-Overfull \hbox (5.86253pt too wide) in paragraph at lines 63--64
+Overfull \hbox (5.86253pt too wide) in paragraph at lines 65--66
 []\T1/cmr/m/sc/12 Hypothesis 2 (H2). \T1/cmr/m/it/12 The gen-er-al-ized reci-pr
 ocity ef-fect is strongest
  []
 
 [6] [7] [8] [9]
-Overfull \hbox (8.63004pt too wide) in paragraph at lines 190--191
+Overfull \hbox (8.63004pt too wide) in paragraph at lines 192--193
  [][] 
  []
 
 [10] [11] [12] [13] [14] [15]
-Overfull \hbox (1.74248pt too wide) in paragraph at lines 270--270
+Overfull \hbox (1.74248pt too wide) in paragraph at lines 272--272
 []|\T1/cmr/m/n/10.95 numQuestionsAsked30D| 
  []
 
 
-Overfull \hbox (3.88582pt too wide) in paragraph at lines 255--288
+Overfull \hbox (3.88582pt too wide) in paragraph at lines 257--290
  [][] 
  []
 
 [16] [17]
-Overfull \hbox (83.95067pt too wide) detected at line 344
+Overfull \hbox (83.95067pt too wide) detected at line 346
  []$[]  \OML/cmm/m/it/12 h\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t \OMS/cmsy/m/n/12 
 j \OT1/cmr/bx/n/12 X\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 )) = \OM
 L/cmm/m/it/12 h[]\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 ) [] []\OML
@@ -887,13 +887,13 @@ Overfull \hbox (44.16954pt too wide) in paragraph at lines 5--42
  [][] 
  []
 
-) [20]
+[20])
 <analysis/output_figures/help_rate_pooled.pdf, id=91, 570.48068pt x 317.6555pt>
 
 File: analysis/output_figures/help_rate_pooled.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_pooled.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_pooled.pdf  used on 
-input line 386.
+input line 388.
 (pdftex.def)             Requested size: 390.0pt x 217.16132pt.
 
 
@@ -905,97 +905,91 @@ Overfull \hbox (21.44804pt too wide) in paragraph at lines 6--38
  [][] 
  []
 
-) (./analysis/output_tables/composite_outcome.tex
+) [23] (./analysis/output_tables/composite_outcome.tex
 Overfull \hbox (54.69676pt too wide) in paragraph at lines 6--24
  [][] 
  []
 
-[23]) [24]
-<analysis/output_figures/strength_rec.pdf, id=168, 570.73976pt x 352.3608pt>
+[24]) [25]
+<analysis/output_figures/strength_rec.pdf, id=172, 570.73976pt x 352.3608pt>
 File: analysis/output_figures/strength_rec.pdf Graphic file (type pdf)
 <use analysis/output_figures/strength_rec.pdf>
 Package pdftex.def Info: analysis/output_figures/strength_rec.pdf  used on inpu
-t line 418.
+t line 420.
 (pdftex.def)             Requested size: 390.0pt x 240.77963pt.
 
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-[25] [26 <./analysis/output_figures/strength_rec.pdf>]
-(./analysis/output_tables/main_results.tex) [27] [28
+[26] [27 <./analysis/output_figures/strength_rec.pdf>]
+(./analysis/output_tables/main_results.tex) [28] [29
 
 
 ]
-(./analysis/output_tables/speed_results.tex) [29]
-<analysis/output_figures/interaction_effect.pdf, id=265, 570.76549pt x 352.4701
+(./analysis/output_tables/speed_results.tex) [30]
+<analysis/output_figures/interaction_effect.pdf, id=268, 570.76549pt x 352.4701
 4pt>
 File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
 <use analysis/output_figures/interaction_effect.pdf>
 Package pdftex.def Info: analysis/output_figures/interaction_effect.pdf  used o
-n input line 449.
+n input line 451.
 (pdftex.def)             Requested size: 390.0pt x 240.8436pt.
 
-(./analysis/output_tables/response_time_bins.tex) [30
+(./analysis/output_tables/response_time_bins.tex) [31
 
 
- <./analysis/output_figures/interaction_effect.pdf>] [31]
-<analysis/output_figures/help_rate_adoption_pooled.pdf, id=353, 569.44495pt x 3
+ <./analysis/output_figures/interaction_effect.pdf>] [32]
+<analysis/output_figures/help_rate_adoption_pooled.pdf, id=356, 569.44495pt x 3
 17.56894pt>
 File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type 
 pdf)
 <use analysis/output_figures/help_rate_adoption_pooled.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
- used on input line 468.
+ used on input line 470.
 (pdftex.def)             Requested size: 390.0pt x 217.49463pt.
-<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=354, 714.02133pt 
+<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=357, 714.02133pt 
 x 1030.28284pt>
 File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
 pe pdf)
 <use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
-df  used on input line 475.
-(pdftex.def)             Requested size: 390.0pt x 562.74283pt.
+df  used on input line 477.
+(pdftex.def)             Requested size: 342.11621pt x 493.64978pt.
 
 
-LaTeX Warning: Float too large for page by 84.24283pt on input line 478.
+LaTeX Warning: Float too large for page by 15.14978pt on input line 480.
 
-[32 <./analysis/output_figures/help_rate_adoption_pooled.pdf>] [33 <./analysis/
+[33 <./analysis/output_figures/help_rate_adoption_pooled.pdf>] [34 <./analysis/
 output_figures/help_rate_adoption_by_tenure.pdf>]
-Overfull \hbox (3.78995pt too wide) in paragraph at lines 491--492
+Overfull \hbox (3.78995pt too wide) in paragraph at lines 493--494
 \T1/cmr/m/n/12 be-tween users whose ques-tions re-ceived an-swers and propensit
 y-score-matched
  []
 
-[34]
-Overfull \hbox (0.60971pt too wide) in paragraph at lines 516--517
-[]\T1/cmr/m/n/12 The pat-tern bears only weakly on the norm-displacement ac-cou
-nt. Among
- []
-
-[35] (./analysis/output_tables/absolute_effects.tex
+[35] [36] (./analysis/output_tables/absolute_effects.tex
 Overfull \hbox (16.82251pt too wide) in paragraph at lines 6--26
  [][] 
  []
 
-) [36] [37] [38] [39] [40]) [41]
+) [37] [38] [39] [40] [41]) [42]
 Overfull \hbox (3.2596pt too wide) in paragraph at lines 38--39
 []\T1/cmr/m/n/12 Stack Over-flow pub-lic data dumps were ob-tained from the In-
 ter-net Archive
  []
 
-(./manuscript.bbl [42] [43] [44]) (./appendix.tex [45]
-<matching/common_support.pdf, id=523, 722.7pt x 361.35pt>
+(./manuscript.bbl [43] [44] [45]) (./appendix.tex [46]
+<matching/common_support.pdf, id=526, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
 Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
 (pdftex.def)             Requested size: 390.0pt x 194.99928pt.
-<matching/love_plot.pdf, id=524, 578.16pt x 433.62pt>
+<matching/love_plot.pdf, id=527, 578.16pt x 433.62pt>
 File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
 Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
 (pdftex.def)             Requested size: 390.0pt x 292.4956pt.
- [46 <./matching/common_support.pdf>] [47 <./matching/love_plot.pdf>]
-<analysis/output_figures/help_rate_by_tenure.pdf, id=629, 715.00879pt x 859.680
+ [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>]
+<analysis/output_figures/help_rate_by_tenure.pdf, id=632, 715.00879pt x 859.680
 51pt>
 File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_by_tenure.pdf>
@@ -1008,14 +1002,14 @@ Overfull \hbox (41.04698pt too wide) in paragraph at lines 6--30
  [][] 
  []
 
-) [48] [49 <./analysis/output_figures/help_rate_by_tenure.pdf>]
-(./analysis/output_tables/pair_bootstrap.tex) [50]
+) [49] [50 <./analysis/output_figures/help_rate_by_tenure.pdf>]
+(./analysis/output_tables/pair_bootstrap.tex) [51]
 (./analysis/output_tables/cohort_robustness.tex
 Overfull \hbox (74.82579pt too wide) in paragraph at lines 6--24
  [][] 
  []
 
-) [51] (./analysis/output_tables/observable_controls.tex
+) [52] (./analysis/output_tables/observable_controls.tex
 Overfull \hbox (17.8397pt too wide) in paragraph at lines 6--20
  [][] 
  []
@@ -1025,7 +1019,7 @@ Overfull \hbox (62.7454pt too wide) in paragraph at lines 6--22
  [][] 
  []
 
-) [52] (./analysis/output_tables/newcomer_robustness.tex
+) [53] (./analysis/output_tables/newcomer_robustness.tex
 Overfull \hbox (49.31952pt too wide) in paragraph at lines 6--24
  [][] 
  []
@@ -1035,18 +1029,18 @@ Overfull \hbox (25.12587pt too wide) in paragraph at lines 6--30
  [][] 
  []
 
-) [53] [54] (./analysis/output_tables/score_coding_sensitivity.tex)) [55]
-[56] (./manuscript.aux)
+) [54] [55] (./analysis/output_tables/score_coding_sensitivity.tex)) [56]
+[57] (./manuscript.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 19416 strings out of 469006
- 392223 string characters out of 5454813
- 774759 words of memory out of 5000000
- 47673 multiletter control sequences out of 15000+600000
+ 19422 strings out of 469006
+ 392397 string characters out of 5454813
+ 767908 words of memory out of 5000000
+ 47679 multiletter control sequences out of 15000+600000
  651154 words of font info for 101 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
  89i,15n,107p,3021b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -1084,10 +1078,10 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (56 pages, 731703 bytes).
+Output written on manuscript.pdf (57 pages, 732794 bytes).
 PDF statistics:
- 1458 PDF objects out of 1728 (max. 8388607)
- 283 compressed objects within 3 object streams
+ 1462 PDF objects out of 1728 (max. 8388607)
+ 285 compressed objects within 3 object streams
  0 named destinations out of 1000 (max. 500000)
  53 words of extra memory for PDF output out of 10000 (max. 10000000)
 
