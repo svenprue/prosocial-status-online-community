@@ -1,4 +1,4 @@
+Newcomers help most after being helped; the response fades to nothing with tenure
 Users whose Stack Overflow questions were answered helped others modestly more often
 Matched difference-in-differences on 21M questions addresses reciprocity confounding
-The association is strongest among newcomers and absent among long-tenured users
 Pattern is consistent with contributor recruitment at the point of entry
