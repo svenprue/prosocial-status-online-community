@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:56
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -988,22 +988,22 @@ File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
 Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
 (pdftex.def)             Requested size: 390.0pt x 292.4956pt.
- [46] [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>]
-<analysis/output_figures/help_rate_by_tenure.pdf, id=632, 715.00879pt x 859.680
+ [46]
+<analysis/output_figures/help_rate_by_tenure.pdf, id=528, 715.00879pt x 859.680
 51pt>
 File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_by_tenure.pdf  used 
 on input line 57.
 (pdftex.def)             Requested size: 390.0pt x 468.90356pt.
-
-(./analysis/output_tables/estimation_samples.tex
+ [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>] [49 <./an
+alysis/output_figures/help_rate_by_tenure.pdf>] (./analysis/output_tables/estim
+ation_samples.tex
 Overfull \hbox (41.04698pt too wide) in paragraph at lines 6--30
  [][] 
  []
 
-) [49] [50 <./analysis/output_figures/help_rate_by_tenure.pdf>]
-(./analysis/output_tables/pair_bootstrap.tex) [51]
+) [50] (./analysis/output_tables/pair_bootstrap.tex) [51]
 (./analysis/output_tables/cohort_robustness.tex
 Overfull \hbox (74.82579pt too wide) in paragraph at lines 6--24
  [][] 
@@ -1078,7 +1078,7 @@ msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
 ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
 public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
 e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (57 pages, 731638 bytes).
+Output written on manuscript.pdf (57 pages, 731680 bytes).
 PDF statistics:
  1461 PDF objects out of 1728 (max. 8388607)
  285 compressed objects within 3 object streams
