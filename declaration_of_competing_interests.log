@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  24 MAY 2026 14:31
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:53
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -56,8 +56,7 @@ Package: setspace 2022/12/04 v6.7b set line spacing
 ef
 File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
 \l__color_backend_stack_int=\count286
-)
-No file declaration_of_competing_interests.aux.
+) (./declaration_of_competing_interests.aux)
 \openout1 = `declaration_of_competing_interests.aux'.
 
 LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 6.
@@ -74,6 +73,7 @@ LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 6.
 LaTeX Font Info:    ... okay on input line 6.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 6.
 LaTeX Font Info:    ... okay on input line 6.
+
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
 *geometry* verbose mode - [ preamble ] result:
@@ -110,25 +110,25 @@ LaTeX Font Info:    ... okay on input line 6.
 
 [1
 
-{/usr/local/texlive/2026basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
-(./declaration_of_competing_interests.aux)
+{/Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/map/pdftex/
+updmap/pdftex.map}] (./declaration_of_competing_interests.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 1077 strings out of 469006
- 18593 string characters out of 5454813
+ 1080 strings out of 469006
+ 18722 string characters out of 5454813
  434756 words of memory out of 5000000
- 29834 multiletter control sequences out of 15000+600000
+ 29835 multiletter control sequences out of 15000+600000
  628932 words of font info for 44 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
  57i,5n,65p,240b,141s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx1
 2.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mr12.pfb>
-Output written on declaration_of_competing_interests.pdf (1 page, 29671 bytes).
+Output written on declaration_of_competing_interests.pdf (1 page, 29932 bytes).
 
 PDF statistics:
  18 PDF objects out of 1000 (max. 8388607)
