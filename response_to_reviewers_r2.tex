@@ -1,0 +1,193 @@
+%% =========================================================
+%% Point-by-point response to reviewers -- CHB-D-26-04350R1 (minor revision)
+%% Standalone; compile from the repo root AFTER manuscript.tex has been
+%% compiled (this file imports manuscript.aux via \externaldocument so that
+%% \ref{tab:...}/\ref{sec:...}/\ref{fig:...} resolve to the manuscript's own
+%% numbers).
+%%   pdflatex response_to_reviewers_r2 && pdflatex response_to_reviewers_r2
+%%
+%% Same conventions as the first-round letter (response_to_reviewers.tex):
+%% left-hand cells quote the reviewer verbatim (elisions marked [...]);
+%% where we complied, one or two sentences plus a pointer to the revised
+%% text; where we did something different, the argument in full.
+%% =========================================================
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+% hyperref intentionally omitted, as in the first-round letter: plain xr +
+% hyperref breaks external \ref inside longtable cells and xr-hyperref is not
+% installed in this TeX Live. Plain \ref/\cite render the external numbers fine.
+\usepackage{xr}
+\externaldocument{manuscript}
+\setlength{\parskip}{6pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.15}
+
+\newcolumntype{L}{>{\raggedright\arraybackslash}p{0.30\textwidth}}
+\newcolumntype{R}{>{\raggedright\arraybackslash}p{0.62\textwidth}}
+
+\begin{document}
+
+\begin{center}
+{\large\bfseries Response to Reviewers (Second Revision)}\\[2pt]
+Manuscript CHB-D-26-04350R1\\
+\emph{Newcomers Help Most After Being Helped, Veterans Do Not: Evidence from Stack Overflow}
+\end{center}
+
+We thank the editor and both reviewers. Reviewer~1 recommends acceptance. Reviewer~2 asks for four changes, all of which we have made, and both reviewers answered ``yes'' to the language-editing question. No estimate in the manuscript changed in this round: every number is the same pipeline run reported in the first revision, and the revision is confined to framing, figures, one new descriptive figure, and copyediting.
+
+The four changes are, in brief: the Abstract and Introduction now frame the study as a pre-generative-AI baseline that locates a narrow effect rather than as a general test of reciprocity; the response-time figure now carries the answer-quality-controlled estimates beside the baseline ones in the main text; the redundant raw-help-rate figures are consolidated from three in the main text to one two-panel figure, with the by-tenure versions gathered in a single appendix; a sample-construction flow diagram is added; and the common-support restriction is stated explicitly in the Discussion.
+
+\subsection*{Note on figure renumbering}
+
+Consolidating the figures renumbered them. For the editor's convenience:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{First revision} & \textbf{This revision} & \textbf{Change}\\
+\midrule
+Figure 1 (study design)              & Figure~\ref{fig:study_design}    & unchanged\\
+---                                  & Figure~\ref{fig:sample_flow}     & \textbf{new} sample-construction flow diagram\\
+Figure 2 (help rate, pooled)         & Figure~\ref{fig:help_rate_pooled}(a) & merged into a two-panel figure\\
+Figure 5 (by answer receipt)         & Figure~\ref{fig:help_rate_pooled}(b) & merged into a two-panel figure\\
+Figure 3 (strength by tenure)        & Figure~\ref{fig:strength_rec}    & unchanged\\
+Figure 4 (response-time bins)        & Figure~\ref{fig:interaction_effect} & \textbf{split} into baseline and quality panels\\
+Appendix D.9 (help rate by tenure)   & Figure~\ref{fig:help_rate_by_tenure} & moved within the appendix\\
+Figure 6 (by answer receipt, tenure) & Figure~\ref{fig:help_rate_adoption_by_tenure} & \textbf{moved} to the appendix\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The main text therefore has five figures where the first revision had six, despite the addition of the flow diagram, and one raw-help-rate figure where it had three.
+
+%% ------------------------------------------------------------------
+\section*{Response to Reviewer 1}
+
+\begin{longtable}{@{}L R@{}}
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\footnotesize\itshape Reviewer 1 (continued)}\\
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r@{}}{\footnotesize\itshape continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textit{``The authors have satisfactorily addressed all my concerns, and I recommend the manuscript for acceptance.''} &
+We thank Reviewer~1 for the close reading across both rounds. The changes in this round respond to Reviewer~2 and are confined to framing, figures, and copyediting; no estimate or inference that Reviewer~1 assessed has changed.\\
+\midrule
+
+\textit{(Q9) Could the manuscript benefit from language editing? --- ``Yes''} &
+We ran a copyediting pass over the passages this revision touches: the Abstract, the Introduction, the Data subsection, the response-time results (Section~\ref{sec:rt_moderation}), and the Limitations (Section~\ref{sec:limitations}). The pass re-stages long sentences rather than shortening the argument. Where a sentence carried a caveat inside an em-dash aside or a trailing clause, the caveat now gets its own sentence. No caveat, qualification, or limitation was removed.
+
+The pass also caught a cross-reference defect that survived the first revision: because \texttt{elsarticle} already prints ``Appendix~C'' for a reference to an appendix section, the six places writing ``Appendix~\textbackslash ref\{...\}'' rendered as ``Appendix Appendix~C''. Two of these were in the submitted R1 PDF. All six are fixed.
+
+We are glad to have the manuscript go through Elsevier's language service at production if the editor would still prefer it.\\
+\midrule
+
+\end{longtable}
+
+%% ------------------------------------------------------------------
+\section*{Response to Reviewer 2}
+
+\begin{longtable}{@{}L R@{}}
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endfirsthead
+\multicolumn{2}{@{}l}{\footnotesize\itshape Reviewer 2 (continued)}\\
+\toprule
+\textbf{Reviewer comment} & \textbf{Response and changes to the manuscript}\\
+\midrule
+\endhead
+\midrule
+\multicolumn{2}{r@{}}{\footnotesize\itshape continued on next page}\\
+\endfoot
+\bottomrule
+\endlastfoot
+
+\textit{(Overall) ``This paper has the potential to be a valuable methodological contribution to the online community literature, but in its current form, it overpromises theoretically and underplays its own fragility. The authors have done extraordinary data work.''} &
+We thank Reviewer~2 for a diagnosis we accept. The four requested changes are made, and we have taken the framing point further than the letter of the request in one respect: rather than adding the recalibration as a caveat, we moved the two boundaries --- how narrow the effect is, and how dated it is --- into the Introduction's contribution paragraph, so a reader meets them before the results rather than after.\\
+\midrule
+
+\textit{(P1) ``The authors should recalibrate the Introduction and Abstract to frame the study as a pre-AI baseline diagnostic rather than a universal theory test.''}
+
+\textit{(Q1) ``[D]ial down the theoretical ambition in the rationale and dial up the contextual specificity. [\ldots] State that honestly in the rationale: `We use this precise design to locate the exact narrow crack where reciprocity actually moves the needle (newcomers, 30-60 mins, pre-AI), rather than naively asking if reciprocity works at all.' ''} &
+Done, in both places, and close to the reviewer's own wording.
+
+\textbf{Abstract.} A new sentence states the design's purpose in the reviewer's terms: ``Rather than asking whether reciprocity works in general, we locate the narrow conditions under which it moves behavior.'' A further sentence gives the vintage: most of the data predate 2020, the newcomer response does not survive a split at ChatGPT's release, and we therefore read the estimates as a pre-generative-AI baseline rather than a general test of reciprocity. The response-time result is now marked as the fragile one (``though far more fragilely''), and the closing claim is scoped to ``this one platform''. The abstract is 247 words, within the 250-word limit.
+
+\textbf{Introduction.} The opening paragraph now says we do not ask whether reciprocity sustains cooperation in general, but ``where, for whom, and under what timing it moves behavior at all''. We also removed the word ``uniquely'' from the contribution sentence. The contribution paragraph now ranks the three findings by robustness and marks the response-time pattern as the most fragile. A new paragraph follows it stating the two boundaries: that the effect is concentrated in the first week, peaks at 30--60 minutes, and is small in absolute terms even where strongest; and that the estimates are dated, because calendar year is an exact-matching stratum and the newcomer response does not survive the ChatGPT split.
+
+\textbf{Highlights.} A fifth bullet records the same boundary: ``Pre-generative-AI baseline: the newcomer response fades after ChatGPT'' (69 characters).\\
+\midrule
+
+\textit{(P2) ``The authors should visually expose the fragility of the response-time sweet spot by promoting quality-controlled estimates to the main text (split Figure 4).''}
+
+\textit{(Q4) ``[T]he main text's Figure 4 (response-time bins) omits the most important robustness check (quality-controlled estimates), which drastically changes the visual interpretation of the `sweet spot.' ''} &
+Done. Figure~\ref{fig:interaction_effect} is now two stacked panels: panel~(a) the baseline per-bin arrival increments of Table~\ref{tab:response_time_bins}, panel~(b) the same bins refit with the three answer-quality controls previously visible only in Appendix Table~\ref{tab:response_time_bins_quality}.
+
+The panels share both axes and are stacked rather than juxtaposed, so each response-time bin can be read vertically across the two specifications and each panel keeps the full text width. The collapse the reviewer expects is now the figure's most visible feature: the 30--60-minute peak drops from 1.19 to 1.03, and the two fastest bins fall significantly below one.
+
+We kept one interpretive guardrail in the caption, because the sub-one estimates would otherwise read as evidence that the effect is absent. Acceptance and vote score are post-treatment, and acceptance in particular requires the asker to return to the platform, so the adjustment absorbs part of the effect itself. The caption says this and points to Section~\ref{sec:rt_moderation}, which sets out the argument in full. We are content for the figure to make the pattern look fragile, because it is; we only want the reason recorded next to it.
+
+The figure-generating code (\texttt{analysis/create\_figures.py}) now produces the two-panel version whenever the quality-controlled fits are available, so the promotion is reproducible rather than hand-assembled.\\
+\midrule
+
+\textit{(P3) ``The authors should consolidate redundant visualizations and add a sample flow diagram.''}
+
+\textit{(Q4) ``There is substantial redundancy across Figures 2, 5, 6, and Appendix D.9---all showing nearly the same raw help rates---which dilutes the reader's attention. [\ldots] The authors should streamline redundant visualizations [\ldots] and add a descriptive flow diagram for the complex matched sample.''} &
+Done, on both counts.
+
+\textbf{Consolidation.} The three main-text raw-help-rate figures are now one. Former Figures~2 and~5 are merged into the two-panel Figure~\ref{fig:help_rate_pooled}, and former Figure~6 is moved to the appendix beside the figure that was Appendix~D.9, so that Appendix~\ref{sec:help_rate_by_tenure} now holds both by-tenure views in one place with a short introduction. The main text has one raw-help-rate figure where it had three, and five figures in total where it had six.
+
+Because the two merged panels are discussed in different sections, we added a sentence to the caption identifying which panel belongs to which argument: panel~(a) bears on the parallel-trends logic of the design (Section~\ref{sec:descriptive_evidence}), panel~(b) on the re-engagement reading of the response-time pattern (Section~\ref{sec:rt_moderation}). This was the one cost of merging, and we would rather name it in the caption than leave a reader to infer it.
+
+\textbf{Flow diagram.} Figure~\ref{fig:sample_flow} is new and sits in the Data subsection. It traces the sample from the public dump to the Cox analysis sample: the window-design and self-answer exclusions, the split into treatment-eligible and control-eligible pools, the questions lost at each stage to missing exact strata or incomplete covariates, the 115,967 treated questions outside common support, the 863,583 eligible controls never selected within the caliper, and the resulting 12,174,880 matched pairs drawing on 2,481,556 distinct control questions. Every count in the diagram is one already reported in the surrounding prose; the diagram adds no new quantity, it only makes the attrition legible in one view.\\
+\midrule
+
+\textit{(P4) ``The authors should explicitly state the common-support limitation (mainstream tags only) in the Discussion.''} &
+Done, and stated in the reviewer's terms. The scope paragraph in Section~\ref{sec:limitations} is now split in two, and the second paragraph is given to this restriction alone.
+
+It says plainly that because the exact strata are calendar year, primary tag, and number of tags, a treated question enters the estimate only if an unanswered question exists in the same stratum; that roughly half the unanswered pool has no on-support match; that the surviving controls are drawn disproportionately from more readily answered tags; and therefore that what we estimate is the effect for answered questions in mainstream, well-trafficked tag areas rather than for the long tail of niche or rarely answered topics. It adds that whether reciprocity behaves differently in that tail is a question this design cannot reach.
+
+We retained the two facts that bear on the direction of the restriction, since dropping them would overstate the problem as much as omitting the restriction understated it: the retained controls are the more answerable ones and so set a higher comparison baseline, and the discarding is not concentrated in the newcomer stratum that carries the central result. Appendix~\ref{sec:estimand_scope} reports the counts, and Figure~\ref{fig:sample_flow} now shows the attrition.\\
+\midrule
+
+\textit{(Q8) Does the manuscript structure, flow or writing need improving? --- ``Yes.''} &
+The structural changes in this round are the ones requested in points~1--4: the recalibrated Abstract and Introduction, the boundaries paragraph moved forward into the Introduction, the consolidated figures, the new flow diagram in the Data subsection, and the Limitations scope paragraph split in two. Section order is otherwise unchanged from the first revision, which Reviewer~1 found satisfactory. If the editor has a specific further reorganization in mind we would be glad to make it.\\
+\midrule
+
+\textit{(Q9) Could the manuscript benefit from language editing? --- ``Yes''} &
+See our response to Reviewer~1 on the same question. We ran a copyediting pass over the passages this revision touches, re-staging long sentences rather than cutting content, and fixed six ``Appendix Appendix~C''-style cross-reference defects, two of which appeared in the submitted R1 PDF. We are happy to use Elsevier's language service at production.\\
+\midrule
+
+\textit{(Q2, Q3, Q5, Q6, Q7) Replicability, statistics, interpretation, strengths, limitations --- all marked satisfactory} &
+We thank the reviewer. Nothing in the analysis changed in this round, so these assessments are unaffected: the estimates, standard errors, bootstrap intervals, and robustness tables are the same pipeline run reported in the first revision.\\
+\midrule
+
+\end{longtable}
+
+%% ------------------------------------------------------------------
+\section*{Editor requirements}
+
+\begin{itemize}
+\item \textbf{Point-by-point response:} this document, covering Reviewer~1's recommendation and language-editing point and each of Reviewer~2's numbered points and questionnaire answers.
+\item \textbf{Manuscript and figure source files:} the revised manuscript is uploaded in editable \LaTeX{} source form (\texttt{manuscript.tex} with \texttt{body.tex}, \texttt{appendix.tex}, \texttt{preamble.tex}, the bibliography files, and the figure sources), not as a PDF only. Figures are supplied as vector PDF and EPS.
+\item \textbf{Highlights:} a separate \texttt{Highlights} file accompanies the submission, now with five bullet points, each verified at or below 85 characters including spaces, worded consistently with the title and the revised abstract.
+\item \textbf{Graphical Abstract:} we respectfully decline the optional Graphical Abstract.
+\item \textbf{Research Elements / interactive data visualization:} we decline these optional services for this submission.
+\item \textbf{Authorship:} unchanged from the first revision.
+\end{itemize}
+
+\end{document}
