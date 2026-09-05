@@ -12,7 +12,8 @@ Outputs (written to output_tables/ and output_figures/):
   - speed_results.tex           Response time moderation by tenure bucket (tab:speed_results)
   - strength_rec.*              Strength of reciprocity across experience (fig:strength_rec)
   - speed_moderation.*          Response time moderation by tenure (appendix)
-  - interaction_effect.*       Treatment effect by response time bin, pooled (fig:interaction_effect)
+  - interaction_effect.*       Treatment effect by response time bin, pooled; baseline vs
+                                answer-quality-controlled panels (fig:interaction_effect)
 
 Usage:
     python create_figures.py
@@ -1378,14 +1379,18 @@ def generate_speed_figure(df: pd.DataFrame):
 def generate_interaction_effect_figure(
     df_rt_bins: pd.DataFrame = None,
     df_speed_all: pd.DataFrame = None,
+    df_rt_bins_quality: pd.DataFrame = None,
 ):
     """
     Plot treatment effect (hazard ratio) by response time.
-    If df_rt_bins is provided and non-empty, plot a bar chart by bin (non-parametric).
+    If df_rt_bins is provided and non-empty, plot the discrete-bin view (non-parametric).
+    When df_rt_bins_quality is also available the figure gains a second panel holding the
+    answer-quality-controlled estimates on a shared y-axis, so the sweet spot can be read
+    against its most aggressive robustness check without turning to the appendix.
     Otherwise plot the parametric curve from Model B (speed interaction).
     """
     if df_rt_bins is not None and not df_rt_bins.empty and "treat_hr" in df_rt_bins.columns:
-        _plot_interaction_effect_bins(df_rt_bins)
+        _plot_interaction_effect_bins(df_rt_bins, df_rt_bins_quality)
         return
     # Fallback: parametric curve from Model B
     if df_speed_all is not None and not df_speed_all.empty and "speed_coef" in df_speed_all.columns:
@@ -1426,8 +1431,8 @@ def generate_interaction_effect_figure(
     print(f"✓ Saved interaction_effect.[eps/png/pdf]")
 
 
-def _plot_interaction_effect_bins(df: pd.DataFrame):
-    """Connected dots and line for treatment effect (HR) by response time bin."""
+def _resolve_bin_cols(df):
+    """Pick the HR/CI/p column family to plot, honouring HEADLINE_ESTIMAND."""
     # ISS-24 re-headline: match the re-headlined response-time-bins TABLE. Under
     # HEADLINE_ESTIMAND=="arrival" plot the per-bin answer-arrival increment (beta_4) as the
     # primary series; under "summed" plot the summed DiD per bin. Both per-bin gradients are
@@ -1435,61 +1440,118 @@ def _plot_interaction_effect_bins(df: pd.DataFrame):
     have_did = "did_hr" in df.columns and df["did_hr"].notna().any()
     have_arrival = "treat_hr" in df.columns and df["treat_hr"].notna().any()
     if HEADLINE_ESTIMAND == "arrival" and have_arrival:
-        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
-    elif have_did:
-        hr_col, lo_col, hi_col, p_col = ("did_hr", "did_ci_lo", "did_ci_hi", "did_p")
-    else:
-        hr_col, lo_col, hi_col, p_col = ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+        return ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+    if have_did:
+        return ("did_hr", "did_ci_lo", "did_ci_hi", "did_p")
+    return ("treat_hr", "treat_ci_lo", "treat_ci_hi", "treat_p")
+
+
+def _order_rt_bins(df: pd.DataFrame) -> pd.DataFrame:
+    order = {label: i for i, label in enumerate(RT_BIN_LABELS)}
+    out = df.copy()
+    out["_bin_order"] = out["bucket"].map(order).fillna(999)
+    return out.sort_values("_bin_order").drop(columns="_bin_order")
+
+
+def _draw_rt_bin_panel(ax, df: pd.DataFrame, color: str, title: str,
+                       show_ylabel: bool = True, show_xlabel: bool = True):
+    """Draw one response-time-bin panel of connected HR dots with 95% CIs."""
+    hr_col, lo_col, hi_col, p_col = _resolve_bin_cols(df)
     labels = df["bucket"].tolist()
     hrs = df[hr_col].values
     ci_lo = df[lo_col].values
     ci_hi = df[hi_col].values
-    err_lo = hrs - ci_lo
-    err_hi = ci_hi - hrs
 
-    fig, ax = plt.subplots(figsize=(8, 5))
-    fig.patch.set_facecolor("white")
-    ax.set_facecolor("#fafafa")
     x = np.arange(len(df))
+    ax.set_facecolor("#fafafa")
     ax.errorbar(
         x, hrs,
-        yerr=[err_lo, err_hi],
+        yerr=[hrs - ci_lo, ci_hi - hrs],
         fmt="o-",
-        color="#2563eb",
+        color=color,
         linewidth=2,
-        markersize=9,
-        capsize=5,
+        markersize=8,
+        capsize=4,
         capthick=1.2,
         ecolor="#2d2d2d",
-        elinewidth=1.5,
+        elinewidth=1.4,
         markeredgecolor="white",
         markeredgewidth=1.0,
     )
     ax.axhspan(0.98, 1.02, color="gray", alpha=0.12, zorder=0)
     ax.axhline(y=1.0, color="#555555", linestyle="--", linewidth=1.2, label="No effect (HR = 1)", zorder=1)
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, fontsize=9, rotation=25, ha="right")
-    ax.set_xlabel("Response time (question to answer)", fontsize=11)
-    ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
-    ax.set_title("Treatment effect (hazard ratio) by response time bin, pooled across tenure", fontsize=12, fontweight="bold", pad=10)
-    y_min = min(0.92, ci_lo.min() - 0.02)
-    y_max = max(1.2, ci_hi.max() + 0.06)
-    ax.set_ylim(y_min, y_max)
+    ax.set_xticklabels(labels, fontsize=8.5, rotation=30, ha="right")
+    if show_xlabel:
+        ax.set_xlabel("Response time (question to answer)", fontsize=10.5)
+    if show_ylabel:
+        ax.set_ylabel("Hazard ratio (receiving answer → helping)", fontsize=10.5)
+    ax.set_title(title, fontsize=11, fontweight="bold", pad=8)
     ax.yaxis.grid(True, linestyle="-", linewidth=0.6, alpha=0.4, color="gray")
     ax.set_axisbelow(True)
-    ax.legend(fontsize=9, loc="upper right", framealpha=0.95)
+    ax.legend(fontsize=8.5, loc="upper right", framealpha=0.95)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.tick_params(axis="both", labelsize=9)
     for i, (_, r) in enumerate(df.iterrows()):
         stars = _sig_stars(r[p_col]).replace("\\textdagger", "†")
         if stars:
-            ax.text(i, ci_hi[i] + 0.015, stars, ha="center", va="bottom", fontsize=10, fontweight="bold", color="#1a1a1a")
+            ax.text(i, ci_hi[i] + 0.008, stars, ha="center", va="bottom",
+                    fontsize=9.5, fontweight="bold", color="#1a1a1a")
+    return ci_lo.min(), ci_hi.max()
+
+
+def _plot_interaction_effect_bins(df: pd.DataFrame, df_qual: pd.DataFrame = None):
+    """
+    Connected dots and line for treatment effect (HR) by response time bin.
+
+    With df_qual supplied the figure is two stacked panels sharing both axes: the
+    baseline per-bin arrival increment on top, the same fits with the three
+    answer-quality controls below. The shared y-scale is deliberate - it is what makes
+    the shrinkage of the 30-60 minute peak, and the sub-one fastest bins that mark the
+    adjustment as over-aggressive, legible at a glance rather than table-only. Stacking
+    rather than juxtaposing keeps the bins vertically aligned, so a single response-time
+    bin can be read across both specifications, and it leaves each panel the full
+    text width of the manuscript rather than half of it.
+    """
+    df = _order_rt_bins(df)
+    two_panel = (
+        df_qual is not None
+        and not df_qual.empty
+        and "treat_hr" in df_qual.columns
+        and df_qual["treat_hr"].notna().any()
+    )
+    if two_panel:
+        df_qual = _order_rt_bins(df_qual)
+        fig, axes = plt.subplots(2, 1, figsize=(9, 8.2), sharex=True, sharey=True)
+        fig.patch.set_facecolor("white")
+        lo_a, hi_a = _draw_rt_bin_panel(
+            axes[0], df, "#2563eb", "(a) Baseline",
+            show_ylabel=False, show_xlabel=False,
+        )
+        lo_b, hi_b = _draw_rt_bin_panel(
+            axes[1], df_qual, "#c2410c", "(b) With answer-quality controls",
+            show_ylabel=False, show_xlabel=True,
+        )
+        lo, hi = min(lo_a, lo_b), max(hi_a, hi_b)
+        axes[0].set_ylim(min(0.92, lo - 0.02), max(1.2, hi + 0.05))
+        fig.supylabel("Hazard ratio (receiving answer → helping)", fontsize=11)
+    else:
+        fig, ax = plt.subplots(figsize=(8, 5))
+        fig.patch.set_facecolor("white")
+        lo, hi = _draw_rt_bin_panel(
+            ax, df, "#2563eb",
+            "Treatment effect (hazard ratio) by response time bin, pooled across tenure",
+            show_ylabel=True,
+        )
+        ax.set_ylim(min(0.92, lo - 0.02), max(1.2, hi + 0.06))
+
     plt.tight_layout()
     for ext in ["eps", "png", "pdf"]:
         fig.savefig(os.path.join(FIGURE_DIR, f"interaction_effect.{ext}"), dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
-    print(f"✓ Saved interaction_effect.[eps/png/pdf]")
+    panels = "2-panel (baseline + quality)" if two_panel else "1-panel (baseline)"
+    print(f"✓ Saved interaction_effect.[eps/png/pdf] - {panels}")
 
 
 # =====================================================================
@@ -1676,7 +1738,7 @@ def main():
     if not df_speed.empty:
         generate_speed_figure(df_speed)
 
-    generate_interaction_effect_figure(df_rt_bins, df_speed_all)
+    generate_interaction_effect_figure(df_rt_bins, df_speed_all, df_rt_bins_quality)
 
     print("\n=== All outputs generated ===")
     print(f"Tables: {TABLE_DIR}/")
