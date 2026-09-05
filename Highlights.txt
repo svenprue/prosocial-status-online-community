@@ -2,3 +2,4 @@ Newcomers help most after being helped; the response fades to nothing with tenur
 Users whose Stack Overflow questions were answered helped others modestly more often
 Matched difference-in-differences on 21M questions addresses reciprocity confounding
 Generalized reciprocity helps with contributor recruitment at the point of entry
+Pre-generative-AI baseline: the newcomer response fades after ChatGPT

@@ -2,7 +2,7 @@
 \section{Introduction}
 %======================================================================
 
-Whether people who receive help on an online platform go on to help others has been a persistent question in the study of online communities. Generalized reciprocity, the tendency to help others after being helped oneself \citep{nowak_upstream_2007, baker_paying_2014}, is among the mechanisms proposed to sustain cooperation on platforms like Stack Overflow and Wikipedia, where the same two people rarely trade help directly. If people who receive help reliably go on to give it, cooperation may sustain itself through cascading helping acts, even among strangers \citep{fowler_cooperative_2010}. The behavioral evidence, however, is inconsistent: some observational studies find substantial reciprocity effects \citep{baker_paying_2014, chen_why_2019}, while others find weak or null relationships \citep{wasko_why_2005, joyce_predicting_2006}. We argue that much of this inconsistency is methodological. Our contribution is a cleaner short-run test on one platform: whether users help more after someone answers their own question. While data do not directly measure the psychological mechanisms that theory proposes (gratitude, moral obligation, social expectation, incentive displacement), we uniquely test the behavioral consequence those mechanisms predict.
+Whether people who receive help on an online platform go on to help others has been a persistent question in the study of online communities. Generalized reciprocity, the tendency to help others after being helped oneself \citep{nowak_upstream_2007, baker_paying_2014}, is among the mechanisms proposed to sustain cooperation on platforms like Stack Overflow and Wikipedia, where the same two people rarely trade help directly. If people who receive help reliably go on to give it, cooperation may sustain itself through cascading helping acts, even among strangers \citep{fowler_cooperative_2010}. The behavioral evidence, however, is inconsistent: some observational studies find substantial reciprocity effects \citep{baker_paying_2014, chen_why_2019}, while others find weak or null relationships \citep{wasko_why_2005, joyce_predicting_2006}. We argue that much of this inconsistency is methodological. Our contribution is a cleaner short-run test on one platform: whether users help more after someone answers their own question. We do not ask whether generalized reciprocity sustains cooperation in general. We ask where, for whom, and under what timing it moves behavior at all, and we build the design around that narrower question. Our data do not directly measure the psychological mechanisms that theory proposes, namely gratitude, moral obligation, social expectation, and incentive displacement. What we test is the behavioral consequence those mechanisms predict.
 
 Researchers who study reciprocity on platforms face a persistent confound: more active users are generally more likely to post questions or answers. Studies that correlate help received with help given over an aggregate period of time, without accounting for how active a user already was, conflate reciprocity with general engagement \citep{baker_paying_2014, chen_engaging_2018, joyce_predicting_2006}. Prior designs have also largely treated receiving help as a one-time event, even though people ask for and give help continuously.
 
@@ -12,7 +12,9 @@ We develop two theoretical predictions alongside the basic reciprocity hypothesi
 
 The results support the baseline reciprocity hypothesis (H1) in a modest form, and offer support for the tenure gradient (H2) and the immediacy pattern (H3). Compared with their matched controls and with their own pre-question baseline, users who receive an answer go on to answer other people's questions more often: the pooled increment at answer arrival is HR\,$=$\,1.049 (95\% CI [1.044, 1.054], $p<.001$). How strongly users respond depends on how long they have been on the platform: newcomers respond most (HR\,$=$\,1.07 in the first week, $p < .001$), and the longest-tenured users do not respond measurably at all. Throughout, we estimate the increment at answer arrival --- the difference-in-differences contrast that removes any treated--control divergence arising before the answer. We report the waiting-period term separately, as a parallel-trends check rather than part of the effect, and we re-estimate the model under broader outcome definitions that add lower-cost contributions, namely comments and edits (Table~\ref{tab:outcome_decomposition}).
 
-Our study makes three contributions. First, using a design built to remove the activity confound that inflates observational estimates, we provide a cleaner short-run test: users who receive an answer help more afterward (HR\,$=$\,1.05), but by much less than prior observational studies report. Second, reciprocity is strongest among newcomers and veterans show none --- the tenure gradient is the most robust and informative pattern in the data. Third, we uncover an inverted U-shaped relationship where moderate response time leads to the biggest effect. We discuss implications for platform designers and future platform research in the age of GenAI. 
+Our study makes three contributions. First, using a design built to remove the activity confound that inflates observational estimates, we provide a cleaner short-run test: users who receive an answer help more afterward (HR\,$=$\,1.05), but by much less than prior observational studies report. Second, reciprocity is strongest among newcomers and veterans show none. The tenure gradient is the most robust and informative pattern in the data. Third, we find an inverted U-shaped relationship in which a moderate response time carries the largest effect. Of the three, this last pattern is the most fragile, and we report it alongside the robustness check that most reduces it.
+
+Two boundaries follow from the design, and we put them in the frame rather than in a closing caveat. The first is that the effect we identify is narrow. It is concentrated among users in their first week, it peaks for answers arriving between 30 and 60 minutes, and it is small in absolute terms even where it is strongest. The second is that the estimates are dated. Calendar year is an exact-matching stratum, so the pre-2020 period supplies most of the analysis, and the newcomer response does not survive a split at the release of ChatGPT. We therefore read our results as a pre-generative-AI baseline for one platform rather than as a general test of whether reciprocity sustains cooperation. Reading them that way is also what makes the design worth re-running as newer data accumulate, and we discuss implications for platform designers and for future platform research in the age of generative AI. 
 
 %======================================================================
 \section{Theory}
@@ -203,6 +205,92 @@ Within each timeline, we track all instances in which the user provides an answe
 
 We used the full sample of non-deleted questions from Stack Overflow's inception on 31 July 2008 through 1 April 2025. We addressed two edge cases that would render our fixed-length observation window invalid. First, for early platform questions, the pre-period could predate the platform's launch, meaning no answers were possible at that time. We removed 1,080 such cases. Second, due to the data dump's 1 April 2025 cutoff, the post-period could be prematurely truncated. We excluded 8,029 cases affected by this. We then excluded 2,671,121 questions that received an answer from the question poster. These filtering steps resulted in a pre-matching dataset of 21,033,429 questions from 4,764,048 unique users, of which 16,034,099 (76.2\%) received at least one answer from another user (treatment-eligible) and 4,999,330 (23.8\%) received no answer (control-eligible). Matching (described below) is nearest-neighbor with replacement within exact strata and requires complete matching covariates, so 12,290,847 answered and 3,345,139 unanswered questions (15,635,986 in total) were eligible. Of the 12,290,847 eligible treated questions, 12,174,880 (99.1\%) were matched to a control; the remaining 115,967 fell outside common support, and a further 3,743,252 answered questions lacked a valid matching stratum or complete covariates. This attrition is not random: the treated propensity-score density piles up near one (Figure~\ref{fig:common_support}), so the discarded questions are disproportionately those that were almost certain to be answered. The 12,174,880 matched treated questions draw on 2,481,556 distinct control questions, each reused about 4.9 times on average (up to 625 times) to fill the control slots. The matched file therefore comprises 24,349,760 question-level rows (12,174,880 matched pairs) from 3,732,706 unique users, with a 50\% treatment rate by construction. All matched rows enter the Cox analysis; the helping outcome is the posting of an answer to another user's question (answers to one's own question do not count), yielding 3,435,973 helping events in the pooled analysis sample (Table~\ref{tab:pooled_experienced}).
 
+Figure~\ref{fig:sample_flow} traces these steps from the public dump to the matched analysis sample.
+
+\begin{figure}[H]
+\caption{Sample Construction: From the Public Dump to the Matched Analysis Sample}
+\label{fig:sample_flow}
+\centering
+\begin{tikzpicture}[
+  font=\footnotesize,
+  >=stealth,
+  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, fill=blue!6},
+  arm/.style={box, text width=0.42\textwidth},
+  wide/.style={box, text width=0.90\textwidth},
+  drop/.style={draw, rounded corners=2pt, align=left, inner sep=4pt,
+               fill=gray!8, text width=0.42\textwidth, font=\scriptsize},
+  flow/.style={->, thick, gray!70!black},
+  side/.style={->, thick, gray, dashed},
+]
+
+\node[wide] (src) {Non-deleted Stack Overflow questions, 31 July 2008 -- 1 April 2025};
+
+% The exclusion box hangs off a coordinate on the arrow, not off the source box's
+% corner, so its width is measured from the page centre and stays inside the text block.
+\coordinate (b1) at ($(src.south)+(0,-13mm)$);
+\node[drop, anchor=west] (excl) at ($(b1)+(6mm,0)$)
+  {\textbf{Excluded from the window design}\\
+   1,080 pre-period predates the launch\\
+   8,029 post-period truncated by the cutoff\\
+   2,671,121 self-answered questions};
+
+\node[wide, below=24mm of src] (pre)
+  {\textbf{Pre-matching sample}\\
+   21,033,429 questions from 4,764,048 users};
+
+\node[arm, below=11mm of pre.south west, anchor=north west] (tarm)
+  {\textbf{Answered by another user}\\
+   16,034,099 questions (76.2\%)\\
+   \textit{treatment-eligible}};
+\node[arm, below=11mm of pre.south east, anchor=north east] (carm)
+  {\textbf{No qualifying answer}\\
+   4,999,330 questions (23.8\%)\\
+   \textit{control-eligible}};
+
+\node[arm, below=9mm of tarm] (telig)
+  {\textbf{Eligible for matching:} 12,290,847\\[1pt]
+   {\scriptsize $-$\,3,743,252 with no valid exact stratum\\
+   or incomplete matching covariates}};
+\node[arm, below=9mm of carm] (celig)
+  {\textbf{Eligible for matching:} 3,345,139\\[1pt]
+   {\scriptsize $-$\,1,654,191 with no valid exact stratum\\
+   or incomplete matching covariates}};
+
+\node[arm, below=9mm of telig] (tmatch)
+  {\textbf{Matched:} 12,174,880 treated (99.1\%)\\[1pt]
+   {\scriptsize $-$\,115,967 outside common support}};
+\node[arm, below=9mm of celig] (cmatch)
+  {\textbf{Serving as matched controls:} 2,481,556\\[1pt]
+   {\scriptsize $-$\,863,583 never selected within the caliper}};
+
+\node[wide, below=11mm of $(tmatch.south)!0.5!(cmatch.south)$] (matched)
+  {\textbf{Matched sample: 12,174,880 pairs}\\
+   24,349,760 question-level rows from 3,732,706 users, 50\% treated by construction;\\
+   each control question is reused 4.9 times on average, and up to 625 times};
+
+\node[wide, below=8mm of matched] (cox)
+  {\textbf{Cox analysis sample}\\
+   3,435,973 helping events across all matched rows};
+
+\draw[flow] (src.south) -- (pre.north);
+\draw[side] (b1) -- (excl.west);
+\draw[flow] (pre.south) -- ++(0,-5mm) -| (tarm.north);
+\draw[flow] (pre.south) -- ++(0,-5mm) -| (carm.north);
+\draw[flow] (tarm) -- (telig);
+\draw[flow] (carm) -- (celig);
+\draw[flow] (telig) -- (tmatch);
+\draw[flow] (celig) -- (cmatch);
+\coordinate (join) at ($(matched.north)+(0,6mm)$);
+\draw[thick, gray!70!black] (tmatch.south) |- (join);
+\draw[thick, gray!70!black] (cmatch.south) |- (join);
+\draw[flow] (join) -- (matched.north);
+\draw[flow] (matched) -- (cox);
+\end{tikzpicture}
+
+\vspace{0.3em}
+\parbox{\textwidth}{\footnotesize\textit{Note.} Counts follow the filtering described in this section, and grey text records what each step removes. Matching is nearest-neighbor with replacement within exact strata of calendar year, primary tag, and number of tags, which is why 12,174,880 matched treated questions draw on only 2,481,556 distinct control questions. \ref{sec:estimand_scope} discusses what the off-support discarding implies for the scope of the estimand; \ref{sec:estimation_samples} reconciles the sample sizes reported across the Cox tables.}
+\end{figure}
+
 %----------------------------------------------------------------------
 \subsection{Variables}
 %----------------------------------------------------------------------
@@ -300,7 +388,7 @@ ownerReputation & Asker's reputation score at posting, capturing standing and ex
 \end{itemize}
 \fi
 
-Table~\ref{tab:balance} displays the covariate balance before and after matching. Before matching, several covariates showed a meaningful imbalance between the treated and control groups. For instance, treated users had asked more questions in the prior 30 days (SMD\,=\,0.197) and 7 days (SMD\,=\,0.174), reflecting that users who ask questions that attract answers tend to be more recently active. They also posted longer questions and had higher reputation (body length SMD\,=\,$-$0.183; owner reputation SMD\,=\,0.115). The largest imbalance was in the tag-level accepted-answer rate (SMD\,=\,0.695), confirming that question topic characteristics strongly predict answer receipt and underscoring the importance of matching on this variable. The propensity model addresses observable selection directly by including posting hour and day, question and title length, and owner reputation (Table~\ref{tab:covariates}). After matching, all standardized mean differences fell well below the conventional threshold of 0.1, with the largest residual imbalance below 0.05 (see Table~\ref{tab:balance}). This confirms adequate balance across all matching covariates; the full set is illustrated in the Love plot in Appendix~\ref{sec:balance_plot}.
+Table~\ref{tab:balance} displays the covariate balance before and after matching. Before matching, several covariates showed a meaningful imbalance between the treated and control groups. For instance, treated users had asked more questions in the prior 30 days (SMD\,=\,0.197) and 7 days (SMD\,=\,0.174), reflecting that users who ask questions that attract answers tend to be more recently active. They also posted longer questions and had higher reputation (body length SMD\,=\,$-$0.183; owner reputation SMD\,=\,0.115). The largest imbalance was in the tag-level accepted-answer rate (SMD\,=\,0.695), confirming that question topic characteristics strongly predict answer receipt and underscoring the importance of matching on this variable. The propensity model addresses observable selection directly by including posting hour and day, question and title length, and owner reputation (Table~\ref{tab:covariates}). After matching, all standardized mean differences fell well below the conventional threshold of 0.1, with the largest residual imbalance below 0.05 (see Table~\ref{tab:balance}). This confirms adequate balance across all matching covariates; the full set is illustrated in the Love plot in \ref{sec:balance_plot}.
 
 \begin{table}
 \caption{Covariate Balance Before and After Matching}
@@ -381,16 +469,29 @@ We analyze 24,349,760 question-level observations from 3,732,706 users on Stack 
 
 %----------------------------------------------------------------------
 \subsection{Descriptive Evidence: Help Rates and the Parallel Trends Assumption}
+\label{sec:descriptive_evidence}
 %----------------------------------------------------------------------
 
-\begin{figure}[h]
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}{0.72\textwidth}
 \centering
 \includegraphics[width=\textwidth]{analysis/output_figures/help_rate_pooled.pdf}
-\caption{Help rate over a fixed $\pm$2-day window centered on question posting, pooled across all tenure buckets. For legibility this descriptive figure uses a symmetric question-centered axis ($T_Q - 2\text{D}$ to $T_Q + 2\text{D}$); it is not the answer-anchored analysis window of Figure~\ref{fig:study_design}, which closes two days after the answer ($T_A + 2\text{D}$) and is the window used in the Cox models. The normalized help rate (relative to each group's pre-question baseline) is plotted for treated users (red, who received an answer) and matched control users (blue, who did not). The dashed vertical line marks the question time ($T_Q$) and the dotted line the median answer arrival; error bars indicate 95\% confidence intervals.}
+\caption{Treated versus matched control users, over a fixed $\pm$2-day window centered on the question. Red: treated (received an answer). Blue: matched control (did not). Rates are normalized to each group's pre-question baseline; the dashed line marks the question time ($T_Q$), the dotted line the median answer arrival, and error bars indicate 95\% confidence intervals.}
+\end{subfigure}
+
+\vspace{0.8em}
+
+\begin{subfigure}{0.72\textwidth}
+\centering
+\includegraphics[width=\textwidth]{analysis/output_figures/help_rate_adoption_pooled.pdf}
+\caption{Treated users in the post-question window, split by answer-receipt status. Grey dashed: matched controls, who received no answer. Blue: treated users not yet answered. Red: treated users already answered. Green dashed (right axis): cumulative share of treated users answered by each hour.}
+\end{subfigure}
+\caption{Raw help rates over the observation window, pooled across all tenure buckets. The two panels answer different questions and are read in different sections: panel~(a) bears on the parallel-trends logic of the design (Section~\ref{sec:descriptive_evidence}), panel~(b) on the re-engagement reading of the response-time pattern (Section~\ref{sec:rt_moderation}). For legibility panel~(a) uses a symmetric question-centered axis ($T_Q \pm 2\text{D}$) rather than the answer-anchored analysis window of Figure~\ref{fig:study_design}, which closes two days after the answer ($T_A + 2\text{D}$) and is the window used in the Cox models. \ref{sec:help_rate_by_tenure} reproduces both panels by tenure bucket.}
 \label{fig:help_rate_pooled}
 \end{figure}
 
-Figure~\ref{fig:help_rate_pooled} plots the normalized help rate for treated and control users over the two days before and after question posting. Before the question ($t < T_Q$), treated and control help rates track each other closely, consistent with the parallel-trends assumption and with the effectiveness of propensity score matching. At the moment of posting, both groups' help rates spike sharply: users who have just asked a question are, mechanically, online and active. The spike is more pronounced for controls, who continue waiting for an answer, than for treated users, whose questions are typically answered within the hour. Beyond this mechanical spike, the treated--control differences implied by our estimates (a few percent of the helping hazard) are too small to be visible in raw normalized rates. We return to the control group's larger at-question spike when discussing the response-time pattern.
+Panel~(a) of Figure~\ref{fig:help_rate_pooled} plots the normalized help rate for treated and control users over the two days before and after question posting. Before the question ($t < T_Q$), treated and control help rates track each other closely, consistent with the parallel-trends assumption and with the effectiveness of propensity score matching. At the moment of posting, both groups' help rates spike sharply: users who have just asked a question are, mechanically, online and active. The spike is more pronounced for controls, who continue waiting for an answer, than for treated users, whose questions are typically answered within the hour. Beyond this mechanical spike, the treated--control differences implied by our estimates (a few percent of the helping hazard) are too small to be visible in raw normalized rates. We return to the control group's larger at-question spike when discussing the response-time pattern.
 
 %----------------------------------------------------------------------
 \subsection{Generalized Reciprocity Effect (H1)}
@@ -435,7 +536,7 @@ Stack Overflow was substantially disrupted by the arrival of generative-AI tools
 \label{sec:rt_moderation}
 %----------------------------------------------------------------------
 
-To test Hypothesis~3, which predicted that faster responses strengthen the reciprocity effect, we estimate the arrival increment and its response-time moderation separately by tenure bucket (Table~\ref{tab:speed_results}); Table~\ref{tab:response_time_bins} and Figure~\ref{fig:interaction_effect} give a more flexible discrete-bin view. The evidence supports the immediacy prediction. The continuous log-response-time interaction with the arrival increment ($\gamma$) is negative in every tenure bucket and statistically significant in all but the most senior: users who waited less for their answer responded more strongly, the direction H3 predicts. The moderation is strongest early in the trajectory (about $-0.07$ to $-0.09$ from the newcomer through one-year buckets), weakens with tenure ($-0.05$ at one to three years, $-0.02$ at three to six), and is indistinguishable from zero among users with more than six years. The discrete bins tell a consistent, if noisier, story. Users who receive help within 30 minutes barely respond at all, while those who receive help between 30 and 60 minutes respond the strongest (1.19\,[1.17, 1.21]). It declines toward one over the following day (1.06 at one to two hours, 1.02--1.05 through one day), with a smaller secondary elevation at one to three days (1.09\,[1.07, 1.11]). The pronounced early peak shows a sweet-spot pattern rather than a monotone speed gradient; we return to explanations for the sweet-spot pattern below.
+To test Hypothesis~3, which predicted that faster responses strengthen the reciprocity effect, we estimate the arrival increment and its response-time moderation separately by tenure bucket (Table~\ref{tab:speed_results}); Table~\ref{tab:response_time_bins} and Figure~\ref{fig:interaction_effect} give a more flexible discrete-bin view, and the figure sets each baseline bin beside its answer-quality-controlled counterpart. The evidence supports the immediacy prediction. The continuous log-response-time interaction with the arrival increment ($\gamma$) is negative in every tenure bucket and statistically significant in all but the most senior: users who waited less for their answer responded more strongly, the direction H3 predicts. The moderation is strongest early in the trajectory (about $-0.07$ to $-0.09$ from the newcomer through one-year buckets), weakens with tenure ($-0.05$ at one to three years, $-0.02$ at three to six), and is indistinguishable from zero among users with more than six years. The discrete bins tell a consistent, if noisier, story. Users who receive help within 30 minutes barely respond at all, while those who receive help between 30 and 60 minutes respond the strongest (1.19\,[1.17, 1.21]). It declines toward one over the following day (1.06 at one to two hours, 1.02--1.05 through one day), with a smaller secondary elevation at one to three days (1.09\,[1.07, 1.11]). The pronounced early peak shows a sweet-spot pattern rather than a monotone speed gradient; we return to explanations for the sweet-spot pattern below.
 
 The waiting-period gap carries a response-time moderation of its own ($\delta$), positive in every bucket --- the counterpart of the $\beta_2$ diagnostic, capturing how the \emph{pre-answer} treated--control gap varies with answer speed. Because no answer has arrived yet, we read it as anticipation or selection, not as a response to answer speed. It is separate from $\gamma$, the moderation of the arrival increment: the difference-in-differences nets the pre-answer gap out of the increment, so the moderation we report ($\gamma$) reflects the change at answer arrival, not treated users' pre-answer trajectories.
 
@@ -447,38 +548,24 @@ A natural concern is that response time reflects unobserved answer quality. Peop
 
 
 
-\begin{figure}[h]
+\begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{analysis/output_figures/interaction_effect.pdf}
-\caption{Treatment effect by response-time bin, pooled across all tenure buckets. Each point represents the arrival-increment hazard ratio ($\beta_4$) estimated within that response-time bin, relative to the matched control. Error bars indicate 95\% confidence intervals; the dashed line marks no effect (HR\,$=$\,1). Estimates correspond to Table~\ref{tab:response_time_bins}.}
+\includegraphics[width=0.92\textwidth]{analysis/output_figures/interaction_effect.pdf}
+\caption{Treatment effect by response-time bin, pooled across all tenure buckets. Each point is the arrival-increment hazard ratio ($\beta_4$) estimated within that response-time bin, relative to the matched control; error bars indicate 95\% confidence intervals and the dashed line marks no effect (HR\,$=$\,1). Panel~(a) gives the baseline fits of Table~\ref{tab:response_time_bins}. Panel~(b) refits every bin with three answer-quality controls, namely acceptance, first-answer score, and answer length, reported in full in Appendix Table~\ref{tab:response_time_bins_quality}. Because the panels share both axes, the adjustment can be read off bin by bin: the 30--60-minute peak shrinks from 1.19 to 1.03 while remaining the early-window maximum, the one-to-three-day elevation is untouched, and the two fastest bins fall below one. Section~\ref{sec:rt_moderation} reads those sub-one estimates as a sign that the adjustment is over-aggressive rather than that the effect is absent, since acceptance and vote score are post-treatment.}
 \label{fig:interaction_effect}
 \end{figure}
 
 \input{analysis/output_tables/response_time_bins.tex}
 
-The first is the direct test for the response-time pattern: we re-estimate each response-time bin with the three answer-quality controls (Appendix Table~\ref{tab:response_time_bins_quality}). This adjustment is deliberately aggressive. Vote score and acceptance are post-treatment, and acceptance in particular requires the asker to return to the platform, so conditioning on them absorbs some of the effect itself, not only the quality confound. The clearest sign of this over-adjustment is that under the controls the fastest bins fall significantly \emph{below} one (0.95), which has no plausible causal reading. Even so, the 30--60-minute peak falls only from 1.19 to 1.03 (95\% CI [1.02, 1.04], $p<.001$) and remains the significant early-window maximum, and the one-to-three-day elevation persists (1.09). The sweet-spot pattern remains even after an adjustment likely biased against it.
+The first is the direct test for the response-time pattern: we re-estimate each response-time bin with the three answer-quality controls, which Figure~\ref{fig:interaction_effect} sets beside the baseline fits in panel~(b) and Appendix Table~\ref{tab:response_time_bins_quality} reports in full. This adjustment is deliberately aggressive. Vote score and acceptance are post-treatment, and acceptance in particular requires the asker to return to the platform, so conditioning on them absorbs some of the effect itself, not only the quality confound. The clearest sign of this over-adjustment is that under the controls the fastest bins fall significantly \emph{below} one (0.95), which has no plausible causal reading. Even so, the 30--60-minute peak falls only from 1.19 to 1.03 (95\% CI [1.02, 1.04], $p<.001$) and remains the significant early-window maximum, and the one-to-three-day elevation persists (1.09). The sweet-spot pattern remains even after an adjustment likely biased against it.
 
 The second check concerns the pooled \emph{level} of the arrival increment. Appendix Table~\ref{tab:answer_quality_robustness} reports how it shifts as the same controls enter one at a time. Answer length, which is the least endogenous signal and plausibly correlated with answer quality, barely moves it (from 1.04 to 1.03). The more endogenous vote-score and acceptance signals pull it further, to 1.01 and then below one (0.98); another sensitivity check, where we account for the heavy right tail of vote scores, accompanies these fits (Appendix Table~\ref{tab:score_coding_sensitivity}). As above, these level estimates are bounds, not estimates of the effect net of quality: conditioning on post-treatment signals likely takes away from the effect itself. The genuine residual caveat is that our quality measures are coarse, so we cannot cleanly separate the effects of timing and quality, and cannot rule out that answer quality, imperfectly measured, remains a rival to a timing-based reading of the response-time pattern.
 
 One interpretation of the sweet-spot pattern is \emph{re-engagement}: users who post a question may remain actively engaged while waiting during the ongoing session on the platform, elevating helping during the waiting period regardless of whether an answer arrives. On this account, a fast answer might lead users to end their session and, with it, their engagement without returning to the platform. If an answer arrives after they have ended their session, they might return to review it and reciprocate in the newly started session triggered by the answer. Later answers are more likely to re-engage the user in another session, which answers in the same initial session do not. 
 
-Figure~\ref{fig:help_rate_adoption_pooled} provides descriptive context, comparing users who have received an answer (red) with users who will receive one but are still waiting (blue), alongside matched controls. In the first half-hour after the question --- when only the fastest answers have arrived --- users still waiting help at the highest rate, consistent with the idea that users help while waiting on the platform. From roughly an hour onward, the ordering flips: users who have received an answer help at a modestly higher rate than those still waiting and than controls, consistent with a small post-answer elevation. We read this as descriptive evidence for the re-engagement mechanism. Figure~\ref{fig:help_rate_adoption_by_tenure} disaggregates this comparison by tenure bucket and shows the same qualitative pattern in every stratum. These raw-rate orderings are descriptive: the differences are small, and answer-arrival timing is not random within the treated group, so we do not read them as decisive evidence for any one mechanism. Still, they are consistent with the modest reciprocity effect and the re-engagement mechanism the models estimate.
+Panel~(b) of Figure~\ref{fig:help_rate_pooled} provides descriptive context, comparing users who have received an answer (red) with users who will receive one but are still waiting (blue), alongside matched controls. In the first half-hour after the question --- when only the fastest answers have arrived --- users still waiting help at the highest rate, consistent with the idea that users help while waiting on the platform. From roughly an hour onward, the ordering flips: users who have received an answer help at a modestly higher rate than those still waiting and than controls, consistent with a small post-answer elevation. We read this as descriptive evidence for the re-engagement mechanism. \ref{sec:help_rate_by_tenure} disaggregates the same comparison by tenure bucket and shows the same qualitative pattern in every stratum. These raw-rate orderings are descriptive: the differences are small, and answer-arrival timing is not random within the treated group, so we do not read them as decisive evidence for any one mechanism. Still, they are consistent with the modest reciprocity effect and the re-engagement mechanism the models estimate.
 
 Overall, however, re-engagement is speculative since we do not observe session boundaries (logins, logouts, inactivity gaps). We present it as one candidate among several, not as an established mechanism. We return to this question in Section~\ref{sec:rt_discussion}.
-
-\begin{figure}
-\centering
-\includegraphics[width=\textwidth]{analysis/output_figures/help_rate_adoption_pooled.pdf}
-\caption{Help rate in the post-question window by answer-receipt status, pooled across all tenure buckets. Grey dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (No answer yet). Red: treated users who have already received an answer (Answer received). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour.}
-\label{fig:help_rate_adoption_pooled}
-\end{figure}
-
-\begin{figure}
-\centering
-\includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{analysis/output_figures/help_rate_adoption_by_tenure.pdf}
-\caption{Help rate in the post-question window by answer-receipt status, separately by tenure bucket. Grey dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (No answer yet). Red: treated users who have already received an answer (Answer received). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour.}
-\label{fig:help_rate_adoption_by_tenure}
-\end{figure}
 
 %======================================================================
 \section{Discussion}
@@ -556,7 +643,9 @@ However, if any behavioral change (that caused the answer) affects help-giving o
 
 That brings us to what we cannot see. The design captures a behavior change but not the psychology behind it. Gratitude, moral obligation, social expectation, incentive displacement, and re-engagement are all \textit{proposed} interpretations, each consistent with part of the pattern and none identified by our data. If social expectation is the behavioral mechanism, users who feel more visible after being answered should be helping more. However, the change in visibility (and the feeling of being observed) is not obvious. Being answered lifts a question in activity-sorted feeds for a while, but it also takes the question out of the unanswered queue that potential answerers browse. Testing visibility as a mechanism needs a measure of how visible a question was at the time, which the dump does not provide. Beyond that, we observe no session boundaries, no reputation salience, and no emotional states. Which of gratitude, moral obligation, and social expectation actually moves users in a setting like this one is not a question our data can settle, and we leave it to psychologists with the instruments to measure it. Separating these pathways calls for behavioral records paired with measures taken while people are on the platform: experience sampling of emotional state, or direct measures of how users reason about obligation when they return to a thread.
 
-Finally, where the estimates apply. Stack Overflow is a large, relatively anonymous, gamified platform built around technical question-answering. The patterns we estimate may not transfer to smaller or relation-based communities (enterprise Slack channels, academic peer review, intimate hobby forums) where social ties and non-status motives differ. We therefore refrain from claiming that generalized reciprocity operates on platforms with different dynamics and mechanisms of social engagement; our estimates describe one platform's pre-/early-generative-AI era. Matching narrows the scope once more, to answered questions that have a comparable unanswered counterpart; Appendix~\ref{sec:estimand_scope} reports which questions this leaves out and why the restriction runs in a conservative direction.
+Finally, where the estimates apply. Stack Overflow is a large, relatively anonymous, gamified platform built around technical question-answering. The patterns we estimate may not transfer to smaller or relation-based communities such as enterprise Slack channels, academic peer review, or intimate hobby forums, where social ties and non-status motives differ. We therefore refrain from claiming that generalized reciprocity operates on platforms with different dynamics and mechanisms of social engagement. Our estimates describe one platform, and largely its pre-generative-AI era.
+
+Matching narrows the scope a second time, and in a way worth stating plainly. Our exact strata are calendar year, primary tag, and number of tags, so a treated question enters the estimate only if an unanswered question exists in the same stratum. Roughly half the unanswered pool has no on-support match, and the control questions that do survive are drawn disproportionately from more readily answered tags. What we estimate is therefore the effect for answered questions in mainstream, well-trafficked tag areas. It is not the effect for the long tail of niche or rarely answered topics, and whether reciprocity operates differently in that tail is a question this design cannot reach. The restriction does run in a conservative direction, since the retained controls are the more answerable ones and so set a higher comparison baseline. It is also not concentrated in the newcomer stratum that carries our central result, which is dropped at close to the arm-wide average rate. \ref{sec:estimand_scope} reports the counts.
 
 %----------------------------------------------------------------------
 \subsection{Generalized Reciprocity in the Generative-AI Era}

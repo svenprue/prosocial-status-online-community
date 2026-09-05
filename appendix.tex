@@ -49,8 +49,10 @@ Matching restricts the scope of the estimand rather than the set of users we obs
 
 The reported contrast is therefore the effect for answered questions that have an on-support unanswered counterpart. This is a generalizability restriction inherent to matching, and a conservative one: because the discarded questions are the less answerable ones, the more-answerable retained controls set a higher, not lower, comparison baseline. The discarding is also not concentrated in the newcomer stratum that carries our central result, where the $<$\,1 week bucket is dropped at close to its arm-wide average rate.
 
-\section{Help Rate Over the Observation Window by Tenure}
+\section{Help Rates Over the Observation Window by Tenure}
 \label{sec:help_rate_by_tenure}
+
+This appendix reproduces both panels of Figure~\ref{fig:help_rate_pooled} separately by tenure bucket. Figure~\ref{fig:help_rate_by_tenure} disaggregates the treated--control comparison of panel~(a), and Figure~\ref{fig:help_rate_adoption_by_tenure} the answer-receipt comparison of panel~(b).
 
 \begin{figure}[!htbp]
 \centering
@@ -60,6 +62,15 @@ The reported contrast is therefore the effect for answered questions that have a
 \end{figure}
 
 Figure~\ref{fig:help_rate_by_tenure} shows that treated and control help rates track each other closely before the question in every tenure bucket, supporting the parallel-trends logic within each stratum. The sharp spike at question time is common to both groups and is somewhat larger for controls; the small post-answer elevations estimated in Table~\ref{tab:main_results} and Figure~\ref{fig:strength_rec} (hazard ratios of a few percent) are below what these raw normalized rates can visually resolve.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{analysis/output_figures/help_rate_adoption_by_tenure.pdf}
+\caption{Help rate in the post-question window by answer-receipt status, separately by tenure bucket. Grey dashed: matched control users who received no answer. Blue: treated users who have not yet received an answer (No answer yet). Red: treated users who have already received an answer (Answer received). Green dashed (right axis): cumulative share of treated users who have received an answer by each hour. This is panel~(b) of Figure~\ref{fig:help_rate_pooled} disaggregated by tenure.}
+\label{fig:help_rate_adoption_by_tenure}
+\end{figure}
+
+Figure~\ref{fig:help_rate_adoption_by_tenure} shows the ordering discussed in Section~\ref{sec:rt_moderation} holding in every tenure stratum. Users still waiting for an answer help at the highest rate in the first half-hour after the question, and from roughly an hour onward users who have already received an answer help at a modestly higher rate than both those still waiting and the matched controls. As in the pooled panel, these are raw rates rather than estimates: the differences are small, and answer-arrival timing is not random within the treated group.
 
 \section{Estimation Sample Sizes}
 \label{sec:estimation_samples}

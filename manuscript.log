@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 19:07
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  5 SEP 2026 01:08
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -850,29 +850,33 @@ Overfull \hbox (8.35416pt too wide) in paragraph at lines 9--10
 ce-in-differences
  []
 
-[2] [3] [4] [5]
-Overfull \hbox (5.86253pt too wide) in paragraph at lines 65--66
+[2] [3] [4] [5] [6]
+Overfull \hbox (5.86253pt too wide) in paragraph at lines 67--68
 []\T1/cmr/m/sc/12 Hypothesis 2 (H2). \T1/cmr/m/it/12 The gen-er-al-ized reci-pr
 ocity ef-fect is strongest
  []
 
-[6] [7] [8] [9]
-Overfull \hbox (8.63004pt too wide) in paragraph at lines 192--193
+[7] [8] [9] [10]
+Overfull \hbox (8.63004pt too wide) in paragraph at lines 194--195
  [][] 
  []
 
-[10] [11] [12] [13] [14] [15]
-Overfull \hbox (1.74248pt too wide) in paragraph at lines 272--272
+[11] [12]
+Overfull \vbox (3.13902pt too high) has occurred while \output is active []
+
+
+[13] [14] [15] [16]
+Overfull \hbox (1.74248pt too wide) in paragraph at lines 360--360
 []|\T1/cmr/m/n/10.95 numQuestionsAsked30D| 
  []
 
 
-Overfull \hbox (3.88582pt too wide) in paragraph at lines 257--290
+Overfull \hbox (3.88582pt too wide) in paragraph at lines 345--378
  [][] 
  []
 
-[16] [17]
-Overfull \hbox (83.95067pt too wide) detected at line 346
+[17] [18]
+Overfull \hbox (83.95067pt too wide) detected at line 434
  []$[]  \OML/cmm/m/it/12 h\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t \OMS/cmsy/m/n/12 
 j \OT1/cmr/bx/n/12 X\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 )) = \OM
 L/cmm/m/it/12 h[]\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 ) [] []\OML
@@ -882,86 +886,69 @@ L/cmm/m/it/12 h[]\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 ) [] []\OML
 t/12 t\OT1/cmr/m/n/12 )$ 
  []
 
-[18] [19] (./analysis/output_tables/desc_stats.tex
+[19] [20] [21] (./analysis/output_tables/desc_stats.tex
 Overfull \hbox (44.16954pt too wide) in paragraph at lines 5--42
  [][] 
  []
 
-[20])
-<analysis/output_figures/help_rate_pooled.pdf, id=91, 570.48068pt x 317.6555pt>
+)
+<analysis/output_figures/help_rate_pooled.pdf, id=96, 570.48068pt x 317.6555pt>
 
 File: analysis/output_figures/help_rate_pooled.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_pooled.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_pooled.pdf  used on 
-input line 388.
-(pdftex.def)             Requested size: 390.0pt x 217.16132pt.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-[21] [22 <./analysis/output_figures/help_rate_pooled.pdf>]
-(./analysis/output_tables/regression_all.tex
+input line 479.
+(pdftex.def)             Requested size: 280.80048pt x 156.35538pt.
+<analysis/output_figures/help_rate_adoption_pooled.pdf, id=97, 569.44495pt x 31
+7.56894pt>
+File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type 
+pdf)
+<use analysis/output_figures/help_rate_adoption_pooled.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
+ used on input line 487.
+(pdftex.def)             Requested size: 280.80048pt x 156.59865pt.
+ [22] (./analysis/output_tables/regression_all.tex
 Overfull \hbox (21.44804pt too wide) in paragraph at lines 6--38
  [][] 
  []
 
-) [23] (./analysis/output_tables/composite_outcome.tex
+) [23] [24 <./analysis/output_figures/help_rate_pooled.pdf> <./analysis/output_
+figures/help_rate_adoption_pooled.pdf>]
+(./analysis/output_tables/composite_outcome.tex
 Overfull \hbox (54.69676pt too wide) in paragraph at lines 6--24
  [][] 
  []
 
-[24]) [25]
-<analysis/output_figures/strength_rec.pdf, id=172, 570.73976pt x 352.3608pt>
+[25]) [26]
+<analysis/output_figures/strength_rec.pdf, id=225, 570.73976pt x 352.3608pt>
 File: analysis/output_figures/strength_rec.pdf Graphic file (type pdf)
 <use analysis/output_figures/strength_rec.pdf>
 Package pdftex.def Info: analysis/output_figures/strength_rec.pdf  used on inpu
-t line 421.
+t line 522.
 (pdftex.def)             Requested size: 390.0pt x 240.77963pt.
 
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
-[26] [27 <./analysis/output_figures/strength_rec.pdf>]
-(./analysis/output_tables/main_results.tex) [28] [29
+[27] [28 <./analysis/output_figures/strength_rec.pdf>]
+(./analysis/output_tables/main_results.tex) [29] [30
 
 
 ]
-(./analysis/output_tables/speed_results.tex) [30]
-<analysis/output_figures/interaction_effect.pdf, id=268, 570.76549pt x 352.4701
+(./analysis/output_tables/speed_results.tex) [31]
+<analysis/output_figures/interaction_effect.pdf, id=322, 641.03491pt x 584.4459
 4pt>
 File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
 <use analysis/output_figures/interaction_effect.pdf>
 Package pdftex.def Info: analysis/output_figures/interaction_effect.pdf  used o
-n input line 452.
-(pdftex.def)             Requested size: 390.0pt x 240.8436pt.
+n input line 553.
+(pdftex.def)             Requested size: 358.79929pt x 327.11804pt.
 
-(./analysis/output_tables/response_time_bins.tex) [31
-
-
- <./analysis/output_figures/interaction_effect.pdf>] [32]
-<analysis/output_figures/help_rate_adoption_pooled.pdf, id=356, 569.44495pt x 3
-17.56894pt>
-File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type 
-pdf)
-<use analysis/output_figures/help_rate_adoption_pooled.pdf>
-Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
- used on input line 471.
-(pdftex.def)             Requested size: 390.0pt x 217.49463pt.
-<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=357, 714.02133pt 
-x 1030.28284pt>
-File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
-pe pdf)
-<use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
-Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
-df  used on input line 478.
-(pdftex.def)             Requested size: 342.11621pt x 493.64978pt.
+(./analysis/output_tables/response_time_bins.tex) [32
 
 
-LaTeX Warning: Float too large for page by 15.14978pt on input line 481.
-
-[33 <./analysis/output_figures/help_rate_adoption_pooled.pdf>] [34 <./analysis/
-output_figures/help_rate_adoption_by_tenure.pdf>]
-Overfull \hbox (3.78995pt too wide) in paragraph at lines 494--495
+] [33 <./analysis/output_figures/interaction_effect.pdf>] [34]
+Overfull \hbox (3.78995pt too wide) in paragraph at lines 581--582
 \T1/cmr/m/n/12 be-tween users whose ques-tions re-ceived an-swers and propensit
 y-score-matched
  []
@@ -971,45 +958,58 @@ Overfull \hbox (16.82251pt too wide) in paragraph at lines 6--26
  [][] 
  []
 
-) [37] [38] [39] [40]) [41]
+) [37] [38] [39] [40] [41]) [42]
 Overfull \hbox (3.2596pt too wide) in paragraph at lines 38--39
 []\T1/cmr/m/n/12 Stack Over-flow pub-lic data dumps were ob-tained from the In-
 ter-net Archive
  []
 
-[42] (./manuscript.bbl [43] [44] [45]) (./appendix.tex
-<matching/common_support.pdf, id=523, 722.7pt x 361.35pt>
+(./manuscript.bbl [43] [44] [45]) (./appendix.tex
+<matching/common_support.pdf, id=450, 722.7pt x 361.35pt>
 File: matching/common_support.pdf Graphic file (type pdf)
 <use matching/common_support.pdf>
 Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
 (pdftex.def)             Requested size: 390.0pt x 194.99928pt.
-<matching/love_plot.pdf, id=524, 578.16pt x 433.62pt>
+ [46]
+<matching/love_plot.pdf, id=454, 578.16pt x 433.62pt>
 File: matching/love_plot.pdf Graphic file (type pdf)
 <use matching/love_plot.pdf>
 Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
 (pdftex.def)             Requested size: 390.0pt x 292.4956pt.
- [46]
-<analysis/output_figures/help_rate_by_tenure.pdf, id=528, 715.00879pt x 859.680
+ [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>]
+<analysis/output_figures/help_rate_by_tenure.pdf, id=559, 715.00879pt x 859.680
 51pt>
 File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
 <use analysis/output_figures/help_rate_by_tenure.pdf>
 Package pdftex.def Info: analysis/output_figures/help_rate_by_tenure.pdf  used 
-on input line 57.
+on input line 59.
 (pdftex.def)             Requested size: 390.0pt x 468.90356pt.
- [47 <./matching/common_support.pdf>] [48 <./matching/love_plot.pdf>] [49 <./an
-alysis/output_figures/help_rate_by_tenure.pdf>] (./analysis/output_tables/estim
-ation_samples.tex
+<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=560, 714.02133pt 
+x 1030.28284pt>
+File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
+pe pdf)
+<use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
+df  used on input line 68.
+(pdftex.def)             Requested size: 342.11621pt x 493.64978pt.
+
+
+LaTeX Warning: Float too large for page by 27.14978pt on input line 71.
+
+(./analysis/output_tables/estimation_samples.tex
 Overfull \hbox (41.04698pt too wide) in paragraph at lines 6--30
  [][] 
  []
 
-) [50] (./analysis/output_tables/pair_bootstrap.tex) [51]
+) [49] [50 <./analysis/output_figures/help_rate_by_tenure.pdf>] [51 <./analysis
+/output_figures/help_rate_adoption_by_tenure.pdf>]
+(./analysis/output_tables/pair_bootstrap.tex) [52]
 (./analysis/output_tables/cohort_robustness.tex
 Overfull \hbox (74.82579pt too wide) in paragraph at lines 6--24
  [][] 
  []
 
-) [52] (./analysis/output_tables/observable_controls.tex
+) [53] (./analysis/output_tables/observable_controls.tex
 Overfull \hbox (17.8397pt too wide) in paragraph at lines 6--20
  [][] 
  []
@@ -1019,7 +1019,7 @@ Overfull \hbox (62.7454pt too wide) in paragraph at lines 6--22
  [][] 
  []
 
-) [53] (./analysis/output_tables/newcomer_robustness.tex
+) [54] (./analysis/output_tables/newcomer_robustness.tex
 Overfull \hbox (49.31952pt too wide) in paragraph at lines 6--24
  [][] 
  []
@@ -1029,59 +1029,61 @@ Overfull \hbox (25.12587pt too wide) in paragraph at lines 6--30
  [][] 
  []
 
-) [54] [55] (./analysis/output_tables/score_coding_sensitivity.tex)) [56]
-[57] (./manuscript.aux)
+) [55] [56] (./analysis/output_tables/score_coding_sensitivity.tex)) [57]
+[58] (./manuscript.aux)
  ***********
 LaTeX2e <2025-11-01>
 L3 programming layer <2026-01-19>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 19423 strings out of 469006
- 392413 string characters out of 5454813
- 767939 words of memory out of 5000000
- 47680 multiletter control sequences out of 15000+600000
- 651154 words of font info for 101 fonts, out of 8000000 for 9000
+ 19577 strings out of 469006
+ 395049 string characters out of 5454813
+ 767971 words of memory out of 5000000
+ 47833 multiletter control sequences out of 15000+600000
+ 651930 words of font info for 102 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 89i,15n,107p,3021b,828s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 89i,15n,107p,3021b,906s stack positions out of 10000i,1000n,20000p,200000b,200000s
  </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfou
 r/jknappen/ec/ectt1200.600pk> </Users/lenardstrahringer/Library/texlive/2026bas
 ic/texmf-var/fonts/pk/ljfour/jknappen/ec/tcrm1000.600pk> </Users/lenardstrahrin
-ger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.60
+ger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1095.60
 0pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljf
-our/jknappen/ec/ecrm1095.600pk> </Users/lenardstrahringer/Library/texlive/2026b
-asic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1095.600pk> </Users/lenardstrahr
-inger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.
+our/jknappen/ec/ecti1095.600pk> </Users/lenardstrahringer/Library/texlive/2026b
+asic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1095.600pk> </Users/lenardstrahr
+inger/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1000.
 600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk/l
-jfour/jknappen/ec/ecti1000.600pk> </Users/lenardstrahringer/Library/texlive/202
-6basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1000.600pk> </Users/lenardstra
-hringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm080
+jfour/jknappen/ec/ecbx0800.600pk> </Users/lenardstrahringer/Library/texlive/202
+6basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1000.600pk> </Users/lenardstra
+hringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm100
 0.600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/pk
-/ljfour/jknappen/ec/eccc1200.600pk> </Users/lenardstrahringer/Library/texlive/2
-026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1200.600pk> </Users/lenardst
-rahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1
+/ljfour/jknappen/ec/ecrm0800.600pk> </Users/lenardstrahringer/Library/texlive/2
+026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/eccc1200.600pk> </Users/lenardst
+rahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecti1
 200.600pk> </Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/
-pk/ljfour/jknappen/ec/ecbx1200.600pk> </Users/lenardstrahringer/Library/texlive
-/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecrm1728.600pk></usr/local/tex
-live/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/local
-/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/l
-ocal/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></u
-sr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi12.pfb
-></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.
-pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmm
-i8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/
-cmmib10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmr10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsf
-onts/cm/cmr12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/a
-msfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
-/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/publ
-ic/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/
-public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmsy8.pfb>
-Output written on manuscript.pdf (57 pages, 731749 bytes).
+pk/ljfour/jknappen/ec/ecrm1200.600pk> </Users/lenardstrahringer/Library/texlive
+/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecbx1200.600pk> </Users/lenard
+strahringer/Library/texlive/2026basic/texmf-var/fonts/pk/ljfour/jknappen/ec/ecr
+m1728.600pk></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmbx12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/ams
+fonts/cm/cmex10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public
+/amsfonts/cm/cmmi10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/pu
+blic/amsfonts/cm/cmmi12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type
+1/public/amsfonts/cm/cmmi6.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/t
+ype1/public/amsfonts/cm/cmmi7.pfb></usr/local/texlive/2026basic/texmf-dist/font
+s/type1/public/amsfonts/cm/cmmi8.pfb></usr/local/texlive/2026basic/texmf-dist/f
+onts/type1/public/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026basic/texmf-d
+ist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026basic/texm
+f-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2026basic/t
+exmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026basic
+/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026bas
+ic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/202
+6basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/
+2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb>
+Output written on manuscript.pdf (58 pages, 765311 bytes).
 PDF statistics:
- 1461 PDF objects out of 1728 (max. 8388607)
- 285 compressed objects within 3 object streams
+ 1541 PDF objects out of 1728 (max. 8388607)
+ 294 compressed objects within 3 object streams
  0 named destinations out of 1000 (max. 500000)
  53 words of extra memory for PDF output out of 10000 (max. 10000000)
 
