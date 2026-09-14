@@ -163,7 +163,7 @@ def _estimand_note_text() -> str:
     """Standard footnote sentence (2026-07-14 estimand decision): replaces every
     prior summed-DiD / upper-bound sentence across the output tables."""
     return (
-        r"$\beta_4$ (the answer-arrival increment) is the difference-in-differences "
+        r"$\beta_4$ (the answer-arrival increment) is the DiD "
         r"treatment effect; $\beta_2$ (waiting period) is reported as a parallel-trends "
         r"diagnostic and is not added to the effect."
     )
@@ -188,7 +188,8 @@ def _conventions_note_text() -> str:
 
 
 def _sig_note_text() -> str:
-    return r"$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$"
+    # No leading zero (APA), matching the body prose.
+    return r"$^{***}p<.001$; $^{**}p<.01$; $^{*}p<.05$; $^{\dagger}p<.1$"
 
 
 def _standard_error_note(n_cols: int, bootstrap_available: bool = False) -> str:
@@ -438,7 +439,7 @@ def generate_regression_all_table(
                     + r" \\[4pt]"
                 )
 
-    lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment effect (difference-in-differences): increment at answer arrival ($\beta_4$)}}}} \\")
+    lines.append(rf"\multicolumn{{{n_cols + 1}}}{{@{{}}l}}{{\textit{{Treatment effect (DiD): increment at answer arrival ($\beta_4$)}}}} \\")
     _coef_row(r"\hspace{1em} Answer arrival ($\times$ Post-Answer Received)", "treat_coef", "treat_p", "treat_se")
     _hr_row(r"\hspace{1em} Hazard Ratio [95\% CI]", "arrival_ci_lo", "arrival_ci_hi")
     _bootstrap_overlay()
@@ -556,6 +557,9 @@ def generate_revision_robustness_table(
         ]
         lines += _table_notes_block([
             _conventions_note_text(),
+            # This branch stars the waiting-period column (_sig_stars above), so it
+            # carries the legend; the no-arrival branch below prints no stars.
+            _sig_note_text(),
         ])
         lines.append(r"\end{table}")
         return "\n".join(lines)
@@ -748,7 +752,7 @@ def generate_outcome_decomposition_table(df: pd.DataFrame) -> str:
     lines += _table_notes_block([
         r"Accepting an answer is excluded from the decomposition: it is a self-directed "
         r"act available only to treated users (a control never receives an answer to "
-        r"accept), so the matched difference-in-differences contrast is degenerate for it.",
+        r"accept), so the matched DiD contrast is degenerate for it.",
         _conventions_note_text(),
     ])
     lines.append(r"\end{table}")
@@ -1118,7 +1122,7 @@ def generate_pair_bootstrap_table(df: pd.DataFrame) -> str:
     ]
     lines += _table_notes_block([
         r"Replicates resample whole matched pairs with replacement. "
-        r"HR is the answer-arrival increment $\exp(\beta_4)$, the difference-in-differences treatment effect.",
+        r"HR is the answer-arrival increment $\exp(\beta_4)$, the DiD treatment effect.",
     ])
     lines.append(r"\end{table}")
     return "\n".join(lines)

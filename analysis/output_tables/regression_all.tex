@@ -7,7 +7,7 @@
 \toprule
  & \textbf{Main} & \textbf{Main + Speed} \\
 \midrule
-\multicolumn{3}{@{}l}{\textit{Treatment effect (difference-in-differences): increment at answer arrival ($\beta_4$)}} \\
+\multicolumn{3}{@{}l}{\textit{Treatment effect (DiD): increment at answer arrival ($\beta_4$)}} \\
 \hspace{1em} Answer arrival ($\times$ Post-Answer Received) & 0.0479*** & 0.0373*** \\
  & (0.0026) & (0.0022) \\
 \hspace{1em} Hazard Ratio [95\% CI] & [1.044, 1.054] & [1.034, 1.042] \\[4pt]
@@ -33,6 +33,6 @@ Events & 3,435,973 & 3,435,973 \\
 \textbf{Notes:} Matched-pair bootstrap 95\% CI for the pooled arrival increment is from Table~\ref{tab:pair_bootstrap}.\\
 N counts matched question-level rows (treated $+$ control). The Cox partial likelihood is fit over the person-interval rows expanded from them. The point estimates use the full interval set; only the matched-pair bootstrap replicates (Table~\ref{tab:pair_bootstrap}) draw an 8M-interval-row subsample per replicate.\\
 Estimand ($\beta_4$/$\beta_2$), standard-error, and Events conventions follow Table~\ref{tab:main_results}.\\
-$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
+$^{***}p<.001$; $^{**}p<.01$; $^{*}p<.05$; $^{\dagger}p<.1$
 \end{minipage}
 \end{table}

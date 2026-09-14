@@ -35,6 +35,6 @@ $+$ Full quality controls & Linear & 0.950*** & [0.939, 0.960] & -0.052*** & 4,0
 \raggedright
 \textbf{Notes:} Codings of the answer's vote score, all re-expressing the same control: \emph{Linear} is the control tabled in Table~\ref{tab:answer_quality_robustness} (raw \emph{Score} winsorized at the 5th/95th percentiles and standardized); \emph{Asinh} is the inverse hyperbolic sine $\mathrm{asinh}(\mathrm{score})=\ln(\mathrm{score}+\sqrt{\mathrm{score}^2+1})$ (a signed log, concave in the score and defined for the negative scores present), likewise winsorized and standardized; \emph{Ordinal bins} are indicators for 1--2, 3--9, and $\ge 10$ votes (reference score $\le 0$). Arrival-HR stars test $H_0$: HR $=1$. The bin reference is score $\le 0$ and the concave coding uses asinh rather than $\log(1+\mathrm{score})$ because roughly two million answers carry net-negative (downvoted) scores, for which $\log(1+\mathrm{score})$ is undefined.\\
 Estimand ($\beta_4$/$\beta_2$), standard-error, and Events conventions follow Table~\ref{tab:main_results}.\\
-$^{***}p<0.001$; $^{**}p<0.01$; $^{*}p<0.05$; $^{\dagger}p<0.1$
+$^{***}p<.001$; $^{**}p<.01$; $^{*}p<.05$; $^{\dagger}p<.1$
 \end{minipage}
 \end{table}
