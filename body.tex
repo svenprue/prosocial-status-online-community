@@ -227,13 +227,14 @@ Figure~\ref{fig:sample_flow} traces these steps from the public dump to the matc
 \begin{tikzpicture}[
   font=\footnotesize,
   >=stealth,
-  box/.style={draw, rounded corners=2pt, align=center, inner sep=4pt, fill=blue!6},
+  line width=0.4pt,
+  box/.style={draw=black, line width=0.4pt, align=center, inner sep=4pt, fill=white},
   arm/.style={box, text width=0.42\textwidth},
   wide/.style={box, text width=0.90\textwidth},
-  drop/.style={draw, rounded corners=2pt, align=left, inner sep=4pt,
-               fill=gray!8, text width=0.42\textwidth, font=\scriptsize},
-  flow/.style={->, thick, gray!70!black},
-  side/.style={->, thick, gray, dashed},
+  drop/.style={draw=black, line width=0.4pt, align=left, inner sep=4pt,
+               fill=white, text width=0.42\textwidth, font=\scriptsize},
+  flow/.style={->, line width=0.4pt, black},
+  side/.style={->, line width=0.4pt, black, dashed},
 ]
 
 \node[wide] (src) {Non-deleted Stack Overflow questions, 31 July 2008 -- 1 April 2025};
@@ -262,12 +263,12 @@ Figure~\ref{fig:sample_flow} traces these steps from the public dump to the matc
 
 \node[arm, below=9mm of tarm] (telig)
   {\textbf{Eligible for matching:} 12,290,847\\[1pt]
-   {\scriptsize $-$\,3,743,252 with no valid exact stratum\\
-   or incomplete matching covariates}};
+   {\scriptsize $-$\,3,743,252 in year--tag cells below\\
+   the 300-question minimum}};
 \node[arm, below=9mm of carm] (celig)
   {\textbf{Eligible for matching:} 3,345,139\\[1pt]
-   {\scriptsize $-$\,1,654,191 with no valid exact stratum\\
-   or incomplete matching covariates}};
+   {\scriptsize $-$\,1,654,191 in year--tag cells below\\
+   the 300-question minimum}};
 
 \node[arm, below=9mm of telig] (tmatch)
   {\textbf{Matched:} 12,174,880 treated (99.1\%)\\[1pt]
@@ -294,8 +295,8 @@ Figure~\ref{fig:sample_flow} traces these steps from the public dump to the matc
 \draw[flow] (telig) -- (tmatch);
 \draw[flow] (celig) -- (cmatch);
 \coordinate (join) at ($(matched.north)+(0,6mm)$);
-\draw[thick, gray!70!black] (tmatch.south) |- (join);
-\draw[thick, gray!70!black] (cmatch.south) |- (join);
+\draw[line width=0.4pt, black] (tmatch.south) |- (join);
+\draw[line width=0.4pt, black] (cmatch.south) |- (join);
 \draw[flow] (join) -- (matched.north);
 \draw[flow] (matched) -- (cox);
 \end{tikzpicture}
