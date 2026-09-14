@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  4 AUG 2026 18:49
+This is pdfTeX, Version 3.141592653-2.6-1.40.29 (TeX Live 2026) (preloaded format=pdflatex 2026.4.22)  13 SEP 2026 20:30
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -925,28 +925,332 @@ Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 2
 \Hy@SectionHShift=\skip66
 )
 Package hyperref Info: Option `colorlinks' set `true' on input line 53.
+ (/usr/local/texlive/2026basic/texmf-dist/tex/latex/tools/verbatim.sty
+Package: verbatim 2024-01-22 v1.5x LaTeX2e package for verbatim enhancements
+\every@verbatim=\toks46
+\verbatim@line=\toks47
+\verbatim@in@stream=\read4
+) (/Users/lenardstrahringer/Library/texmf/tex/latex/import/import.sty
+Package: import 2020/04/01  v 6.2
+)
+(/Users/lenardstrahringer/Library/texmf/tex/latex/titling/titling.sty
+Package: titling 2009/09/04 v2.1d maketitle typesetting
+\thanksmarkwidth=\skip67
+\thanksmargin=\skip68
+\droptitle=\skip69
+)
+(/usr/local/texlive/2026basic/texmf-dist/tex/latex/l3backend/l3backend-pdftex.d
+ef
+File: l3backend-pdftex.def 2025-10-09 L3 backend support: PDF output (pdfTeX)
+\l__color_backend_stack_int=\count363
+) (./main.aux)
+\openout1 = `main.aux'.
+
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 83.
+LaTeX Font Info:    ... okay on input line 83.
+
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+*geometry* verbose mode - [ preamble ] result:
+* driver: pdftex
+* paper: letterpaper
+* layout: <same size as paper>
+* layoutoffset:(h,v)=(0.0pt,0.0pt)
+* modes: 
+* h-part:(L,W,R)=(72.26999pt, 469.75502pt, 72.26999pt)
+* v-part:(T,H,B)=(72.26999pt, 650.43001pt, 72.26999pt)
+* \paperwidth=614.295pt
+* \paperheight=794.96999pt
+* \textwidth=469.75502pt
+* \textheight=650.43001pt
+* \oddsidemargin=0.0pt
+* \evensidemargin=0.0pt
+* \topmargin=-37.0pt
+* \headheight=12.0pt
+* \headsep=25.0pt
+* \topskip=12.0pt
+* \footskip=30.0pt
+* \marginparwidth=44.0pt
+* \marginparsep=10.0pt
+* \columnsep=10.0pt
+* \skip\footins=10.8pt plus 4.0pt minus 2.0pt
+* \hoffset=0.0pt
+* \voffset=0.0pt
+* \mag=1000
+* \@twocolumnfalse
+* \@twosidefalse
+* \@mparswitchfalse
+* \@reversemarginfalse
+* (1in=72.27pt=25.4mm, 1cm=28.453pt)
+
+(/usr/local/texlive/2026basic/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+\scratchcounter=\count364
+\scratchdimen=\dimen337
+\scratchbox=\box124
+\nofMPsegments=\count365
+\nofMParguments=\count366
+\everyMPshowfont=\toks48
+\MPscratchCnt=\count367
+\MPscratchDim=\dimen338
+\MPnumerator=\count368
+\makeMPintoPDFobject=\count369
+\everyMPtoPDFconversion=\toks49
+)
+(/usr/local/texlive/2026basic/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.s
+ty
+Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
+Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
+85.
+
+(/usr/local/texlive/2026basic/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
+File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
+e
+))
+Package caption Info: Begin \AtBeginDocument code.
+Package caption Info: hyperref package is loaded.
+Package caption Info: longtable package is loaded.
+ (/usr/local/texlive/2026basic/texmf-dist/tex/latex/caption/ltcaption.sty
+Package: ltcaption 2021/01/08 v1.4c longtable captions (AR)
+)
+Package caption Info: threeparttable package is loaded.
+Package caption Info: End \AtBeginDocument code.
+Package hyperref Info: Link coloring ON on input line 83.
+
+(./main.out) (./main.out)
+\@outlinefile=\write4
+\openout4 = `main.out'.
+
+LaTeX Font Info:    Trying to load font information for U+msa on input line 87.
 
 
-! LaTeX Error: File `todonotes.sty' not found.
+(/usr/local/texlive/2026basic/texmf-dist/tex/latex/amsfonts/umsa.fd
+File: umsa.fd 2013/01/14 v3.01 AMS symbols A
+)
+LaTeX Font Info:    Trying to load font information for U+msb on input line 87.
 
-Type X to quit or <RETURN> to proceed,
-or enter new name. (Default extension: sty)
 
-Enter file name: 
-! Emergency stop.
-<read *> 
-         
-l.57 \usepackage
-                {verbatim}^^M
-*** (cannot \read from terminal in nonstop modes)
+(/usr/local/texlive/2026basic/texmf-dist/tex/latex/amsfonts/umsb.fd
+File: umsb.fd 2013/01/14 v3.01 AMS symbols B
+)
+LaTeX Font Info:    Trying to load font information for TS1+ppl on input line 8
+7.
 
- 
+(/Users/lenardstrahringer/Library/texmf/tex/latex/psnfss/ts1ppl.fd
+File: ts1ppl.fd 2001/06/04 font definitions for TS1/ppl.
+) [1
+
+{/Users/lenardstrahringer/Library/texlive/2026basic/texmf-var/fonts/map/pdftex/
+updmap/pdftex.map}{/usr/local/texlive/2026basic/texmf-dist/fonts/enc/dvips/base
+/8r.enc}] (./body.tex
+Overfull \hbox (2.04051pt too wide) in paragraph at lines 11--12
+[]\OT1/ppl/m/n/12 We de-velop two the-o-ret-i-cal pre-dic-tions along-side the 
+ba-sic reci-procity hy-poth-e-sis (H1).
+ []
+
+[2] [3] [4] [5] [6] [7]
+Overfull \hbox (0.75966pt too wide) in paragraph at lines 106--107
+\OT1/ppl/m/n/12 swer-ers are typ-i-cally dif-fer-ent in-di-vid-u-als, which mak
+es the plat-form well suited to study-
+ []
+
+[8] [9] [10] [11] [12] [13] [14] [15]
+Overfull \hbox (3.28683pt too wide) in paragraph at lines 375--375
+[]|\OT1/ppl/m/n/10.95 numQuestionsAskedAT| 
+ []
+
+
+Overfull \hbox (8.2912pt too wide) in paragraph at lines 379--379
+[]|\OT1/ppl/m/n/10.95 numQuestionsAsked30D| 
+ []
+
+
+Overfull \hbox (2.81621pt too wide) in paragraph at lines 383--383
+[]|\OT1/ppl/m/n/10.95 numQuestionsAsked7D| 
+ []
+
+[16] [17]
+Overfull \hbox (13.33888pt too wide) detected at line 453
+ []$[]  \OML/cmm/m/it/12 h\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t \OMS/cmsy/m/n/12 
+j \OT1/cmr/bx/n/12 X\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 )) = \OM
+L/cmm/m/it/12 h[]\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 ) [] []\OML
+/cmm/m/it/12 ^^L[] \OMS/cmsy/m/n/12 ^^A [] \OT1/cmr/m/n/12 + \OML/cmm/m/it/12 ^
+^L[] \OMS/cmsy/m/n/12 ^^A []\OT1/cmr/m/n/12 (\OML/cmm/m/it/12 t\OT1/cmr/m/n/12 
+) + \OML/cmm/m/it/12 ^^L[] \OMS/cmsy/m/n/12 ^^A []\OT1/cmr/m/n/12 (\OML/cmm/m/i
+t/12 t\OT1/cmr/m/n/12 )$ 
+ []
+
+[18]
+Overfull \hbox (11.00769pt too wide) in paragraph at lines 467--468
+\OT1/ppl/m/n/12 across lev-els of user ex-pe-ri-ence, pro-vid-ing a non-para-me
+t-ric view of how reci-procity changes
+ []
+
+[19] (./analysis/output_tables/desc_stats.tex) [20]
+<analysis/output_figures/help_rate_pooled.pdf, id=473, 570.48068pt x 317.6555pt
+>
+File: analysis/output_figures/help_rate_pooled.pdf Graphic file (type pdf)
+<use analysis/output_figures/help_rate_pooled.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_pooled.pdf  used on 
+input line 498.
+(pdftex.def)             Requested size: 338.22418pt x 188.3312pt.
+<analysis/output_figures/help_rate_adoption_pooled.pdf, id=474, 569.44495pt x 3
+17.56894pt>
+File: analysis/output_figures/help_rate_adoption_pooled.pdf Graphic file (type 
+pdf)
+<use analysis/output_figures/help_rate_adoption_pooled.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_adoption_pooled.pdf 
+ used on input line 507.
+(pdftex.def)             Requested size: 338.22418pt x 188.61908pt.
+ [21] [22 <./analysis/output_figures/help_rate_pooled.pdf> <./analysis/output_f
+igures/help_rate_adoption_pooled.pdf>] (./analysis/output_tables/regression_all
+.tex) [23]
+(./analysis/output_tables/composite_outcome.tex [24]) [25]
+<analysis/output_figures/strength_rec.pdf, id=636, 570.73976pt x 352.3608pt>
+File: analysis/output_figures/strength_rec.pdf Graphic file (type pdf)
+<use analysis/output_figures/strength_rec.pdf>
+Package pdftex.def Info: analysis/output_figures/strength_rec.pdf  used on inpu
+t line 546.
+(pdftex.def)             Requested size: 469.75502pt x 290.02379pt.
+
+
+LaTeX Warning: `h' float specifier changed to `ht'.
+
+[26] [27 <./analysis/output_figures/strength_rec.pdf>]
+(./analysis/output_tables/main_results.tex) [28] [29
+
+
+]
+(./analysis/output_tables/speed_results.tex) [30]
+<analysis/output_figures/interaction_effect.pdf, id=748, 641.03491pt x 584.4459
+4pt>
+File: analysis/output_figures/interaction_effect.pdf Graphic file (type pdf)
+<use analysis/output_figures/interaction_effect.pdf>
+Package pdftex.def Info: analysis/output_figures/interaction_effect.pdf  used o
+n input line 579.
+(pdftex.def)             Requested size: 432.17375pt x 394.02025pt.
+
+(./analysis/output_tables/response_time_bins.tex) [31
+
+
+] [32 <./analysis/output_figures/interaction_effect.pdf>] [33] [34]
+Overfull \hbox (10.4675pt too wide) in paragraph at lines 634--635
+\OT1/ppl/m/n/12 tude: that faster help pro-duces stronger reci-procity. That mu
+ch fits an emotional-immediacy
+ []
+
+[35] (./analysis/output_tables/absolute_effects.tex) [36] [37] [38]) [39]
+(./main.bbl [40] [41]
+LaTeX Font Info:    Trying to load font information for OT1+pcr on input line 1
+43.
+
+(/Users/lenardstrahringer/Library/texmf/tex/latex/psnfss/ot1pcr.fd
+File: ot1pcr.fd 2001/06/04 font definitions for OT1/pcr.
+) [42])
+[43] (./appendix.tex
+<matching/common_support.pdf, id=934, 722.7pt x 361.35pt>
+File: matching/common_support.pdf Graphic file (type pdf)
+<use matching/common_support.pdf>
+Package pdftex.def Info: matching/common_support.pdf  used on input line 31.
+(pdftex.def)             Requested size: 469.75502pt x 234.88023pt.
+<matching/love_plot.pdf, id=936, 578.16pt x 433.62pt>
+File: matching/love_plot.pdf Graphic file (type pdf)
+<use matching/love_plot.pdf>
+Package pdftex.def Info: matching/love_plot.pdf  used on input line 40.
+(pdftex.def)             Requested size: 469.75502pt x 352.31538pt.
+ [44 <./matching/common_support.pdf>] [45 <./matching/love_plot.pdf>]
+<analysis/output_figures/help_rate_by_tenure.pdf, id=1046, 715.00879pt x 859.68
+051pt>
+File: analysis/output_figures/help_rate_by_tenure.pdf Graphic file (type pdf)
+<use analysis/output_figures/help_rate_by_tenure.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_by_tenure.pdf  used 
+on input line 59.
+(pdftex.def)             Requested size: 469.75502pt x 564.80672pt.
+<analysis/output_figures/help_rate_adoption_by_tenure.pdf, id=1050, 714.02133pt
+ x 1030.28284pt>
+File: analysis/output_figures/help_rate_adoption_by_tenure.pdf Graphic file (ty
+pe pdf)
+<use analysis/output_figures/help_rate_adoption_by_tenure.pdf>
+Package pdftex.def Info: analysis/output_figures/help_rate_adoption_by_tenure.p
+df  used on input line 68.
+(pdftex.def)             Requested size: 405.69986pt x 585.39655pt.
+
+
+LaTeX Warning: Float too large for page by 31.96652pt on input line 71.
+
+[46] [47 <./analysis/output_figures/help_rate_by_tenure.pdf>] [48 <./analysis/o
+utput_figures/help_rate_adoption_by_tenure.pdf>]
+(./analysis/output_tables/estimation_samples.tex)
+(./analysis/output_tables/pair_bootstrap.tex) [49]
+(./analysis/output_tables/cohort_robustness.tex) [50]
+(./analysis/output_tables/observable_controls.tex)
+(./analysis/output_tables/answer_quality_robustness.tex) [51]
+(./analysis/output_tables/newcomer_robustness.tex)
+Overfull \hbox (1.81656pt too wide) in paragraph at lines 112--113
+\OT1/ppl/m/n/12 and length). Be-cause each row al-ready con-di-tions on a respo
+nse-time win-dow, the quality-
+ []
+
+[52] (./analysis/output_tables/response_time_bins_quality.tex) [53]
+(./analysis/output_tables/score_coding_sensitivity.tex)) [54] [55] (./main.aux)
+ ***********
+LaTeX2e <2025-11-01>
+L3 programming layer <2026-01-19>
+ ***********
+Package rerunfilecheck Info: File `main.out' has not changed.
+(rerunfilecheck)             Checksum: 547A0FD055B764E951AE21C057157B0B;7645.
+ ) 
 Here is how much of TeX's memory you used:
- 25552 strings out of 469006
- 483343 string characters out of 5454813
- 877830 words of memory out of 5000000
- 53839 multiletter control sequences out of 15000+600000
- 628446 words of font info for 42 fonts, out of 8000000 for 9000
+ 27503 strings out of 469006
+ 524078 string characters out of 5454813
+ 923022 words of memory out of 5000000
+ 55461 multiletter control sequences out of 15000+600000
+ 662041 words of font info for 134 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
- 84i,0n,104p,468b,95s stack positions out of 10000i,1000n,20000p,200000b,200000s
-!  ==> Fatal error occurred, no output PDF file produced!
+ 84i,15n,104p,3017b,921s stack positions out of 10000i,1000n,20000p,200000b,200000s
+
+pdfTeX warning (dest): name{Hfootnote.1} has been referenced but does not exist
+, replaced by a fixed one
+
+</usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.
+pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm/cme
+x10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfonts/cm
+/cmmi10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmmi12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/ams
+fonts/cm/cmmi7.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/public/
+amsfonts/cm/cmmi8.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmmib10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/type1
+/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2026basic/texmf-dist/fonts/ty
+pe1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2026basic/texmf-dist/fonts
+/type1/public/amsfonts/cm/cmr7.pfb></usr/local/texlive/2026basic/texmf-dist/fon
+ts/type1/public/amsfonts/cm/cmr8.pfb></usr/local/texlive/2026basic/texmf-dist/f
+onts/type1/public/amsfonts/cm/cmsy10.pfb></usr/local/texlive/2026basic/texmf-di
+st/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/local/texlive/2026basic/texmf
+-dist/fonts/type1/public/amsfonts/cm/cmsy8.pfb></Users/lenardstrahringer/Librar
+y/texmf/fonts/type1/urw/courier/ucrr8a.pfb></Users/lenardstrahringer/Library/te
+xmf/fonts/type1/urw/palatino/uplb8a.pfb></Users/lenardstrahringer/Library/texmf
+/fonts/type1/urw/palatino/uplr8a.pfb></Users/lenardstrahringer/Library/texmf/fo
+nts/type1/urw/palatino/uplri8a.pfb>
+Output written on main.pdf (55 pages, 654322 bytes).
+PDF statistics:
+ 1421 PDF objects out of 1440 (max. 8388607)
+ 818 compressed objects within 9 object streams
+ 168 named destinations out of 1000 (max. 500000)
+ 333 words of extra memory for PDF output out of 10000 (max. 10000000)
+
