@@ -458,12 +458,13 @@ def plot_help_rate_one_panel(
         ta_days = median_ta_hours / 24.0
         ax.axvline(ta_days, color="gray", linestyle=":", linewidth=0.7, alpha=0.9, label="Median answer ($T_A$)")
 
-    ax.set_xlabel("Time relative to question (days)")
-    ax.set_ylabel("Help rate (norm. to baseline)" if use_normalized else "Help rate (answers per user per hour)")
+    ax.set_xlabel("Time relative to question (days)", fontsize=11)
+    ax.set_ylabel("Help rate (norm. to baseline)" if use_normalized else "Help rate (answers per user per hour)", fontsize=11)
     if show_ci and min_yerr_frac > 0:
-        ax.text(0.02, 0.98, "95% CI (min. length for visibility)", transform=ax.transAxes, fontsize=6, va="top", color="gray")
-    ax.set_title(tenure_label)
-    ax.legend(loc="upper right", fontsize=8)
+        ax.text(0.02, 0.98, "95% CI (min. length for visibility)", transform=ax.transAxes, fontsize=8, va="top", color="gray")
+    ax.set_title(tenure_label, fontsize=12)
+    ax.legend(loc="upper right", fontsize=10)
+    ax.tick_params(axis="both", labelsize=10)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xlim(xlim_days[0], xlim_days[1])
@@ -596,26 +597,26 @@ def _plot_adoption_one_panel(
         label="Share with answer", zorder=2,
     )
     if show_share_ylabel:
-        ax2.set_ylabel("Share with answer", fontsize=9, color="#2d7a3e")
-    ax2.tick_params(axis="y", labelcolor="#2d7a3e", labelsize=8)
+        ax2.set_ylabel("Share with answer", fontsize=11, color="#2d7a3e")
+    ax2.tick_params(axis="y", labelcolor="#2d7a3e", labelsize=10)
     ax2.set_ylim(0, 1.05)
     ax2.spines["right"].set_visible(True)
     ax2.spines["right"].set_color("#2d7a3e")
 
     ax.axvline(0, color="black", linestyle="--", linewidth=0.8, alpha=0.7)
-    ax.set_xlabel("Hours since question", fontsize=9)
-    ax.set_ylabel("Help rate (per user per hour)", fontsize=9)
-    ax.set_title(title, fontsize=10)
+    ax.set_xlabel("Hours since question", fontsize=11)
+    ax.set_ylabel("Help rate (per user per hour)", fontsize=11)
+    ax.set_title(title, fontsize=12)
     if show_legend:
         lines1, labels1 = ax.get_legend_handles_labels()
         lines2, labels2 = ax2.get_legend_handles_labels()
-        ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=7)
+        ax.legend(lines1 + lines2, labels1 + labels2, loc="upper right", fontsize=10)
     ax.set_xlim(xlim_hours[0], xlim_hours[1])
     ax.set_ylim(bottom=0)
     ax.grid(True, alpha=0.3, linestyle="-")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.tick_params(axis="both", labelsize=8)
+    ax.tick_params(axis="both", labelsize=10)
 
 
 def plot_adoption_pooled(
@@ -687,7 +688,7 @@ def plot_adoption_by_tenure(
         ax = axes.flat[i]
         tl_b = timelines[timelines["tenure_bucket"] == bucket]
         if tl_b.empty:
-            ax.set_title(bucket)
+            ax.set_title(bucket, fontsize=12)
             ax.set_visible(True)
             continue
         rates_b = compute_binned_rates_adoption(
