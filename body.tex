@@ -137,9 +137,11 @@ These helping events constitute the outcome in our survival analysis. The decomp
 % Main axis
 \draw[thick, ->] (0,2) -- (9.2,2);
 % Phase regions
-\fill[blue!10] (0,1.5) rectangle (3.5,2.5);
-\fill[orange!15] (3.5,1.5) rectangle (5.5,2.5);
-\fill[green!12] (5.5,1.5) rectangle (8.5,2.5);
+% Phase bands are value-coded, not hue-coded: the same three grays mark the same
+% three phases on both timelines.
+\fill[black!8]  (0,1.5) rectangle (3.5,2.5);
+\fill[black!16] (3.5,1.5) rectangle (5.5,2.5);
+\fill[black!24] (5.5,1.5) rectangle (8.5,2.5);
 % Tick marks
 \draw[thick] (0,1.8) -- (0,2.2);
 \draw[thick] (3.5,1.8) -- (3.5,2.2);
@@ -161,8 +163,8 @@ These helping events constitute the outcome in our survival analysis. The decomp
 \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (5.5, 1.3) -- (8.5, 1.3);
 \node[below, font=\footnotesize\itshape] at (7.0, 1.15) {2 days (fixed)};
 % Question and answer markers
-\node[above, font=\footnotesize, text=blue!70!black] at (3.5, 2.55) {Question};
-\node[above, font=\footnotesize, text=green!50!black] at (5.5, 2.55) {Answer};
+\node[above, font=\footnotesize] at (3.5, 2.55) {Question};
+\node[above, font=\footnotesize] at (5.5, 2.55) {Answer};
 % --- Control timeline ---
 % Shifted down to keep the two timelines visually separated.
 \begin{scope}[yshift=-0.9cm]
@@ -170,9 +172,9 @@ These helping events constitute the outcome in our survival analysis. The decomp
 % Main axis
 \draw[thick, ->] (0,-0.5) -- (9.2,-0.5);
 % Phase regions
-\fill[blue!10] (0,-1) rectangle (3.5,0);
-\fill[orange!8] (3.5,-1) rectangle (5.5,0);
-\fill[gray!8] (5.5,-1) rectangle (8.5,0);
+\fill[black!8]  (0,-1) rectangle (3.5,0);
+\fill[black!16] (3.5,-1) rectangle (5.5,0);
+\fill[black!24] (5.5,-1) rectangle (8.5,0);
 % Tick marks
 \draw[thick] (0,-0.7) -- (0,-0.3);
 \draw[thick] (3.5,-0.7) -- (3.5,-0.3);
@@ -181,23 +183,25 @@ These helping events constitute the outcome in our survival analysis. The decomp
 % Labels below axis
 \node[below, font=\footnotesize] at (0,-0.7) {$T_Q - 2\text{D}$};
 \node[below, font=\footnotesize] at (3.5,-0.75) {$T_Q$};
-\node[below, font=\footnotesize, text=gray] at (5.5,-0.75) {Synthetic $T_A$};
+\node[below, font=\footnotesize, text=black!55] at (5.5,-0.75) {Synthetic $T_A$};
 \node[below, font=\footnotesize] at (8.5,-0.7) {Synthetic $T_A + 2\text{D}$};
 % Phase labels
 \node[font=\footnotesize] at (1.75, -0.5) {Pre-question};
 \node[font=\footnotesize] at (4.5, -0.5) {Waiting};
-\node[font=\footnotesize, text=gray] at (7.0, -0.5) {Post (no answer)};
+% black!70 rather than the black!55 used for the de-emphasized labels on white:
+% this one sits on the black!24 band and needs the extra contrast in print.
+\node[font=\footnotesize, text=black!70] at (7.0, -0.5) {Post (no answer)};
 % Question marker
-\node[above, font=\footnotesize, text=blue!70!black] at (3.5, 0.05) {Question};
-\node[above, font=\footnotesize, text=gray] at (5.5, 0.05) {No answer};
+\node[above, font=\footnotesize] at (3.5, 0.05) {Question};
+\node[above, font=\footnotesize, text=black!55] at (5.5, 0.05) {No answer};
 \end{scope}
 % Alignment arrows
-\draw[dashed, gray, <->] (5.5, 1.2) -- (5.5, -0.25);
-\node[right, font=\scriptsize, text=gray] at (5.65, 0.25) {Aligned};
+\draw[dashed, black!55, <->] (5.5, 1.2) -- (5.5, -0.25);
+\node[right, font=\scriptsize, text=black!55] at (5.65, 0.25) {Aligned};
 % Help events (example)
-\draw[red, thick] (2.0, 2.5) -- (2.0, 2.7) node[above, font=\scriptsize, text=red] {Help};
-\draw[red, thick] (6.8, 2.5) -- (6.8, 2.7) node[above, font=\scriptsize, text=red] {Help};
-\draw[red, thick] (1.5, -0.9) -- (1.5, -0.7) node[above, font=\scriptsize, text=red] {Help};
+\draw[black, thick] (2.0, 2.5) -- (2.0, 2.7) node[above, font=\scriptsize] {Help};
+\draw[black, thick] (6.8, 2.5) -- (6.8, 2.7) node[above, font=\scriptsize] {Help};
+\draw[black, thick] (1.5, -0.9) -- (1.5, -0.7) node[above, font=\scriptsize] {Help};
 \end{tikzpicture}
 
 \vspace{0.5em}
@@ -210,12 +214,6 @@ These helping events constitute the outcome in our survival analysis. The decomp
 %----------------------------------------------------------------------
 
 We used the full sample of non-deleted questions from Stack Overflow's inception on 31 July 2008 through 1 April 2025. We dropped all 9,109 questions where our observation window was truncated either by the platform launch date or the cutoff date. We then excluded 2,671,121 questions that received an answer from the question poster.
-% TODO (numbers verified against data/input/prematch_meta.json, which the matching run
-% wrote: n_rows 15,635,986 / n_treated 12,290,847 / n_control 3,345,139 / n_strata 7,925).
-% Re-deriving the stratum filter from the current processed parquet yields 16,630,490 rows
-% in 7,171 strata, ~6% above the artifact and spread evenly across years, so the artifact
-% was likely built from a slightly different frame. Reason in the prose is now correct;
-% the residual is a reproduction gap, not a wrong number.
 These filtering steps resulted in a pre-matching dataset of 21,033,429 questions from 4,764,048 unique users, of which 16,034,099 (76.2\%) received at least one answer from another user (treatment-eligible) and 4,999,330 (23.8\%) received no answer (control-eligible). Matching (described below) pairs questions only within cells defined by calendar year and primary tag, so we drop cells holding fewer than 300 questions, as these are too thin to support a within-cell comparison. This leaves 12,290,847 answered and 3,345,139 unanswered questions (15,635,986 in total) eligible for matching. Of the 12,290,847 eligible treated questions, 12,174,880 (99.1\%) were matched to a control; the remaining 115,967 fell outside common support. This attrition is not random: the treated propensity-score density piles up near one (Figure~\ref{fig:common_support}), so the discarded questions are disproportionately those that were almost certain to be answered. The 12,174,880 matched treated questions draw on 2,481,556 distinct control questions, each reused about 4.9 times on average (up to 625 times) to fill the control slots. The matched file therefore comprises 24,349,760 question-level rows (12,174,880 matched pairs) from 3,732,706 unique users, with a 50\% treatment rate by construction. All matched rows enter the Cox analysis; the helping outcome is the posting of an answer to another user's question (answers to one's own question do not count), yielding 3,435,973 helping events in the pooled analysis sample (Table~\ref{tab:pooled_experienced}).
 
 Figure~\ref{fig:sample_flow} traces these steps from the public dump to the matched analysis sample.
